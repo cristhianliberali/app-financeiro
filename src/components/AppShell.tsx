@@ -1,0 +1,140 @@
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useEffect, type ReactNode } from "react";
+import {
+  LayoutDashboard,
+  ArrowLeftRight,
+  Tags,
+  TrendingUp,
+  Target,
+  LogOut,
+  ChevronDown,
+} from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useAppState } from "@/lib/app-state";
+import { useProfiles } from "@/lib/data";
+import { PeriodControls } from "@/components/PeriodControls";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const nav = [
+  { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/transacoes", label: "Transações", icon: ArrowLeftRight },
+  { to: "/categorias", label: "Categorias", icon: Tags },
+  { to: "/investimentos", label: "Investimentos", icon: TrendingUp },
+  { to: "/metas", label: "Metas", icon: Target },
+] as const;
+
+export function AppShell({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
+  const { session, loading } = useAuth();
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { profileId, setProfileId } = useAppState();
+  const { data: profiles } = useProfiles();
+
+  useEffect(() => {
+    if (!loading && !session) navigate({ to: "/auth" });
+  }, [loading, session, navigate]);
+
+  useEffect(() => {
+    if (profiles?.length && !profiles.some((p) => p.id === profileId)) {
+      setProfileId((profiles.find((p) => p.is_default) ?? profiles[0]!).id);
+    }
+  }, [profiles, profileId, setProfileId]);
+
+  const current = profiles?.find((p) => p.id === profileId);
+
+  if (loading || !session) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+        Carregando…
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <aside className="fixed left-0 top-0 z-10 hidden h-full w-64 flex-col border-r border-border bg-card p-6 lg:flex">
+        <div className="mb-10 flex items-center gap-2">
+          <div className="size-8 rounded-lg bg-primary" />
+          <span className="text-xl font-bold tracking-tight">AURA</span>
+        </div>
+        <nav className="space-y-1">
+          {nav.map((item) => {
+            const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                  active
+                    ? "bg-secondary font-medium text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <item.icon className="size-4" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="mt-auto space-y-4">
+          <div className="rounded-xl border border-primary/10 bg-primary/5 p-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
+              Perfil ativo
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Os lançamentos, categorias e metas exibidos pertencem ao perfil{" "}
+              <span className="font-semibold text-foreground">{current?.name ?? "—"}</span>.
+            </p>
+          </div>
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              navigate({ to: "/auth" });
+            }}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <LogOut className="size-4" /> Sair
+          </button>
+        </div>
+      </aside>
+
+      <main className="lg:pl-64">
+        <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-card/80 px-4 py-3 backdrop-blur-md lg:px-8">
+          <div className="flex flex-wrap items-center gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary">
+                <span
+                  className="size-2 rounded-full"
+                  style={{ backgroundColor: current?.color ?? "#3B82F6" }}
+                />
+                Perfil: {current?.name ?? "—"}
+                <ChevronDown className="size-3 opacity-50" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {profiles?.map((p) => (
+                  <DropdownMenuItem key={p.id} onClick={() => setProfileId(p.id)}>
+                    <span
+                      className="mr-2 size-2 rounded-full"
+                      style={{ backgroundColor: p.color }}
+                    />
+                    {p.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <div className="hidden h-4 w-px bg-border sm:block" />
+            <PeriodControls />
+          </div>
+          <div className="flex items-center gap-2">{actions}</div>
+        </header>
+        <div className="mx-auto max-w-7xl space-y-6 p-4 lg:p-8">{children}</div>
+      </main>
+    </div>
+  );
+}
