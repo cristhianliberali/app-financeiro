@@ -87,25 +87,39 @@ const DEFAULT_CATEGORIES: Array<Omit<Category, "id" | "profile_id">> = [
   { name: "Freelance", kind: "income", color: "#22C55E", emoji: "🧾", monthly_cap: null },
 ];
 
-export function useProfiles() {
+export function useProfiles(accountId: string | null) {
   const qc = useQueryClient();
   return useQuery({
-    queryKey: ["profiles"],
+    queryKey: ["profiles", accountId],
+    enabled: !!accountId,
     queryFn: async (): Promise<BudgetProfile[]> => {
       const uid = await userId();
       const { data, error } = await supabase
         .from("budget_profiles")
         .select("id,name,color,is_default")
+        .eq("account_id", accountId!)
         .order("created_at");
       if (error) throw error;
       if (data && data.length > 0) return data as BudgetProfile[];
 
-      // Bootstrap: primeiro acesso cria os perfis e categorias padrão
+      // Bootstrap: primeiro acesso da conta cria perfis e categorias padrão
       const { data: created, error: e2 } = await supabase
         .from("budget_profiles")
         .insert([
-          { user_id: uid, name: "Pessoal", color: "#3B82F6", is_default: true },
-          { user_id: uid, name: "Empresa", color: "#10B981", is_default: false },
+          {
+            user_id: uid,
+            account_id: accountId!,
+            name: "Pessoal",
+            color: "#3B82F6",
+            is_default: true,
+          },
+          {
+            user_id: uid,
+            account_id: accountId!,
+            name: "Empresa",
+            color: "#10B981",
+            is_default: false,
+          },
         ])
         .select("id,name,color,is_default");
       if (e2) throw e2;
@@ -119,6 +133,7 @@ export function useProfiles() {
     },
   });
 }
+
 
 export function useCategories(profileId: string | null) {
   return useQuery({
