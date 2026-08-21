@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAppState } from "@/lib/app-state";
 import { useAcceptInvite, useInvitePreview } from "@/lib/accounts";
 
-type Search = { token?: string };
+type Search = { token?: string | undefined };
 
 export const Route = createFileRoute("/convite")({
   validateSearch: (search: Record<string, unknown>): Search => ({

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CategoriasRouteImport } from './routes/categorias'
 import { Route as ContaRouteImport } from './routes/conta'
+import { Route as ConviteRouteImport } from './routes/convite'
 import { Route as InvestimentosRouteImport } from './routes/investimentos'
 import { Route as MetasRouteImport } from './routes/metas'
 import { Route as TransacoesRouteImport } from './routes/transacoes'
@@ -37,6 +38,11 @@ const ContaRoute = ContaRouteImport.update({
   path: '/conta',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConviteRoute = ConviteRouteImport.update({
+  id: '/convite',
+  path: '/convite',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InvestimentosRoute = InvestimentosRouteImport.update({
   id: '/investimentos',
   path: '/investimentos',
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/categorias': typeof CategoriasRoute
   '/conta': typeof ContaRoute
+  '/convite': typeof ConviteRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
   '/transacoes': typeof TransacoesRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/categorias': typeof CategoriasRoute
   '/conta': typeof ContaRoute
+  '/convite': typeof ConviteRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
   '/transacoes': typeof TransacoesRoute
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/categorias': typeof CategoriasRoute
   '/conta': typeof ContaRoute
+  '/convite': typeof ConviteRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
   '/transacoes': typeof TransacoesRoute
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/categorias'
     | '/conta'
+    | '/convite'
     | '/investimentos'
     | '/metas'
     | '/transacoes'
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/categorias'
     | '/conta'
+    | '/convite'
     | '/investimentos'
     | '/metas'
     | '/transacoes'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/categorias'
     | '/conta'
+    | '/convite'
     | '/investimentos'
     | '/metas'
     | '/transacoes'
@@ -116,6 +128,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CategoriasRoute: typeof CategoriasRoute
   ContaRoute: typeof ContaRoute
+  ConviteRoute: typeof ConviteRoute
   InvestimentosRoute: typeof InvestimentosRoute
   MetasRoute: typeof MetasRoute
   TransacoesRoute: typeof TransacoesRoute
@@ -151,6 +164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/convite': {
+      id: '/convite'
+      path: '/convite'
+      fullPath: '/convite'
+      preLoaderRoute: typeof ConviteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/investimentos': {
       id: '/investimentos'
       path: '/investimentos'
@@ -180,6 +200,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CategoriasRoute: CategoriasRoute,
   ContaRoute: ContaRoute,
+  ConviteRoute: ConviteRoute,
   InvestimentosRoute: InvestimentosRoute,
   MetasRoute: MetasRoute,
   TransacoesRoute: TransacoesRoute,
