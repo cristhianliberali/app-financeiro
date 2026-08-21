@@ -4,6 +4,8 @@ import { toISODate } from "./format";
 export type DateBasis = "transaction_date" | "due_date";
 
 type Ctx = {
+  accountId: string | null;
+  setAccountId: (id: string) => void;
   profileId: string | null;
   setProfileId: (id: string) => void;
   dateBasis: DateBasis;
@@ -25,12 +27,15 @@ const endOfMonth = () => {
 };
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
+  const [accountId, setAccountIdState] = useState<string | null>(null);
   const [profileId, setProfileIdState] = useState<string | null>(null);
   const [dateBasis, setDateBasisState] = useState<DateBasis>("transaction_date");
   const [from, setFrom] = useState(startOfMonth);
   const [to, setTo] = useState(endOfMonth);
 
   useEffect(() => {
+    const savedAccount = localStorage.getItem("aura.accountId");
+    if (savedAccount) setAccountIdState(savedAccount);
     const saved = localStorage.getItem("aura.profileId");
     if (saved) setProfileIdState(saved);
     const basis = localStorage.getItem("aura.dateBasis") as DateBasis | null;
@@ -39,6 +44,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Ctx>(
     () => ({
+      accountId,
+      setAccountId: (id) => {
+        localStorage.setItem("aura.accountId", id);
+        setAccountIdState(id);
+      },
       profileId,
       setProfileId: (id) => {
         localStorage.setItem("aura.profileId", id);
@@ -56,7 +66,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setTo(t);
       },
     }),
-    [profileId, dateBasis, from, to],
+    [accountId, profileId, dateBasis, from, to],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
