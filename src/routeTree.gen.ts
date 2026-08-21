@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CategoriasRouteImport } from './routes/categorias'
+import { Route as ContaRouteImport } from './routes/conta'
 import { Route as InvestimentosRouteImport } from './routes/investimentos'
 import { Route as MetasRouteImport } from './routes/metas'
 import { Route as TransacoesRouteImport } from './routes/transacoes'
@@ -29,6 +30,11 @@ const AuthRoute = AuthRouteImport.update({
 const CategoriasRoute = CategoriasRouteImport.update({
   id: '/categorias',
   path: '/categorias',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContaRoute = ContaRouteImport.update({
+  id: '/conta',
+  path: '/conta',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InvestimentosRoute = InvestimentosRouteImport.update({
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/categorias': typeof CategoriasRoute
+  '/conta': typeof ContaRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
   '/transacoes': typeof TransacoesRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/categorias': typeof CategoriasRoute
+  '/conta': typeof ContaRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
   '/transacoes': typeof TransacoesRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/categorias': typeof CategoriasRoute
+  '/conta': typeof ContaRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
   '/transacoes': typeof TransacoesRoute
@@ -75,15 +84,28 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/auth' | '/categorias' | '/investimentos' | '/metas' | '/transacoes'
+    | '/'
+    | '/auth'
+    | '/categorias'
+    | '/conta'
+    | '/investimentos'
+    | '/metas'
+    | '/transacoes'
   fileRoutesByTo: FileRoutesByTo
   to:
-    '/' | '/auth' | '/categorias' | '/investimentos' | '/metas' | '/transacoes'
+    | '/'
+    | '/auth'
+    | '/categorias'
+    | '/conta'
+    | '/investimentos'
+    | '/metas'
+    | '/transacoes'
   id:
     | '__root__'
     | '/'
     | '/auth'
     | '/categorias'
+    | '/conta'
     | '/investimentos'
     | '/metas'
     | '/transacoes'
@@ -93,6 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   CategoriasRoute: typeof CategoriasRoute
+  ContaRoute: typeof ContaRoute
   InvestimentosRoute: typeof InvestimentosRoute
   MetasRoute: typeof MetasRoute
   TransacoesRoute: typeof TransacoesRoute
@@ -119,6 +142,13 @@ declare module '@tanstack/react-router' {
       path: '/categorias'
       fullPath: '/categorias'
       preLoaderRoute: typeof CategoriasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/conta': {
+      id: '/conta'
+      path: '/conta'
+      fullPath: '/conta'
+      preLoaderRoute: typeof ContaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/investimentos': {
@@ -149,6 +179,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   CategoriasRoute: CategoriasRoute,
+  ContaRoute: ContaRoute,
   InvestimentosRoute: InvestimentosRoute,
   MetasRoute: MetasRoute,
   TransacoesRoute: TransacoesRoute,
