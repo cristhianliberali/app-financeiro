@@ -14,8 +14,121 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_invites: {
+        Row: {
+          account_id: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          role: string
+          status: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by: string
+          role?: string
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          role?: string
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_invites_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      account_members: {
+        Row: {
+          account_id: string
+          created_at: string
+          email: string | null
+          id: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          role?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_members_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accounts: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       budget_profiles: {
         Row: {
+          account_id: string
           color: string
           created_at: string
           id: string
@@ -25,6 +138,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id: string
           color?: string
           created_at?: string
           id?: string
@@ -34,6 +148,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string
           color?: string
           created_at?: string
           id?: string
@@ -42,7 +157,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "budget_profiles_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       categories: {
         Row: {
@@ -334,7 +457,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      accept_account_invite: { Args: { _token: string }; Returns: string }
+      account_role: { Args: { _account_id: string }; Returns: string }
+      can_edit_account: { Args: { _account_id: string }; Returns: boolean }
+      invite_preview: {
+        Args: { _token: string }
+        Returns: {
+          account_name: string
+          email: string
+          expires_at: string
+          role: string
+          status: string
+        }[]
+      }
+      is_account_member: { Args: { _account_id: string }; Returns: boolean }
+      is_account_owner: { Args: { _account_id: string }; Returns: boolean }
+      profile_account: { Args: { _profile_id: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
