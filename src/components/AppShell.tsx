@@ -6,6 +6,7 @@ import {
   Tags,
   TrendingUp,
   Target,
+  Users,
   LogOut,
   ChevronDown,
 } from "lucide-react";
@@ -13,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppState } from "@/lib/app-state";
 import { useProfiles } from "@/lib/data";
+import { useAccounts } from "@/lib/accounts";
 import { PeriodControls } from "@/components/PeriodControls";
 import {
   DropdownMenu,
@@ -27,14 +29,22 @@ const nav = [
   { to: "/categorias", label: "Categorias", icon: Tags },
   { to: "/investimentos", label: "Investimentos", icon: TrendingUp },
   { to: "/metas", label: "Metas", icon: Target },
+  { to: "/conta", label: "Conta & equipe", icon: Users },
 ] as const;
 
 export function AppShell({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
   const { session, loading } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { profileId, setProfileId } = useAppState();
-  const { data: profiles } = useProfiles();
+  const { accountId, setAccountId, profileId, setProfileId } = useAppState();
+  const { data: accounts } = useAccounts();
+  const { data: profiles } = useProfiles(accountId);
+
+  useEffect(() => {
+    if (accounts?.length && !accounts.some((a) => a.id === accountId)) {
+      setAccountId(accounts[0]!.id);
+    }
+  }, [accounts, accountId, setAccountId]);
 
   useEffect(() => {
     if (!loading && !session) navigate({ to: "/auth" });
@@ -47,6 +57,7 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
   }, [profiles, profileId, setProfileId]);
 
   const current = profiles?.find((p) => p.id === profileId);
+  const currentAccount = accounts?.find((a) => a.id === accountId);
 
   if (loading || !session) {
     return (
@@ -107,6 +118,34 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
       <main className="lg:pl-64">
         <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-card/80 px-4 py-3 backdrop-blur-md lg:px-8">
           <div className="flex flex-wrap items-center gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-border bg-secondary/60 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary">
+                <span
+                  className="size-2 rounded-full"
+                  style={{ backgroundColor: currentAccount?.color ?? "#3B82F6" }}
+                />
+                {currentAccount?.name ?? "Conta"}
+                <ChevronDown className="size-3 opacity-50" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {accounts?.map((a) => (
+                  <DropdownMenuItem key={a.id} onClick={() => setAccountId(a.id)}>
+                    <span
+                      className="mr-2 size-2 rounded-full"
+                      style={{ backgroundColor: a.color }}
+                    />
+                    {a.name}
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {a.role === "owner" ? "dono" : a.role === "editor" ? "editor" : "leitor"}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuItem onClick={() => navigate({ to: "/conta" })}>
+                  + Gerenciar contas
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <div className="hidden h-4 w-px bg-border sm:block" />
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary">
                 <span
