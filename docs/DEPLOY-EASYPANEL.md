@@ -30,6 +30,11 @@ No projeto do EasyPanel: **+ Service → App**.
 | Branch | `main` |
 | Build path | `/` |
 
+> O EasyPanel builda o commit mais recente **dessa branch**. Se o `Dockerfile`
+> ainda estiver só em uma branch de feature, o build falha com
+> `failed to read dockerfile: no such file or directory` — mescle antes, ou
+> aponte o campo Branch para a branch que já tem o arquivo.
+
 **Aba Build**
 
 | Campo | Valor |
@@ -51,7 +56,6 @@ Há dois momentos distintos, e confundi-los é o erro mais comum:
 ### 3.1 Build args (aba *Build → Build Args*)
 
 ```
-VITE_APP_URL=https://financas.seudominio.com
 VITE_SUPABASE_URL=https://esdleuxwybngrlunflzo.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 VITE_SUPABASE_PROJECT_ID=esdleuxwybngrlunflzo
@@ -59,8 +63,14 @@ VITE_SUPABASE_PROJECT_ID=esdleuxwybngrlunflzo
 
 > Se você não passar nada aqui, o build usa os valores do `.env` versionado no
 > repositório (que tem só URL e publishable key do Supabase, ambos públicos).
-> `VITE_APP_URL`, porém, não está lá — sem informá-lo, o app cai no
-> `window.location.origin` do navegador, o que funciona mas não cobre SSR.
+
+**Não passe `VITE_APP_URL`.** Por ser uma variável `VITE_`, o domínio é gravado
+dentro do bundle no momento do build — se ele mudar depois, os e-mails de
+confirmação, o retorno do login com Google e os links de convite continuam
+apontando para o domínio antigo até alguém rebuildar a imagem. Em branco, o
+navegador usa o domínio real de onde a página foi aberta, seja ele qual for, e
+`APP_URL` (runtime, seção 3.2) cobre o lado do servidor. Preencha `VITE_APP_URL`
+apenas no caso raro de o domínio canônico ser diferente do domínio acessado.
 
 ### 3.2 Runtime (aba *Environment*)
 
@@ -80,8 +90,8 @@ NODE_ENV=production
 
 | Variável | Onde | Obrigatória | Para quê |
 | --- | --- | --- | --- |
-| `VITE_APP_URL` | build | recomendada | Domínio público usado no bundle do cliente |
-| `APP_URL` | runtime | recomendada | Mesmo domínio, usado no SSR e na checagem de CSRF |
+| `APP_URL` | runtime | recomendada | Domínio público, usado no SSR e na checagem de CSRF |
+| `VITE_APP_URL` | build | **deixe em branco** | Só para domínio canônico ≠ domínio acessado; fixa o domínio no bundle |
 | `VITE_SUPABASE_URL` | build | sim | Endpoint do Supabase no navegador |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | build | sim | Chave pública do Supabase no navegador |
 | `VITE_SUPABASE_PROJECT_ID` | build | não | Identificação do projeto |
@@ -92,8 +102,8 @@ NODE_ENV=production
 | `PORT` | runtime | não | Porta do servidor (padrão `3000`) |
 | `HOST` | runtime | sim | Precisa ser `0.0.0.0` para o proxy alcançar |
 
-`APP_URL` e `VITE_APP_URL` devem ter o **mesmo valor**, com `https://` e **sem
-barra no final**.
+`APP_URL` vai com `https://` e **sem barra no final**. Se você preencher
+`VITE_APP_URL`, ela precisa ter exatamente o mesmo valor.
 
 Por que o domínio precisa ser configurado explicitamente: atrás do proxy do
 EasyPanel o servidor Node só enxerga `localhost:3000`, então ele não tem como
@@ -116,6 +126,12 @@ funcionam a partir do navegador — e quebram no SSR.
 
 Aponte um registro `A` do seu DNS para o IP do servidor antes de emitir o
 certificado.
+
+O EasyPanel também cria um subdomínio próprio no formato
+`<projeto>-<serviço>.<id>.easypanel.host`, que continua funcionando em paralelo
+ao domínio próprio. Como `VITE_APP_URL` fica em branco (seção 3.1), o app se
+comporta corretamente nos dois — basta que ambos estejam nas *Redirect URLs* do
+Supabase (seção 6).
 
 ---
 
@@ -142,6 +158,8 @@ para o domínio antigo. No painel do Supabase, em
 - **Redirect URLs**: adicione
   - `https://financas.seudominio.com`
   - `https://financas.seudominio.com/**`
+  - o subdomínio `*.easypanel.host` e o `/**` dele, se pretende continuar
+    acessando o app por ele
 
 Se usa login com Google, adicione o mesmo domínio nas *Authorized redirect URIs*
 do cliente OAuth no Google Cloud Console.
@@ -168,7 +186,6 @@ curl https://financas.seudominio.com/api/health
 
 ```sh
 docker build \
-  --build-arg VITE_APP_URL=http://localhost:3000 \
   --build-arg VITE_SUPABASE_URL=https://esdleuxwybngrlunflzo.supabase.co \
   --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_... \
   -t app-financeiro .
@@ -186,6 +203,8 @@ docker run --rm -p 3000:3000 \
 
 | Sintoma | Causa provável |
 | --- | --- |
+| `failed to read dockerfile: no such file or directory` | O `Dockerfile` não existe na branch configurada em Source → Branch |
+| Depois de trocar de domínio, os redirects ainda levam ao domínio antigo | `VITE_APP_URL` foi gravada em um build anterior; remova o build arg e rebuilde |
 | Página em branco e `Missing Supabase environment variable(s)` no console do navegador | Faltaram os build args `VITE_SUPABASE_*` |
 | Mesmo erro, mas nos logs do container | Faltaram as variáveis de runtime `SUPABASE_*` |
 | E-mail de confirmação leva ao domínio errado | `Site URL` do Supabase desatualizada, ou `VITE_APP_URL` divergente |
