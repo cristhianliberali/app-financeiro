@@ -1,7 +1,6 @@
 import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
-import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { getConfiguredSiteUrl } from "./lib/site-url";
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
@@ -38,7 +37,9 @@ const csrfMiddleware = createCsrfMiddleware({
     : {}),
 });
 
+// A sessão viaja num cookie httpOnly, que o navegador já anexa sozinho em toda
+// chamada de server function — não há mais token para um `functionMiddleware`
+// global grudar no header.
 export const startInstance = createStart(() => ({
-  functionMiddleware: [attachSupabaseAuth],
   requestMiddleware: [errorMiddleware, csrfMiddleware],
 }));

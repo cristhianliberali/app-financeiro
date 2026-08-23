@@ -14,10 +14,9 @@ dist
 *.log
 .DS_Store
 
-# `.env` NÃO está aqui de propósito: ele só guarda os valores públicos do
-# Supabase (URL e publishable key) e serve de fallback caso os build args
-# VITE_* não sejam passados. Segredos de verdade (SUPABASE_SERVICE_ROLE_KEY,
-# LOVABLE_API_KEY) nunca devem entrar nesse arquivo — configure-os como
-# variáveis de ambiente do serviço no EasyPanel.
+# `.env` NÃO está aqui de propósito: ele guarda só a configuração pública do
+# banco (host, porta, nome, schema) usada no desenvolvimento local. Segredos
+# (POSTGRES_PASSWORD, LOVABLE_API_KEY) nunca devem entrar nesse arquivo —
+# configure-os como variáveis de ambiente do serviço no EasyPanel.
 .env.local
 .env.*.local

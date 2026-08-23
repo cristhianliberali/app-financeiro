@@ -1,5 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+
+import {
+  fetchCategories,
+  fetchGoals,
+  fetchInvestments,
+  fetchProfiles,
+  fetchRecurring,
+  fetchTransactions,
+  removeRow,
+  upsertRows,
+  type DataTableName,
+} from "./data.functions";
 import type { DateBasis } from "./app-state";
 
 export type BudgetProfile = {
@@ -71,83 +82,21 @@ export type Goal = {
   done: boolean;
 };
 
-async function userId() {
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) throw new Error("Sessão expirada");
-  return data.user.id;
-}
-
-const DEFAULT_CATEGORIES: Array<Omit<Category, "id" | "profile_id">> = [
-  { name: "Moradia", kind: "expense", color: "#3B82F6", emoji: "🏠", monthly_cap: 3000 },
-  { name: "Alimentação", kind: "expense", color: "#F97316", emoji: "🍕", monthly_cap: 1500 },
-  { name: "Transporte", kind: "expense", color: "#8B5CF6", emoji: "🚗", monthly_cap: 800 },
-  { name: "Lazer", kind: "expense", color: "#EC4899", emoji: "🎬", monthly_cap: 600 },
-  { name: "Saúde", kind: "expense", color: "#14B8A6", emoji: "💊", monthly_cap: 500 },
-  { name: "Salário", kind: "income", color: "#10B981", emoji: "💼", monthly_cap: null },
-  { name: "Freelance", kind: "income", color: "#22C55E", emoji: "🧾", monthly_cap: null },
-];
-
 export function useProfiles(accountId: string | null) {
-  const qc = useQueryClient();
   return useQuery({
     queryKey: ["profiles", accountId],
     enabled: !!accountId,
-    queryFn: async (): Promise<BudgetProfile[]> => {
-      const uid = await userId();
-      const { data, error } = await supabase
-        .from("budget_profiles")
-        .select("id,name,color,is_default")
-        .eq("account_id", accountId!)
-        .order("created_at");
-      if (error) throw error;
-      if (data && data.length > 0) return data as BudgetProfile[];
-
-      // Bootstrap: primeiro acesso da conta cria perfis e categorias padrão
-      const { data: created, error: e2 } = await supabase
-        .from("budget_profiles")
-        .insert([
-          {
-            user_id: uid,
-            account_id: accountId!,
-            name: "Pessoal",
-            color: "#3B82F6",
-            is_default: true,
-          },
-          {
-            user_id: uid,
-            account_id: accountId!,
-            name: "Empresa",
-            color: "#10B981",
-            is_default: false,
-          },
-        ])
-        .select("id,name,color,is_default");
-      if (e2) throw e2;
-      const profiles = (created ?? []) as BudgetProfile[];
-      const rows = profiles.flatMap((p) =>
-        DEFAULT_CATEGORIES.map((c) => ({ ...c, user_id: uid, profile_id: p.id })),
-      );
-      if (rows.length) await supabase.from("categories").insert(rows);
-      qc.invalidateQueries({ queryKey: ["categories"] });
-      return profiles;
-    },
+    queryFn: async (): Promise<BudgetProfile[]> =>
+      (await fetchProfiles({ data: { accountId: accountId! } })) as BudgetProfile[],
   });
 }
-
 
 export function useCategories(profileId: string | null) {
   return useQuery({
     queryKey: ["categories", profileId],
     enabled: !!profileId,
-    queryFn: async (): Promise<Category[]> => {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id,profile_id,name,kind,color,emoji,monthly_cap")
-        .eq("profile_id", profileId!)
-        .order("name");
-      if (error) throw error;
-      return (data ?? []) as Category[];
-    },
+    queryFn: async (): Promise<Category[]> =>
+      (await fetchCategories({ data: { profileId: profileId! } })) as Category[],
   });
 }
 
@@ -161,19 +110,10 @@ export function useTransactions(opts: {
   return useQuery({
     queryKey: ["transactions", profileId, from, to, basis],
     enabled: !!profileId,
-    queryFn: async (): Promise<Transaction[]> => {
-      let q = supabase
-        .from("transactions")
-        .select(
-          "id,profile_id,category_id,description,amount,kind,transaction_date,due_date,status,installment_no,installment_total,installment_group,notes",
-        )
-        .eq("profile_id", profileId!);
-      if (from) q = q.gte(basis, from);
-      if (to) q = q.lte(basis, to);
-      const { data, error } = await q.order(basis, { ascending: false }).limit(2000);
-      if (error) throw error;
-      return (data ?? []).map((t) => ({ ...t, amount: Number(t.amount) })) as Transaction[];
-    },
+    queryFn: async (): Promise<Transaction[]> =>
+      (await fetchTransactions({
+        data: { profileId: profileId!, ...(from ? { from } : {}), ...(to ? { to } : {}), basis },
+      })) as Transaction[],
   });
 }
 
@@ -181,15 +121,8 @@ export function useRecurring(profileId: string | null) {
   return useQuery({
     queryKey: ["recurring", profileId],
     enabled: !!profileId,
-    queryFn: async (): Promise<RecurringRule[]> => {
-      const { data, error } = await supabase
-        .from("recurring_rules")
-        .select("*")
-        .eq("profile_id", profileId!)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []).map((r) => ({ ...r, amount: Number(r.amount) })) as RecurringRule[];
-    },
+    queryFn: async (): Promise<RecurringRule[]> =>
+      (await fetchRecurring({ data: { profileId: profileId! } })) as RecurringRule[],
   });
 }
 
@@ -197,20 +130,8 @@ export function useInvestments(profileId: string | null) {
   return useQuery({
     queryKey: ["investments", profileId],
     enabled: !!profileId,
-    queryFn: async (): Promise<Investment[]> => {
-      const { data, error } = await supabase
-        .from("investments")
-        .select("*")
-        .eq("profile_id", profileId!)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []).map((i) => ({
-        ...i,
-        invested_amount: Number(i.invested_amount),
-        current_amount: Number(i.current_amount),
-        expected_rate: Number(i.expected_rate),
-      })) as Investment[];
-    },
+    queryFn: async (): Promise<Investment[]> =>
+      (await fetchInvestments({ data: { profileId: profileId! } })) as Investment[],
   });
 }
 
@@ -218,29 +139,12 @@ export function useGoals(profileId: string | null) {
   return useQuery({
     queryKey: ["goals", profileId],
     enabled: !!profileId,
-    queryFn: async (): Promise<Goal[]> => {
-      const { data, error } = await supabase
-        .from("goals")
-        .select("*")
-        .eq("profile_id", profileId!)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []).map((g) => ({
-        ...g,
-        target_amount: Number(g.target_amount),
-        current_amount: Number(g.current_amount),
-      })) as Goal[];
-    },
+    queryFn: async (): Promise<Goal[]> =>
+      (await fetchGoals({ data: { profileId: profileId! } })) as Goal[],
   });
 }
 
-type TableName =
-  | "transactions"
-  | "categories"
-  | "budget_profiles"
-  | "recurring_rules"
-  | "investments"
-  | "goals";
+type TableName = DataTableName;
 
 const invalidationKey: Record<TableName, string> = {
   transactions: "transactions",
@@ -255,12 +159,7 @@ export function useUpsert(table: TableName) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (rows: Record<string, unknown> | Record<string, unknown>[]) => {
-      const uid = await userId();
-      const list = (Array.isArray(rows) ? rows : [rows]).map((r) => ({ ...r, user_id: uid }));
-      const { error } = await supabase
-        .from(table)
-        .upsert(list as never, { onConflict: "id", defaultToNull: false });
-      if (error) throw error;
+      await upsertRows({ data: { table, rows } });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [invalidationKey[table]] });
@@ -273,8 +172,7 @@ export function useRemove(table: TableName) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from(table).delete().eq("id", id);
-      if (error) throw error;
+      await removeRow({ data: { table, id } });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: [invalidationKey[table]] }),
   });

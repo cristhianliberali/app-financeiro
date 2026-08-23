@@ -10,7 +10,6 @@ import {
   LogOut,
   ChevronDown,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppState } from "@/lib/app-state";
 import { useProfiles } from "@/lib/data";
@@ -33,7 +32,7 @@ const nav = [
 ] as const;
 
 export function AppShell({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
-  const { session, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { accountId, setAccountId, profileId, setProfileId } = useAppState();
@@ -47,8 +46,8 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
   }, [accounts, accountId, setAccountId]);
 
   useEffect(() => {
-    if (!loading && !session) navigate({ to: "/auth" });
-  }, [loading, session, navigate]);
+    if (!loading && !user) navigate({ to: "/auth" });
+  }, [loading, user, navigate]);
 
   useEffect(() => {
     if (profiles?.length && !profiles.some((p) => p.id === profileId)) {
@@ -59,7 +58,7 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
   const current = profiles?.find((p) => p.id === profileId);
   const currentAccount = accounts?.find((a) => a.id === accountId);
 
-  if (loading || !session) {
+  if (loading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
         Carregando…
@@ -105,7 +104,7 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
           </div>
           <button
             onClick={async () => {
-              await supabase.auth.signOut();
+              await signOut();
               navigate({ to: "/auth" });
             }}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"

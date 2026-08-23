@@ -11,8 +11,9 @@ bucket separado para o front.
 ## 1. Pré-requisitos
 
 - Repositório no GitHub conectado ao EasyPanel.
-- Um projeto Supabase (o app usa o mesmo banco em dev e produção, a menos que
-  você crie um projeto separado).
+- Um Postgres acessível a partir do container, com o schema de `db/schema.sql`
+  já aplicado (veja `db/README.md`). Pode ser um serviço Postgres do próprio
+  EasyPanel ou um banco externo.
 - Um domínio ou subdomínio apontando para o servidor do EasyPanel.
 
 ---
@@ -55,49 +56,60 @@ Há dois momentos distintos, e confundi-los é o erro mais comum:
 
 ### 3.1 Build args (aba *Build → Build Args*)
 
-```
-VITE_SUPABASE_URL=https://esdleuxwybngrlunflzo.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
-VITE_SUPABASE_PROJECT_ID=esdleuxwybngrlunflzo
-```
+Nenhuma variável do banco é build arg: o Postgres é acessado só pelo servidor
+Node, em runtime. Na prática, o único build arg possível é `VITE_APP_URL` — e
+**o normal é não passá-lo**.
 
-> Se você não passar nada aqui, o build usa os valores do `.env` versionado no
-> repositório (que tem só URL e publishable key do Supabase, ambos públicos).
+Por ser uma variável `VITE_`, o domínio é gravado dentro do bundle no momento do
+build: se ele mudar depois, os links de convite continuam apontando para o
+antigo até alguém rebuildar a imagem. Em branco, o navegador usa o domínio real
+de onde a página foi aberta, e `APP_URL` (runtime, seção 3.2) cobre o lado do
+servidor. Preencha `VITE_APP_URL` apenas no caso raro de o domínio canônico ser
+diferente do domínio acessado — e, se preencher, use a variável do painel:
 
-**Não passe `VITE_APP_URL`.** Por ser uma variável `VITE_`, o domínio é gravado
-dentro do bundle no momento do build — se ele mudar depois, os e-mails de
-confirmação, o retorno do login com Google e os links de convite continuam
-apontando para o domínio antigo até alguém rebuildar a imagem. Em branco, o
-navegador usa o domínio real de onde a página foi aberta, seja ele qual for, e
-`APP_URL` (runtime, seção 3.2) cobre o lado do servidor. Preencha `VITE_APP_URL`
-apenas no caso raro de o domínio canônico ser diferente do domínio acessado.
+```
+VITE_APP_URL=https://$(PRIMARY_DOMAIN)
+```
 
 ### 3.2 Runtime (aba *Environment*)
 
 ```
 APP_URL=https://financas.seudominio.com
-SUPABASE_URL=https://esdleuxwybngrlunflzo.supabase.co
-SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
-SUPABASE_PROJECT_ID=esdleuxwybngrlunflzo
-SUPABASE_SERVICE_ROLE_KEY=<opcional, segredo>
+POSTGRES_HOST=186.226.112.41
+POSTGRES_PORT=5437
+POSTGRES_DB=app_financeiro_pg
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=<segredo>
+POSTGRES_SSL=false
+POSTGRES_SCHEMA=public
+CREATE_USERS_HOME=true
 LOVABLE_API_KEY=<opcional, segredo>
 PORT=3000
 HOST=0.0.0.0
 NODE_ENV=production
 ```
 
+Se o Postgres for um serviço do mesmo projeto no EasyPanel, use o nome interno
+do serviço como `POSTGRES_HOST` (ex.: `app-financeiro_postgres`) e a porta
+interna `5432` — assim o tráfego não sai para a internet.
+
 ### 3.3 Referência
 
 | Variável | Onde | Obrigatória | Para quê |
 | --- | --- | --- | --- |
-| `APP_URL` | runtime | recomendada | Domínio público, usado no SSR e na checagem de CSRF |
+| `APP_URL` | runtime | recomendada | Domínio público, usado nos links de convite, na checagem de CSRF e para decidir se o cookie de sessão é `Secure` |
 | `VITE_APP_URL` | build | **deixe em branco** | Só para domínio canônico ≠ domínio acessado; fixa o domínio no bundle |
-| `VITE_SUPABASE_URL` | build | sim | Endpoint do Supabase no navegador |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | build | sim | Chave pública do Supabase no navegador |
-| `VITE_SUPABASE_PROJECT_ID` | build | não | Identificação do projeto |
-| `SUPABASE_URL` | runtime | sim | Endpoint do Supabase no servidor |
-| `SUPABASE_PUBLISHABLE_KEY` | runtime | sim | Validação do token do usuário nas server functions |
-| `SUPABASE_SERVICE_ROLE_KEY` | runtime | não | Client admin (ignora RLS). **Segredo** |
+| `POSTGRES_HOST` | runtime | sim | Host do banco |
+| `POSTGRES_PORT` | runtime | não | Porta (padrão `5432`) |
+| `POSTGRES_DB` | runtime | sim | Nome do banco |
+| `POSTGRES_USER` | runtime | sim | Usuário do banco |
+| `POSTGRES_PASSWORD` | runtime | sim | Senha do banco. **Segredo** |
+| `POSTGRES_SSL` | runtime | não | `true` se o banco exigir TLS (padrão `false`) |
+| `POSTGRES_SCHEMA` | runtime | não | Schema das tabelas (padrão `public`) |
+| `POSTGRES_POOL_MAX` | runtime | não | Conexões simultâneas por processo (padrão `10`) |
+| `CREATE_USERS_HOME` | runtime | não | `true` mostra o cadastro na tela inicial; `false` deixa o app só por convite |
+| `SESSION_COOKIE_NAME` | runtime | não | Nome do cookie de sessão (padrão `aura_session`) |
+| `SESSION_TTL_DAYS` | runtime | não | Validade da sessão em dias (padrão `30`) |
 | `LOVABLE_API_KEY` | runtime | não | Importação de faturas por IA. **Segredo** |
 | `PORT` | runtime | não | Porta do servidor (padrão `3000`) |
 | `HOST` | runtime | sim | Precisa ser `0.0.0.0` para o proxy alcançar |
@@ -107,9 +119,10 @@ NODE_ENV=production
 
 Por que o domínio precisa ser configurado explicitamente: atrás do proxy do
 EasyPanel o servidor Node só enxerga `localhost:3000`, então ele não tem como
-descobrir sozinho o domínio real. Sem essas variáveis, os links de convite, o
-`emailRedirectTo` do cadastro e o `redirect_uri` do login com Google só
-funcionam a partir do navegador — e quebram no SSR.
+descobrir sozinho o domínio real. Sem `APP_URL`, os links de convite gerados no
+SSR saem sem host, e o cookie de sessão não é marcado como `Secure`.
+
+---
 
 ---
 
@@ -130,15 +143,18 @@ certificado.
 O EasyPanel também cria um subdomínio próprio no formato
 `<projeto>-<serviço>.<id>.easypanel.host`, que continua funcionando em paralelo
 ao domínio próprio. Como `VITE_APP_URL` fica em branco (seção 3.1), o app se
-comporta corretamente nos dois — basta que ambos estejam nas *Redirect URLs* do
-Supabase (seção 6).
+comporta corretamente nos dois.
 
 ---
 
 ## 5. Health check
 
 O app expõe `GET /api/health`, que responde `{"status":"ok"}` sem tocar no
-banco. Configure em **Advanced → Health Check**:
+banco — de propósito: o health check serve para saber se o processo Node subiu,
+não se as dependências estão de pé. Para incluir um ping no Postgres (503 quando
+o banco não responde), use `GET /api/health?db=1`.
+
+Configure em **Advanced → Health Check**:
 
 | Campo | Valor |
 | --- | --- |
@@ -148,21 +164,23 @@ banco. Configure em **Advanced → Health Check**:
 
 ---
 
-## 6. Configurar o Supabase para o novo domínio
+## 6. Preparar o banco
 
-Sem este passo o login por e-mail e o Google OAuth continuam redirecionando
-para o domínio antigo. No painel do Supabase, em
-**Authentication → URL Configuration**:
+Antes do primeiro deploy, aplique o schema no Postgres:
 
-- **Site URL**: `https://financas.seudominio.com`
-- **Redirect URLs**: adicione
-  - `https://financas.seudominio.com`
-  - `https://financas.seudominio.com/**`
-  - o subdomínio `*.easypanel.host` e o `/**` dele, se pretende continuar
-    acessando o app por ele
+```sh
+psql "postgresql://postgres:SENHA@186.226.112.41:5437/app_financeiro_pg" \
+     -v ON_ERROR_STOP=1 -f db/schema.sql
+```
 
-Se usa login com Google, adicione o mesmo domínio nas *Authorized redirect URIs*
-do cliente OAuth no Google Cloud Console.
+O script é idempotente: rodá-lo de novo em versões futuras do app não apaga
+dados. Detalhes e a lista de tabelas estão em `db/README.md`.
+
+Depois que o serviço subir, o primeiro acesso cria o usuário, a conta e os
+perfis padrão pela própria tela inicial — desde que `CREATE_USERS_HOME=true`.
+Com o banco vazio o cadastro é liberado mesmo com a variável em `false`, senão
+não haveria como entrar. Feito o primeiro login, mude para `false` se quiser que
+o app funcione só por convite.
 
 ---
 
@@ -176,6 +194,9 @@ Depois que subir, verifique:
 ```sh
 curl https://financas.seudominio.com/api/health
 # {"status":"ok","uptime":12.34}
+
+curl "https://financas.seudominio.com/api/health?db=1"
+# {"status":"ok","uptime":12.34,"database":"up"}
 ```
 
 ---
@@ -185,15 +206,18 @@ curl https://financas.seudominio.com/api/health
 Útil para reproduzir um problema de produção antes de investigar no servidor:
 
 ```sh
-docker build \
-  --build-arg VITE_SUPABASE_URL=https://esdleuxwybngrlunflzo.supabase.co \
-  --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_... \
-  -t app-financeiro .
+docker build -t app-financeiro .
 
 docker run --rm -p 3000:3000 \
   -e APP_URL=http://localhost:3000 \
-  -e SUPABASE_URL=https://esdleuxwybngrlunflzo.supabase.co \
-  -e SUPABASE_PUBLISHABLE_KEY=sb_publishable_... \
+  -e POSTGRES_HOST=186.226.112.41 \
+  -e POSTGRES_PORT=5437 \
+  -e POSTGRES_DB=app_financeiro_pg \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=... \
+  -e POSTGRES_SSL=false \
+  -e POSTGRES_SCHEMA=public \
+  -e CREATE_USERS_HOME=true \
   app-financeiro
 ```
 
@@ -205,9 +229,11 @@ docker run --rm -p 3000:3000 \
 | --- | --- |
 | `failed to read dockerfile: no such file or directory` | O `Dockerfile` não existe na branch configurada em Source → Branch |
 | Depois de trocar de domínio, os redirects ainda levam ao domínio antigo | `VITE_APP_URL` foi gravada em um build anterior; remova o build arg e rebuilde |
-| Página em branco e `Missing Supabase environment variable(s)` no console do navegador | Faltaram os build args `VITE_SUPABASE_*` |
-| Mesmo erro, mas nos logs do container | Faltaram as variáveis de runtime `SUPABASE_*` |
-| E-mail de confirmação leva ao domínio errado | `Site URL` do Supabase desatualizada, ou `VITE_APP_URL` divergente |
+| `Variáveis de ambiente do Postgres ausentes: ...` nos logs do container | Faltou alguma das `POSTGRES_*` na aba Environment |
+| Login falha e o log mostra erro de conexão do `pg` | Host/porta errados, banco fora do ar, ou firewall bloqueando o container |
+| `relation "app_users" does not exist` | O `db/schema.sql` não foi aplicado, ou `POSTGRES_SCHEMA` aponta para outro schema |
+| Tela de entrada sem a opção de criar conta | `CREATE_USERS_HOME=false` — comportamento esperado; entre por convite |
+| Login "esquece" a cada request | `APP_URL` em `https://` mas o app servido em `http://` (o cookie `Secure` não volta) |
 | Link de convite gerado com domínio errado | `VITE_APP_URL` com barra no final ou apontando para outro host |
 | `502 Bad Gateway` no EasyPanel | `HOST` diferente de `0.0.0.0`, ou porta do domínio diferente de `PORT` |
 | `403 Forbidden` ao salvar transações | `APP_URL` não bate com o domínio de onde a página foi aberta |
