@@ -2,6 +2,7 @@ import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/r
 
 import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { getConfiguredSiteUrl } from "./lib/site-url";
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
@@ -21,8 +22,20 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
 // Start installs this automatically when src/start.ts is absent; defining the
 // file opts out, so re-add it explicitly to keep server functions protected
 // from cross-site requests.
+//
+// Behind a reverse proxy (EasyPanel/Traefik) the request URL the server sees is
+// the internal one, so the Origin fallback would never match the public domain.
+// When APP_URL/VITE_APP_URL is set we accept it too — the Sec-Fetch-Site check,
+// which browsers always send and which runs first, is unaffected either way.
+const configuredOrigin = getConfiguredSiteUrl();
 const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => ctx.handlerType === "serverFn",
+  ...(configuredOrigin
+    ? {
+        origin: (value: string, ctx: { request: Request }) =>
+          value === configuredOrigin || value === new URL(ctx.request.url).origin,
+      }
+    : {}),
 });
 
 export const startInstance = createStart(() => ({

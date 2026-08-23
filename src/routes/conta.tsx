@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppState } from "@/lib/app-state";
+import { siteUrl } from "@/lib/site-url";
 import { useProfiles, useUpsert, useRemove } from "@/lib/data";
 import {
   useAccountInvites,
@@ -89,7 +90,7 @@ function AccountPage() {
 
   const displayName = useMemo(() => name || account?.name || "", [name, account]);
 
-  const inviteLink = (token: string) => `${window.location.origin}/convite?token=${token}`;
+  const inviteLink = (token: string) => siteUrl(`/convite?token=${token}`);
 
   return (
     <AppShell>

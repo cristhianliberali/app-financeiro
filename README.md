@@ -50,5 +50,19 @@ Prefer working locally? You need Node.js and npm — [install with nvm](https://
 git clone <this-repository-url>
 cd <repository-name>
 npm i
+cp .env.example .env   # ajuste os valores do Supabase e do domínio
 npm run dev
 ```
+
+## Deploy
+
+O repositório inclui um `Dockerfile` que gera um servidor Node standalone
+(SSR + estáticos no mesmo processo), pronto para rodar no EasyPanel ou em
+qualquer host com Docker.
+
+Passo a passo, variáveis de ambiente e configuração de domínio:
+**[docs/DEPLOY-EASYPANEL.md](docs/DEPLOY-EASYPANEL.md)**.
+
+As variáveis usadas pelo app estão documentadas em
+[`.env.example`](.env.example) — atenção à diferença entre as `VITE_*` (build)
+e as demais (runtime).
