@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "db:migrate": "bun run scripts/db-migrate.ts",
     "db:check": "bun run scripts/db-check.ts",
     "format": "prettier --write ."
   },

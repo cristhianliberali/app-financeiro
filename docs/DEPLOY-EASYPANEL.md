@@ -166,15 +166,24 @@ Configure em **Advanced → Health Check**:
 
 ## 6. Preparar o banco
 
-Antes do primeiro deploy, aplique o schema no Postgres:
+Antes do primeiro deploy, aplique o `db/schema.sql` no Postgres. Ele é SQL
+puro e idempotente — rodá-lo de novo em versões futuras do app não apaga dados.
+
+Do terminal, usando as mesmas variáveis `POSTGRES_*` do serviço:
 
 ```sh
-psql "postgresql://postgres:SENHA@186.226.112.41:5437/app_financeiro_pg" \
-     -v ON_ERROR_STOP=1 -f db/schema.sql
+bun run db:migrate
 ```
 
-O script é idempotente: rodá-lo de novo em versões futuras do app não apaga
-dados. Detalhes e a lista de tabelas estão em `db/README.md`.
+Sem terminal? Cole o conteúdo de `db/schema.sql` inteiro no console SQL do
+painel e execute — o arquivo foi feito para caber em uma colagem só. Com psql à
+mão, também funciona:
+
+```sh
+psql "postgresql://USUARIO:SENHA@HOST:PORTA/BANCO" -v ON_ERROR_STOP=1 -f db/schema.sql
+```
+
+Detalhes e a lista de tabelas estão em `db/README.md`.
 
 Depois que o serviço subir, o primeiro acesso cria o usuário, a conta e os
 perfis padrão pela própria tela inicial — desde que `CREATE_USERS_HOME=true`.
@@ -232,6 +241,7 @@ docker run --rm -p 3000:3000 \
 | `Variáveis de ambiente do Postgres ausentes: ...` nos logs do container | Faltou alguma das `POSTGRES_*` na aba Environment |
 | Login falha e o log mostra erro de conexão do `pg` | Host/porta errados, banco fora do ar, ou firewall bloqueando o container |
 | `relation "app_users" does not exist` | O `db/schema.sql` não foi aplicado, ou `POSTGRES_SCHEMA` aponta para outro schema |
+| `syntax error at or near "\"` ao aplicar o SQL | Versão antiga do `db/schema.sql`, que usava comandos do psql. Pegue a versão atual do repositório |
 | Tela de entrada sem a opção de criar conta | `CREATE_USERS_HOME=false` — comportamento esperado; entre por convite |
 | Login "esquece" a cada request | `APP_URL` em `https://` mas o app servido em `http://` (o cookie `Secure` não volta) |
 | Link de convite gerado com domínio errado | `VITE_APP_URL` com barra no final ou apontando para outro host |

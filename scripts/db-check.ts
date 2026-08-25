@@ -46,9 +46,7 @@ async function main() {
 
   if (missing.length) {
     console.error(
-      `\nFaltam ${missing.length} tabela(s). Aplique o schema:\n` +
-        `  psql "postgresql://${settings.user}@${settings.host}:${settings.port}/${settings.database}" ` +
-        `-v ON_ERROR_STOP=1 -f db/schema.sql`,
+      `\nFaltam ${missing.length} tabela(s). Aplique o schema com:\n  bun run db:migrate`,
     );
     process.exitCode = 1;
     return;

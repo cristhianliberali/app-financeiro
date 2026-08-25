@@ -6,12 +6,24 @@ banco — ele chama *server functions*, e elas é que consultam o Postgres.
 
 ## Aplicar o schema
 
-`schema.sql` cria tudo: tabelas, índices, triggers e funções. É idempotente —
-pode rodar de novo em um banco já populado sem perder dados.
+`schema.sql` cria tudo: tabelas, índices, triggers e funções. É SQL puro, sem
+comandos de cliente, então roda igual em qualquer lugar. É idempotente — pode
+rodar de novo em um banco já populado sem perder dados.
+
+**Pelo terminal, com as variáveis do app** (não precisa de psql nem de cliente
+externo — usa a mesma conexão que o servidor usa):
 
 ```sh
-psql "postgresql://postgres:SENHA@186.226.112.41:5437/app_financeiro_pg" \
-     -v ON_ERROR_STOP=1 -f db/schema.sql
+bun run db:migrate
+```
+
+**Pelo console SQL do painel**: cole o conteúdo de `db/schema.sql` inteiro e
+execute. O arquivo é uma colagem só, de propósito.
+
+**Pelo psql**, se preferir:
+
+```sh
+psql "postgresql://USUARIO:SENHA@HOST:PORTA/BANCO" -v ON_ERROR_STOP=1 -f db/schema.sql
 ```
 
 Para conferir a conexão e se o schema está completo:
@@ -22,13 +34,15 @@ bun run db:check
 
 ## Schema diferente de `public`
 
-Se `POSTGRES_SCHEMA` não for `public`, ajuste também a primeira linha de
-configuração do `schema.sql`:
+Se `POSTGRES_SCHEMA` não for `public`, troque `public` pelo nome do seu schema
+nas duas linhas do topo do `schema.sql`:
 
 ```sql
-\set app_schema meu_schema
+CREATE SCHEMA IF NOT EXISTS meu_schema;
+SET search_path TO meu_schema;
 ```
 
+Os dois valores — o do arquivo e o de `POSTGRES_SCHEMA` — precisam ser iguais.
 O app coloca esse schema no `search_path` da conexão, então as queries seguem
 sem prefixo.
 

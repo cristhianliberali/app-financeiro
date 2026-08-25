@@ -10,37 +10,45 @@
 --      papéis (dono / editor / leitor) é a camada de servidor, em
 --      `src/integrations/postgres/access.server.ts`.
 --
--- Como aplicar:
+-- Como aplicar (qualquer um dos três):
 --
---   psql "postgresql://postgres:SENHA@186.226.112.41:5437/app_financeiro_pg" \
---        -v ON_ERROR_STOP=1 -f db/schema.sql
+--   1. bun run db:migrate            ← usa a mesma conexão do app
+--   2. colar este arquivo inteiro no console SQL do painel
+--   3. psql "postgresql://USUARIO:SENHA@HOST:PORTA/BANCO" -v ON_ERROR_STOP=1 -f db/schema.sql
 --
--- O script é idempotente: pode rodar de novo sem apagar dados. Se `app_schema`
--- abaixo for diferente de `public`, ajuste também POSTGRES_SCHEMA no .env.
+-- É SQL puro, sem comandos de cliente: roda igual no psql, no console web do
+-- painel e em clientes gráficos. O script é idempotente — pode rodar de novo
+-- sem apagar dados.
 -- ─────────────────────────────────────────────────────────────────────────────
 
-\set ON_ERROR_STOP on
-
--- Precisa bater com POSTGRES_SCHEMA. Troque aqui se usar um schema dedicado.
-\set app_schema public
-
-CREATE SCHEMA IF NOT EXISTS :"app_schema";
-SET search_path TO :"app_schema", public;
+-- Usa outro schema? Troque `public` nas duas linhas abaixo e em
+-- POSTGRES_SCHEMA (.env / painel). Os dois valores precisam ser iguais.
+CREATE SCHEMA IF NOT EXISTS public;
+SET search_path TO public;
 
 -- gen_random_uuid() é nativa a partir do Postgres 13; em versões anteriores
--- vem da pgcrypto. `IF NOT EXISTS` deixa o script rodar nos dois casos.
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- vem da pgcrypto. Um usuário comum não tem permissão de criar extensão, e
+-- falhar aqui abortaria o script inteiro — no Postgres 13+ nem é preciso, então
+-- a falta de privilégio vira aviso. O bloco EXCEPTION isola isso numa
+-- subtransação, sem contaminar o resto do script.
+DO $ext$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS pgcrypto;
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'Sem permissão para criar a extensão pgcrypto. Tudo bem no Postgres 13+, onde gen_random_uuid() já é nativa.';
+END;
+$ext$;
 
 
 -- ─────────────────────────────── utilitários ────────────────────────────────
 
 CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql AS $fn$
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
-$$;
+$fn$;
 
 
 -- ───────────────────────── usuários e autenticação ──────────────────────────
@@ -234,16 +242,16 @@ CREATE INDEX IF NOT EXISTS goals_profile_idx ON goals(profile_id);
 -- Quem cria a conta entra automaticamente como dono. A aplicação depende
 -- disso: `createAccount` só faz o INSERT em `accounts`.
 CREATE OR REPLACE FUNCTION add_owner_member() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql AS $fn$
 BEGIN
   INSERT INTO account_members (account_id, user_id, role)
   VALUES (NEW.id, NEW.owner_id, 'owner')
   ON CONFLICT (account_id, user_id) DO NOTHING;
   RETURN NEW;
 END;
-$$;
+$fn$;
 
-DO $$
+DO $do$
 DECLARE
   t record;
 BEGIN
@@ -259,7 +267,7 @@ BEGIN
          FOR EACH ROW EXECUTE FUNCTION set_updated_at()', t.name);
   END LOOP;
 END;
-$$;
+$do$;
 
 DROP TRIGGER IF EXISTS t_accounts_owner_member ON accounts;
 CREATE TRIGGER t_accounts_owner_member AFTER INSERT ON accounts
@@ -272,7 +280,7 @@ CREATE TRIGGER t_accounts_owner_member AFTER INSERT ON accounts
 -- `expires_at`), mas acumulam. Rode de tempos em tempos, ou por cron:
 --   SELECT purge_expired_sessions();
 CREATE OR REPLACE FUNCTION purge_expired_sessions() RETURNS bigint
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql AS $fn$
 DECLARE
   removed bigint;
 BEGIN
@@ -280,4 +288,4 @@ BEGIN
   GET DIAGNOSTICS removed = ROW_COUNT;
   RETURN removed;
 END;
-$$;
+$fn$;

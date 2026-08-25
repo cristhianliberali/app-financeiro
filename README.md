@@ -55,8 +55,9 @@ npm run dev
 ```
 
 O app precisa de um Postgres com o schema aplicado. Crie as tabelas com
-[`db/schema.sql`](db/schema.sql) e confira a conexão com `bun run db:check` —
-detalhes em [`db/README.md`](db/README.md).
+`bun run db:migrate` (ou cole [`db/schema.sql`](db/schema.sql) no console SQL do
+seu painel) e confira a conexão com `bun run db:check` — detalhes em
+[`db/README.md`](db/README.md).
 
 ## Deploy
 
