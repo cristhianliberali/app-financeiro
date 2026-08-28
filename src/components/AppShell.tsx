@@ -9,13 +9,19 @@ import {
   Users,
   LogOut,
   ChevronDown,
+  KanbanSquare,
+  CalendarDays,
+  UserCheck,
+  Layers,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppState } from "@/lib/app-state";
 import { useProfiles } from "@/lib/data";
 import { useAccounts } from "@/lib/accounts";
+import { useSpaces } from "@/lib/tasks";
 import { PeriodControls } from "@/components/PeriodControls";
+import { ActiveTimerBar } from "@/components/tasks/ActiveTimerBar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,16 +35,37 @@ const nav = [
   { to: "/categorias", label: "Categorias", icon: Tags },
   { to: "/investimentos", label: "Investimentos", icon: TrendingUp },
   { to: "/metas", label: "Metas", icon: Target },
+  { to: "/tarefas", label: "Tarefas e Projetos", icon: KanbanSquare },
   { to: "/conta", label: "Conta & equipe", icon: Users },
 ] as const;
 
-export function AppShell({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
+const tasksNav = [
+  { to: "/tarefas", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { to: "/tarefas/minhas", label: "Minhas Tarefas", icon: UserCheck, exact: false },
+  { to: "/tarefas/calendario", label: "Calendário", icon: CalendarDays, exact: false },
+  { to: "/tarefas/espacos", label: "Espaços", icon: Layers, exact: false },
+] as const;
+
+export function AppShell({
+  children,
+  actions,
+  /** O módulo Tarefas e Projetos não usa perfil de orçamento nem período financeiro. */
+  hideFinanceControls = false,
+  breadcrumb,
+}: {
+  children: ReactNode;
+  actions?: ReactNode;
+  hideFinanceControls?: boolean;
+  breadcrumb?: ReactNode;
+}) {
   const { session, loading } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { accountId, setAccountId, profileId, setProfileId } = useAppState();
   const { data: accounts } = useAccounts();
   const { data: profiles } = useProfiles(accountId);
+  const inTasks = pathname.startsWith("/tarefas");
+  const { data: spaces } = useSpaces(inTasks ? accountId : null);
 
   useEffect(() => {
     if (accounts?.length && !accounts.some((a) => a.id === accountId)) {
@@ -92,17 +119,57 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
               </Link>
             );
           })}
+          {inTasks && (
+            <div className="ml-3 space-y-1 border-l border-border pl-3 pt-1">
+              {tasksNav.map((item) => {
+                const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors ${
+                      active
+                        ? "bg-secondary font-medium text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <item.icon className="size-3.5" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+              {(spaces ?? [])
+                .filter((s) => !s.archived_at)
+                .map((space) => (
+                  <Link
+                    key={space.id}
+                    to="/tarefas/espacos/$spaceId"
+                    params={{ spaceId: space.id }}
+                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors ${
+                      pathname === `/tarefas/espacos/${space.id}`
+                        ? "bg-secondary font-medium text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span>{space.icon}</span>
+                    <span className="truncate">{space.name}</span>
+                  </Link>
+                ))}
+            </div>
+          )}
         </nav>
         <div className="mt-auto space-y-4">
-          <div className="rounded-xl border border-primary/10 bg-primary/5 p-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
-              Perfil ativo
-            </p>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Os lançamentos, categorias e metas exibidos pertencem ao perfil{" "}
-              <span className="font-semibold text-foreground">{current?.name ?? "—"}</span>.
-            </p>
-          </div>
+          {!hideFinanceControls && (
+            <div className="rounded-xl border border-primary/10 bg-primary/5 p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
+                Perfil ativo
+              </p>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Os lançamentos, categorias e metas exibidos pertencem ao perfil{" "}
+                <span className="font-semibold text-foreground">{current?.name ?? "—"}</span>.
+              </p>
+            </div>
+          )}
           <button
             onClick={async () => {
               await supabase.auth.signOut();
@@ -145,32 +212,45 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <div className="hidden h-4 w-px bg-border sm:block" />
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary">
-                <span
-                  className="size-2 rounded-full"
-                  style={{ backgroundColor: current?.color ?? "#3B82F6" }}
-                />
-                Perfil: {current?.name ?? "—"}
-                <ChevronDown className="size-3 opacity-50" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {profiles?.map((p) => (
-                  <DropdownMenuItem key={p.id} onClick={() => setProfileId(p.id)}>
+            {!hideFinanceControls && (
+              <>
+                <div className="hidden h-4 w-px bg-border sm:block" />
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary">
                     <span
-                      className="mr-2 size-2 rounded-full"
-                      style={{ backgroundColor: p.color }}
+                      className="size-2 rounded-full"
+                      style={{ backgroundColor: current?.color ?? "#3B82F6" }}
                     />
-                    {p.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <div className="hidden h-4 w-px bg-border sm:block" />
-            <PeriodControls />
+                    Perfil: {current?.name ?? "—"}
+                    <ChevronDown className="size-3 opacity-50" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {profiles?.map((p) => (
+                      <DropdownMenuItem key={p.id} onClick={() => setProfileId(p.id)}>
+                        <span
+                          className="mr-2 size-2 rounded-full"
+                          style={{ backgroundColor: p.color }}
+                        />
+                        {p.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <div className="hidden h-4 w-px bg-border sm:block" />
+                <PeriodControls />
+              </>
+            )}
+            {breadcrumb && (
+              <>
+                <div className="hidden h-4 w-px bg-border sm:block" />
+                {breadcrumb}
+              </>
+            )}
           </div>
-          <div className="flex items-center gap-2">{actions}</div>
+          <div className="flex items-center gap-2">
+            <ActiveTimerBar />
+            {actions}
+          </div>
         </header>
         <div className="mx-auto max-w-7xl space-y-6 p-4 lg:p-8">{children}</div>
       </main>

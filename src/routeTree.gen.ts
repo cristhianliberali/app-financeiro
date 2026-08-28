@@ -18,6 +18,12 @@ import { Route as InvestimentosRouteImport } from './routes/investimentos'
 import { Route as MetasRouteImport } from './routes/metas'
 import { Route as TransacoesRouteImport } from './routes/transacoes'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as TarefasIndexRouteImport } from './routes/tarefas/index'
+import { Route as TarefasCalendarioRouteImport } from './routes/tarefas/calendario'
+import { Route as TarefasMinhasRouteImport } from './routes/tarefas/minhas'
+import { Route as TarefasEspacosIndexRouteImport } from './routes/tarefas/espacos/index'
+import { Route as TarefasEspacosSpaceIdRouteImport } from './routes/tarefas/espacos/$spaceId'
+import { Route as TarefasQuadrosBoardIdRouteImport } from './routes/tarefas/quadros/$boardId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -64,6 +70,36 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TarefasIndexRoute = TarefasIndexRouteImport.update({
+  id: '/tarefas/',
+  path: '/tarefas/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TarefasCalendarioRoute = TarefasCalendarioRouteImport.update({
+  id: '/tarefas/calendario',
+  path: '/tarefas/calendario',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TarefasMinhasRoute = TarefasMinhasRouteImport.update({
+  id: '/tarefas/minhas',
+  path: '/tarefas/minhas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TarefasEspacosIndexRoute = TarefasEspacosIndexRouteImport.update({
+  id: '/tarefas/espacos/',
+  path: '/tarefas/espacos/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TarefasEspacosSpaceIdRoute = TarefasEspacosSpaceIdRouteImport.update({
+  id: '/tarefas/espacos/$spaceId',
+  path: '/tarefas/espacos/$spaceId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TarefasQuadrosBoardIdRoute = TarefasQuadrosBoardIdRouteImport.update({
+  id: '/tarefas/quadros/$boardId',
+  path: '/tarefas/quadros/$boardId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -75,6 +111,12 @@ export interface FileRoutesByFullPath {
   '/metas': typeof MetasRoute
   '/transacoes': typeof TransacoesRoute
   '/api/health': typeof ApiHealthRoute
+  '/tarefas/calendario': typeof TarefasCalendarioRoute
+  '/tarefas/minhas': typeof TarefasMinhasRoute
+  '/tarefas/': typeof TarefasIndexRoute
+  '/tarefas/espacos/$spaceId': typeof TarefasEspacosSpaceIdRoute
+  '/tarefas/quadros/$boardId': typeof TarefasQuadrosBoardIdRoute
+  '/tarefas/espacos/': typeof TarefasEspacosIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +128,12 @@ export interface FileRoutesByTo {
   '/metas': typeof MetasRoute
   '/transacoes': typeof TransacoesRoute
   '/api/health': typeof ApiHealthRoute
+  '/tarefas/calendario': typeof TarefasCalendarioRoute
+  '/tarefas/minhas': typeof TarefasMinhasRoute
+  '/tarefas': typeof TarefasIndexRoute
+  '/tarefas/espacos/$spaceId': typeof TarefasEspacosSpaceIdRoute
+  '/tarefas/quadros/$boardId': typeof TarefasQuadrosBoardIdRoute
+  '/tarefas/espacos': typeof TarefasEspacosIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +146,12 @@ export interface FileRoutesById {
   '/metas': typeof MetasRoute
   '/transacoes': typeof TransacoesRoute
   '/api/health': typeof ApiHealthRoute
+  '/tarefas/calendario': typeof TarefasCalendarioRoute
+  '/tarefas/minhas': typeof TarefasMinhasRoute
+  '/tarefas/': typeof TarefasIndexRoute
+  '/tarefas/espacos/$spaceId': typeof TarefasEspacosSpaceIdRoute
+  '/tarefas/quadros/$boardId': typeof TarefasQuadrosBoardIdRoute
+  '/tarefas/espacos/': typeof TarefasEspacosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +165,12 @@ export interface FileRouteTypes {
     | '/metas'
     | '/transacoes'
     | '/api/health'
+    | '/tarefas/calendario'
+    | '/tarefas/minhas'
+    | '/tarefas/'
+    | '/tarefas/espacos/$spaceId'
+    | '/tarefas/quadros/$boardId'
+    | '/tarefas/espacos/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +182,12 @@ export interface FileRouteTypes {
     | '/metas'
     | '/transacoes'
     | '/api/health'
+    | '/tarefas/calendario'
+    | '/tarefas/minhas'
+    | '/tarefas'
+    | '/tarefas/espacos/$spaceId'
+    | '/tarefas/quadros/$boardId'
+    | '/tarefas/espacos'
   id:
     | '__root__'
     | '/'
@@ -133,6 +199,12 @@ export interface FileRouteTypes {
     | '/metas'
     | '/transacoes'
     | '/api/health'
+    | '/tarefas/calendario'
+    | '/tarefas/minhas'
+    | '/tarefas/'
+    | '/tarefas/espacos/$spaceId'
+    | '/tarefas/quadros/$boardId'
+    | '/tarefas/espacos/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,6 +217,12 @@ export interface RootRouteChildren {
   MetasRoute: typeof MetasRoute
   TransacoesRoute: typeof TransacoesRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  TarefasCalendarioRoute: typeof TarefasCalendarioRoute
+  TarefasMinhasRoute: typeof TarefasMinhasRoute
+  TarefasIndexRoute: typeof TarefasIndexRoute
+  TarefasEspacosSpaceIdRoute: typeof TarefasEspacosSpaceIdRoute
+  TarefasQuadrosBoardIdRoute: typeof TarefasQuadrosBoardIdRoute
+  TarefasEspacosIndexRoute: typeof TarefasEspacosIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -212,6 +290,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tarefas/': {
+      id: '/tarefas/'
+      path: '/tarefas'
+      fullPath: '/tarefas/'
+      preLoaderRoute: typeof TarefasIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tarefas/calendario': {
+      id: '/tarefas/calendario'
+      path: '/tarefas/calendario'
+      fullPath: '/tarefas/calendario'
+      preLoaderRoute: typeof TarefasCalendarioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tarefas/minhas': {
+      id: '/tarefas/minhas'
+      path: '/tarefas/minhas'
+      fullPath: '/tarefas/minhas'
+      preLoaderRoute: typeof TarefasMinhasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tarefas/espacos/': {
+      id: '/tarefas/espacos/'
+      path: '/tarefas/espacos'
+      fullPath: '/tarefas/espacos/'
+      preLoaderRoute: typeof TarefasEspacosIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tarefas/espacos/$spaceId': {
+      id: '/tarefas/espacos/$spaceId'
+      path: '/tarefas/espacos/$spaceId'
+      fullPath: '/tarefas/espacos/$spaceId'
+      preLoaderRoute: typeof TarefasEspacosSpaceIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tarefas/quadros/$boardId': {
+      id: '/tarefas/quadros/$boardId'
+      path: '/tarefas/quadros/$boardId'
+      fullPath: '/tarefas/quadros/$boardId'
+      preLoaderRoute: typeof TarefasQuadrosBoardIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -225,6 +345,12 @@ const rootRouteChildren: RootRouteChildren = {
   MetasRoute: MetasRoute,
   TransacoesRoute: TransacoesRoute,
   ApiHealthRoute: ApiHealthRoute,
+  TarefasCalendarioRoute: TarefasCalendarioRoute,
+  TarefasMinhasRoute: TarefasMinhasRoute,
+  TarefasIndexRoute: TarefasIndexRoute,
+  TarefasEspacosSpaceIdRoute: TarefasEspacosSpaceIdRoute,
+  TarefasQuadrosBoardIdRoute: TarefasQuadrosBoardIdRoute,
+  TarefasEspacosIndexRoute: TarefasEspacosIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
