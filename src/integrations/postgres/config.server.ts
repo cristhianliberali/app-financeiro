@@ -102,6 +102,65 @@ export function isSignupOpen(): boolean {
   return readBool("CREATE_USERS_HOME", true);
 }
 
+/**
+ * Configuração do provedor de IA usado na importação de faturas.
+ *
+ * `PROVEDOR_IA` existe para o dia em que houver mais de um provedor; hoje só
+ * `openai` é aceito, e qualquer outro valor falha na hora em vez de tentar uma
+ * requisição que não vai funcionar.
+ */
+export type AiSettings = {
+  provider: "openai";
+  model: string;
+  /** Teto de tokens do documento por requisição; acima disso, vira lote. */
+  tokenLimit: number;
+  apiKey: string;
+};
+
+const SUPPORTED_PROVIDERS = ["openai"] as const;
+
+export function getAiProvider(): "openai" {
+  const provider = (readEnv("PROVEDOR_IA") ?? "openai").toLowerCase();
+  if (!(SUPPORTED_PROVIDERS as readonly string[]).includes(provider)) {
+    throw new Error(
+      `PROVEDOR_IA "${provider}" não é suportado. Provedores disponíveis: ${SUPPORTED_PROVIDERS.join(", ")}.`,
+    );
+  }
+  return provider as "openai";
+}
+
+export function getAiSettings(): AiSettings {
+  const provider = getAiProvider();
+  const model = readEnv("MODELO_IA");
+  const apiKey = readEnv("OPENAI_API_KEY");
+
+  const missing = [...(model ? [] : ["MODELO_IA"]), ...(apiKey ? [] : ["OPENAI_API_KEY"])];
+  if (missing.length) {
+    throw new Error(
+      `Importação por IA não configurada. Faltam as variáveis: ${missing.join(", ")}.`,
+    );
+  }
+
+  return {
+    provider,
+    model: model!,
+    apiKey: apiKey!,
+    // O teto é do texto do documento, não da resposta: o que passar disso é
+    // dividido em lotes processados um por vez.
+    tokenLimit: readInt("LIMITE_TOKENS", 12_000),
+  };
+}
+
+/** A tela de importação usa isto para se esconder quando não há IA configurada. */
+export function isAiConfigured(): boolean {
+  try {
+    getAiSettings();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Nome do cookie que carrega o token de sessão. */
 export function getSessionCookieName(): string {
   return readEnv("SESSION_COOKIE_NAME") ?? "aura_session";

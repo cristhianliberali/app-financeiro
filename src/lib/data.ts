@@ -28,6 +28,8 @@ export type Category = {
   color: string;
   emoji: string;
   monthly_cap: number | null;
+  /** Palavras-chave da fatura; vão junto na importação por IA. */
+  description: string | null;
 };
 
 export type Transaction = {

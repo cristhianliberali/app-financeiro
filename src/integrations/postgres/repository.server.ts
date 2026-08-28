@@ -22,7 +22,7 @@ export const DATA_TABLES: DataTable[] = ["budget_profiles", ...PROFILE_TABLES];
 /** Colunas que o cliente pode gravar, por tabela. */
 const WRITABLE_COLUMNS: Record<DataTable, readonly string[]> = {
   budget_profiles: ["account_id", "name", "color", "is_default"],
-  categories: ["profile_id", "name", "kind", "color", "emoji", "monthly_cap"],
+  categories: ["profile_id", "name", "kind", "color", "emoji", "monthly_cap", "description"],
   transactions: [
     "profile_id",
     "category_id",
@@ -62,7 +62,7 @@ const WRITABLE_COLUMNS: Record<DataTable, readonly string[]> = {
 };
 
 const PROFILE_COLUMNS = "id, name, color, is_default";
-const CATEGORY_COLUMNS = "id, profile_id, name, kind, color, emoji, monthly_cap";
+const CATEGORY_COLUMNS = "id, profile_id, name, kind, color, emoji, monthly_cap, description";
 const TRANSACTION_COLUMNS =
   "id, profile_id, category_id, description, amount, kind, transaction_date, due_date, status, " +
   "installment_no, installment_total, installment_group, notes";

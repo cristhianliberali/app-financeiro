@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, FileUp, Sparkles, Trash2, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,50 +16,119 @@ import {
 } from "@/components/ui/dialog";
 import { useAppState } from "@/lib/app-state";
 import { useCategories, useUpsert } from "@/lib/data";
-import { parseStatement, type ParsedRow } from "@/lib/ai-import.functions";
+import {
+  ACCEPTED_UPLOAD,
+  getImportConfig,
+  prepareImport,
+  processNextBatch,
+  type ImportSummary,
+  type ParsedRow,
+} from "@/lib/ai-import.functions";
 import { brl } from "@/lib/format";
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void };
 
 type Draft = ParsedRow & { category_id: string; include: boolean };
 
+/** Lê o arquivo escolhido como base64, sem o prefixo `data:`. */
+function readAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Não foi possível ler o arquivo"));
+    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+    reader.readAsDataURL(file);
+  });
+}
+
 export function AiImportDialog({ open, onOpenChange }: Props) {
   const { profileId } = useAppState();
   const { data: categories = [] } = useCategories(profileId);
   const upsert = useUpsert("transactions");
-  const parse = useServerFn(parseStatement);
+  const prepare = useServerFn(prepareImport);
+  const processBatch = useServerFn(processNextBatch);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const { data: config } = useQuery({
+    queryKey: ["ai-import-config"],
+    queryFn: () => getImportConfig(),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const [text, setText] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [summary, setSummary] = useState<ImportSummary | null>(null);
+  const [batchesDone, setBatchesDone] = useState(0);
   const [rows, setRows] = useState<Draft[]>([]);
 
-  async function analyse() {
+  useEffect(() => {
+    if (open) return;
+    // Fechar o diálogo descarta o rascunho; o cache do servidor expira sozinho.
+    setText("");
+    setFile(null);
+    setSummary(null);
+    setBatchesDone(0);
+    setRows([]);
+  }, [open]);
+
+  function toDraft(row: ParsedRow): Draft {
+    return {
+      ...row,
+      include: true,
+      category_id:
+        categories.find(
+          (c) => c.kind === row.kind && c.name.toLowerCase() === row.category.toLowerCase(),
+        )?.id ?? "",
+    };
+  }
+
+  /** Envia o documento, que é dividido em lotes, e já processa o primeiro. */
+  async function start() {
+    if (!profileId) return;
     setLoading(true);
     try {
-      const res = await parse({
-        data: { text, categories: categories.map((c) => c.name) },
+      const prepared = await prepare({
+        data: {
+          profileId,
+          ...(file ? { file: { name: file.name, base64: await readAsBase64(file) } } : { text }),
+        },
       });
-      if (res.error) {
-        toast.error(res.error);
-        return;
+      setSummary(prepared);
+
+      if (prepared.totalBatches > 1) {
+        toast.info(
+          `Documento dividido em ${prepared.totalBatches} lotes (${prepared.totalTokens.toLocaleString("pt-BR")} tokens). ` +
+            `Processando o primeiro.`,
+        );
       }
-      if (!res.rows.length) {
-        toast.error("Nenhum lançamento identificado no texto");
-        return;
+      await runBatch(prepared.importId);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao preparar a importação");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /** Processa o próximo lote pendente — uma requisição de IA por clique. */
+  async function runBatch(importId: string) {
+    if (!profileId) return;
+    setLoading(true);
+    try {
+      const result = await processBatch({ data: { importId, profileId } });
+      setRows((prev) => [...prev, ...result.rows.map(toDraft)]);
+      setBatchesDone(result.batchNumber);
+      if (result.rows.length === 0) {
+        toast.warning(`Lote ${result.batchNumber} não trouxe lançamentos.`);
+      } else {
+        toast.success(
+          result.totalBatches > 1
+            ? `Lote ${result.batchNumber}/${result.totalBatches}: ${result.rows.length} lançamentos`
+            : `${result.rows.length} lançamentos identificados`,
+        );
       }
-      setRows(
-        res.rows.map((r) => ({
-          ...r,
-          include: true,
-          category_id:
-            categories.find(
-              (c) => c.kind === r.kind && c.name.toLowerCase() === r.category.toLowerCase(),
-            )?.id ?? "",
-        })),
-      );
-      toast.success(`${res.rows.length} lançamentos identificados`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao analisar");
+      if (result.done) setSummary((prev) => (prev ? { ...prev, importId: "" } : prev));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao processar o lote");
     } finally {
       setLoading(false);
     }
@@ -89,10 +159,13 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
       })),
     );
     toast.success(`${selected.length} lançamentos importados`);
-    setRows([]);
-    setText("");
     onOpenChange(false);
   }
+
+  const pendingBatches = summary && summary.importId ? summary.totalBatches - batchesDone : 0;
+  const unverified = rows.filter((r) => !r.amountFound).length;
+  const started = rows.length > 0 || batchesDone > 0;
+  const canStart = !!file || text.trim().length >= 10;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -103,27 +176,103 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
           </DialogTitle>
         </DialogHeader>
 
-        {rows.length === 0 ? (
-          <div className="space-y-3">
-            <Label>Cole o texto da fatura ou extrato</Label>
-            <Textarea
-              rows={12}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={"01/03  UBER TRIP           R$ 24,90\n02/03  MERCADO XPTO 2/5     R$ 189,00"}
-              className="font-mono text-xs"
-            />
+        {config && !config.enabled && (
+          <p className="rounded-lg border border-border bg-secondary/40 p-3 text-xs text-muted-foreground">
+            A importação por IA não está configurada neste ambiente. Defina <code>PROVEDOR_IA</code>
+            , <code>MODELO_IA</code> e <code>OPENAI_API_KEY</code> no serviço.
+          </p>
+        )}
+
+        {!started ? (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Anexar arquivo</Label>
+              <input
+                ref={fileInput}
+                type="file"
+                accept={ACCEPTED_UPLOAD}
+                className="hidden"
+                onChange={(e) => {
+                  const chosen = e.target.files?.[0] ?? null;
+                  setFile(chosen);
+                  if (chosen) setText("");
+                }}
+              />
+              {file ? (
+                <div className="flex items-center gap-2 rounded-lg border border-border p-2.5 text-sm">
+                  <FileUp className="size-4 shrink-0 text-primary" />
+                  <span className="truncate">{file.name}</span>
+                  <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                    {(file.size / 1024).toFixed(0)} KB
+                  </span>
+                  <button
+                    onClick={() => {
+                      setFile(null);
+                      if (fileInput.current) fileInput.current.value = "";
+                    }}
+                    className="text-muted-foreground transition-colors hover:text-destructive"
+                    aria-label="Remover arquivo"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => fileInput.current?.click()}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                >
+                  <FileUp className="size-4" /> PDF, Word, Excel, CSV ou TXT
+                </button>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                O arquivo é convertido em texto na hora e mantido só em memória durante a
+                importação. Nada é gravado em disco.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Ou cole o texto da fatura</Label>
+              <Textarea
+                rows={8}
+                value={text}
+                disabled={!!file}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={
+                  "01/03  UBER TRIP           R$ 24,90\n02/03  MERCADO XPTO 2/5     R$ 189,00"
+                }
+                className="font-mono text-xs"
+              />
+            </div>
+
             <p className="text-xs text-muted-foreground">
-              A IA categoriza cada linha e devolve uma lista para você conferir e ajustar antes de
-              lançar em massa.
+              A IA usa as palavras-chave cadastradas em cada categoria para classificar as linhas.
+              Documentos grandes são divididos em lotes e processados um por vez.
             </p>
           </div>
         ) : (
           <div className="space-y-2">
+            {summary && summary.totalBatches > 1 && (
+              <p className="text-xs text-muted-foreground">
+                {summary.source} · lote {batchesDone} de {summary.totalBatches} · {rows.length}{" "}
+                lançamentos até agora
+              </p>
+            )}
+
+            {unverified > 0 && (
+              <p className="flex items-center gap-2 rounded-lg border border-[#F59E0B]/40 bg-[#F59E0B]/10 p-2.5 text-xs">
+                <AlertTriangle className="size-4 shrink-0 text-[#F59E0B]" />
+                {unverified === 1
+                  ? "1 lançamento tem valor que não foi encontrado no documento. Confira antes de lançar."
+                  : `${unverified} lançamentos têm valor que não foi encontrado no documento. Confira antes de lançar.`}
+              </p>
+            )}
+
             {rows.map((r, i) => (
               <div
                 key={i}
-                className="grid grid-cols-12 items-center gap-2 rounded-xl border border-border p-2"
+                className={`grid grid-cols-12 items-center gap-2 rounded-xl border p-2 ${
+                  r.amountFound ? "border-border" : "border-[#F59E0B]/60 bg-[#F59E0B]/5"
+                }`}
               >
                 <input
                   type="checkbox"
@@ -158,17 +307,24 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                     ))}
                 </select>
                 <span
-                  className={`col-span-2 text-right font-mono text-xs font-semibold ${
+                  className={`col-span-2 flex items-center justify-end gap-1 text-right font-mono text-xs font-semibold ${
                     r.kind === "income" ? "text-positive" : "text-negative"
                   }`}
+                  title={r.amountFound ? undefined : "Valor não localizado no documento"}
                 >
+                  {!r.amountFound && <AlertTriangle className="size-3 text-[#F59E0B]" />}
                   {r.kind === "income" ? "+" : "−"}
                   {brl(r.amount)}
                 </span>
               </div>
             ))}
+
             <button
-              onClick={() => setRows([])}
+              onClick={() => {
+                setRows([]);
+                setSummary(null);
+                setBatchesDone(0);
+              }}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
             >
               <Trash2 className="size-3" /> Descartar análise
@@ -180,14 +336,27 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          {rows.length === 0 ? (
-            <Button onClick={analyse} disabled={loading || text.trim().length < 10}>
+          {!started ? (
+            <Button onClick={start} disabled={loading || !canStart || config?.enabled === false}>
               {loading ? "Analisando…" : "Analisar com IA"}
             </Button>
           ) : (
-            <Button onClick={commit} disabled={upsert.isPending}>
-              Lançar selecionados
-            </Button>
+            <>
+              {pendingBatches > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={() => summary && runBatch(summary.importId)}
+                  disabled={loading}
+                >
+                  {loading
+                    ? "Processando…"
+                    : `Processar mais (${pendingBatches} ${pendingBatches === 1 ? "lote" : "lotes"})`}
+                </Button>
+              )}
+              <Button onClick={commit} disabled={upsert.isPending || loading}>
+                Lançar selecionados
+              </Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>

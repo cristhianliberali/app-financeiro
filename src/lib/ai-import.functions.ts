@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+
 import { requireAuth } from "@/integrations/postgres/auth-middleware";
 
 export type ParsedRow = {
@@ -10,89 +11,79 @@ export type ParsedRow = {
   category: string;
   installment_no: number | null;
   installment_total: number | null;
+  /** O valor foi conferido no texto do documento. */
+  amountFound: boolean;
 };
 
-export const parseStatement = createServerFn({ method: "POST" })
+export type ImportSummary = {
+  importId: string;
+  source: string;
+  totalBatches: number;
+  totalTokens: number;
+  expiresInMinutes: number;
+};
+
+export type BatchResult = {
+  rows: ParsedRow[];
+  batchNumber: number;
+  totalBatches: number;
+  done: boolean;
+};
+
+/** Extensões que o servidor sabe converter em texto. */
+export const ACCEPTED_UPLOAD = ".pdf,.docx,.doc,.xlsx,.xlsm,.xls,.csv,.txt,.ofx";
+
+function requireId(value: unknown, field = "id"): string {
+  if (typeof value !== "string" || !value.trim()) throw new Error(`${field} é obrigatório`);
+  return value;
+}
+
+/** Diz à tela se a importação por IA está configurada neste ambiente. */
+export const getImportConfig = createServerFn({ method: "GET" })
   .middleware([requireAuth])
-  .inputValidator((input: { text: string; categories: string[] }) => {
-    if (!input?.text || input.text.trim().length < 10) throw new Error("Cole o texto da fatura");
-    return { text: input.text.slice(0, 20000), categories: input.categories ?? [] };
-  })
-  .handler(async ({ data }): Promise<{ rows: ParsedRow[]; error?: string }> => {
-    const apiKey = process.env["LOVABLE_API_KEY"];
-    if (!apiKey) return { rows: [], error: "IA indisponível no momento" };
-
-    const today = new Date().toISOString().slice(0, 10);
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "google/gemini-3.5-flash",
-        messages: [
-          {
-            role: "system",
-            content:
-              `Você extrai lançamentos financeiros de faturas de cartão e extratos bancários brasileiros. ` +
-              `Hoje é ${today}. Datas no formato YYYY-MM-DD. Valores positivos. ` +
-              `Use "expense" para gastos e "income" para créditos/estornos/recebimentos. ` +
-              `Se o texto indicar parcela (ex: 2/5), preencha installment_no e installment_total. ` +
-              `Escolha a categoria mais adequada entre: ${data.categories.join(", ") || "Outros"}. ` +
-              `Responda apenas via a ferramenta.`,
-          },
-          { role: "user", content: data.text },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "registrar_lancamentos",
-              description: "Devolve a lista de lançamentos extraídos",
-              parameters: {
-                type: "object",
-                properties: {
-                  rows: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        description: { type: "string" },
-                        amount: { type: "number" },
-                        kind: { type: "string", enum: ["income", "expense"] },
-                        date: { type: "string" },
-                        due_date: { type: "string" },
-                        category: { type: "string" },
-                        installment_no: { type: ["number", "null"] },
-                        installment_total: { type: ["number", "null"] },
-                      },
-                      required: ["description", "amount", "kind", "date", "due_date", "category"],
-                      additionalProperties: false,
-                    },
-                  },
-                },
-                required: ["rows"],
-                additionalProperties: false,
-              },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "registrar_lancamentos" } },
-      }),
-    });
-
-    if (res.status === 429) return { rows: [], error: "Limite de uso da IA atingido. Tente novamente em instantes." };
-    if (res.status === 402) return { rows: [], error: "Créditos de IA esgotados." };
-    if (!res.ok) return { rows: [], error: "A IA não conseguiu processar o documento." };
-
-    const json = (await res.json()) as {
-      choices?: Array<{ message?: { tool_calls?: Array<{ function?: { arguments?: string } }> } }>;
-    };
-    const args = json.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    if (!args) return { rows: [], error: "Nenhum lançamento identificado." };
-
+  .handler(async (): Promise<{ enabled: boolean; provider: string; model: string | null }> => {
+    const { getAiSettings } = await import("@/integrations/postgres/config.server");
     try {
-      const parsed = JSON.parse(args) as { rows?: ParsedRow[] };
-      return { rows: (parsed.rows ?? []).map((r) => ({ ...r, amount: Math.abs(Number(r.amount)) })) };
+      const settings = getAiSettings();
+      return { enabled: true, provider: settings.provider, model: settings.model };
     } catch {
-      return { rows: [], error: "Resposta da IA inválida." };
+      return { enabled: false, provider: "openai", model: null };
     }
+  });
+
+/**
+ * Lê o documento e o divide em lotes. Não gasta IA — devolve só o resumo, e o
+ * usuário dispara cada lote em seguida.
+ */
+export const prepareImport = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator(
+    (input: { profileId: string; text?: string; file?: { name: string; base64: string } }) => {
+      const profileId = requireId(input?.profileId, "profileId");
+      if (input?.file) {
+        if (typeof input.file.name !== "string" || typeof input.file.base64 !== "string") {
+          throw new Error("Arquivo inválido");
+        }
+        return { profileId, file: { name: input.file.name, base64: input.file.base64 } };
+      }
+      const text = typeof input?.text === "string" ? input.text.trim() : "";
+      if (text.length < 10) throw new Error("Cole o texto da fatura ou anexe um arquivo");
+      return { profileId, text };
+    },
+  )
+  .handler(async ({ data, context }): Promise<ImportSummary> => {
+    const { prepareImport: run } = await import("@/integrations/ai/import.server");
+    return run(context.user.id, data);
+  });
+
+/** Processa o próximo lote pendente — uma requisição de IA por chamada. */
+export const processNextBatch = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((input: { importId: string; profileId: string }) => ({
+    importId: requireId(input?.importId, "importId"),
+    profileId: requireId(input?.profileId, "profileId"),
+  }))
+  .handler(async ({ data, context }): Promise<BatchResult> => {
+    const { processNextBatch: run } = await import("@/integrations/ai/import.server");
+    return run(context.user.id, data);
   });
