@@ -237,6 +237,162 @@ CREATE TABLE IF NOT EXISTS goals (
 CREATE INDEX IF NOT EXISTS goals_profile_idx ON goals(profile_id);
 
 
+-- ──────────────────────── tarefas e projetos ────────────────────────────────
+--
+-- Hierarquia: conta → espaços → quadros → tarefas → subtarefas.
+-- Quem pode ver/editar cada nível é decidido em
+-- `src/integrations/postgres/tasks.server.ts`, do mesmo jeito que o resto do
+-- app — aqui ficam só as regras que são integridade de dado.
+
+CREATE TABLE IF NOT EXISTS spaces (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id  uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  name        text NOT NULL,
+  description text,
+  icon        text NOT NULL DEFAULT '📁',
+  color       text NOT NULL DEFAULT '#3B82F6',
+  created_by  uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  archived_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS spaces_account_idx ON spaces(account_id);
+
+-- Sem nenhuma linha aqui, o espaço é visível para todos os membros da conta.
+-- Ao adicionar linhas, o acesso passa a ser restrito a quem está na lista.
+CREATE TABLE IF NOT EXISTS space_members (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  space_id   uuid NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+  user_id    uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (space_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS space_members_user_idx ON space_members(user_id);
+
+CREATE TABLE IF NOT EXISTS boards (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  space_id     uuid NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+  name         text NOT NULL,
+  description  text,
+  owner_id     uuid REFERENCES app_users(id) ON DELETE SET NULL,
+  start_date   date,
+  due_date     date,
+  status       text NOT NULL DEFAULT 'active'
+                 CHECK (status IN ('planning','active','paused','done')),
+  default_view text NOT NULL DEFAULT 'kanban'
+                 CHECK (default_view IN ('kanban','list','calendar')),
+  color        text NOT NULL DEFAULT '#3B82F6',
+  created_by   uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  archived_at  timestamptz
+);
+CREATE INDEX IF NOT EXISTS boards_space_idx ON boards(space_id);
+
+CREATE TABLE IF NOT EXISTS board_members (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  board_id   uuid NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+  user_id    uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (board_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS board_members_user_idx ON board_members(user_id);
+
+-- Status personalizados por quadro. O nome é livre; `polarity` é o significado
+-- interno que dashboards e automações usam para saber se a tarefa está ativa,
+-- concluída ou fora do fluxo.
+CREATE TABLE IF NOT EXISTS board_statuses (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  board_id   uuid NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+  name       text NOT NULL,
+  sort_order int NOT NULL DEFAULT 0,
+  color      text NOT NULL DEFAULT '#64748B',
+  polarity   text NOT NULL DEFAULT 'IN_PROGRESS'
+               CHECK (polarity IN ('IN_PROGRESS','SUCCESS','ARCHIVED')),
+  is_default boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS board_statuses_board_idx ON board_statuses(board_id, sort_order);
+
+CREATE TABLE IF NOT EXISTS tasks (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  board_id            uuid NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+  status_id           uuid REFERENCES board_statuses(id) ON DELETE SET NULL,
+  title               text NOT NULL,
+  description         text,
+  responsible_user_id uuid REFERENCES app_users(id) ON DELETE SET NULL,
+  start_date          timestamptz,
+  due_date            timestamptz,
+  sort_order          int NOT NULL DEFAULT 0,
+  created_by          uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  updated_at          timestamptz NOT NULL DEFAULT now(),
+  completed_at        timestamptz,
+  archived_at         timestamptz
+);
+CREATE INDEX IF NOT EXISTS tasks_board_idx ON tasks(board_id, sort_order);
+CREATE INDEX IF NOT EXISTS tasks_responsible_idx ON tasks(responsible_user_id);
+CREATE INDEX IF NOT EXISTS tasks_due_idx ON tasks(due_date);
+
+CREATE TABLE IF NOT EXISTS task_participants (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id    uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  user_id    uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (task_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS task_participants_user_idx ON task_participants(user_id);
+
+CREATE TABLE IF NOT EXISTS subtasks (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id             uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  title               text NOT NULL,
+  responsible_user_id uuid REFERENCES app_users(id) ON DELETE SET NULL,
+  start_date          timestamptz,
+  due_date            timestamptz,
+  completed           boolean NOT NULL DEFAULT false,
+  completed_at        timestamptz,
+  sort_order          int NOT NULL DEFAULT 0,
+  created_by          uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  updated_at          timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS subtasks_task_idx ON subtasks(task_id, sort_order);
+CREATE INDEX IF NOT EXISTS subtasks_due_idx ON subtasks(due_date);
+
+-- `stopped_at IS NULL` significa cronômetro em execução.
+CREATE TABLE IF NOT EXISTS time_entries (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id          uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  user_id          uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  started_at       timestamptz NOT NULL DEFAULT now(),
+  stopped_at       timestamptz,
+  duration_seconds int,
+  note             text,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz NOT NULL DEFAULT now(),
+  CHECK (stopped_at IS NULL OR stopped_at >= started_at)
+);
+CREATE INDEX IF NOT EXISTS time_entries_task_idx ON time_entries(task_id);
+CREATE INDEX IF NOT EXISTS time_entries_user_idx ON time_entries(user_id, started_at);
+-- Impede registros inconsistentes: no máximo um cronômetro ativo por usuário.
+CREATE UNIQUE INDEX IF NOT EXISTS time_entries_single_running
+  ON time_entries(user_id) WHERE stopped_at IS NULL;
+
+-- Trilha de auditoria da tarefa, escrita pela camada de servidor (que é quem
+-- sabe qual usuário está por trás da requisição).
+CREATE TABLE IF NOT EXISTS task_activity (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id    uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  user_id    uuid REFERENCES app_users(id) ON DELETE SET NULL,
+  action     text NOT NULL,
+  meta       jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS task_activity_task_idx ON task_activity(task_id, created_at DESC);
+
+
 -- ─────────────────────────────── triggers ───────────────────────────────────
 
 -- Quem cria a conta entra automaticamente como dono. A aplicação depende
@@ -258,7 +414,8 @@ BEGIN
   FOR t IN
     SELECT unnest(ARRAY[
       'app_users','accounts','account_members','account_invites','budget_profiles',
-      'categories','transactions','recurring_rules','investments','goals'
+      'categories','transactions','recurring_rules','investments','goals',
+      'spaces','boards','board_statuses','tasks','subtasks','time_entries'
     ]) AS name
   LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS t_%1$s_updated ON %1$I', t.name);
@@ -272,6 +429,65 @@ $do$;
 DROP TRIGGER IF EXISTS t_accounts_owner_member ON accounts;
 CREATE TRIGGER t_accounts_owner_member AFTER INSERT ON accounts
   FOR EACH ROW EXECUTE FUNCTION add_owner_member();
+
+-- A polaridade do status é quem decide se a tarefa está concluída ou
+-- arquivada: o app pode renomear os status à vontade sem perder essa noção.
+CREATE OR REPLACE FUNCTION sync_task_completion() RETURNS trigger
+LANGUAGE plpgsql AS $fn$
+DECLARE
+  task_polarity text;
+BEGIN
+  SELECT polarity INTO task_polarity FROM board_statuses WHERE id = NEW.status_id;
+  IF task_polarity = 'SUCCESS' THEN
+    NEW.completed_at := COALESCE(NEW.completed_at, now());
+    NEW.archived_at := NULL;
+  ELSIF task_polarity = 'ARCHIVED' THEN
+    NEW.archived_at := COALESCE(NEW.archived_at, now());
+    NEW.completed_at := NULL;
+  ELSE
+    NEW.completed_at := NULL;
+    NEW.archived_at := NULL;
+  END IF;
+  RETURN NEW;
+END;
+$fn$;
+
+DROP TRIGGER IF EXISTS t_tasks_completion ON tasks;
+CREATE TRIGGER t_tasks_completion BEFORE INSERT OR UPDATE OF status_id ON tasks
+  FOR EACH ROW EXECUTE FUNCTION sync_task_completion();
+
+CREATE OR REPLACE FUNCTION sync_subtask_completion() RETURNS trigger
+LANGUAGE plpgsql AS $fn$
+BEGIN
+  IF NEW.completed THEN
+    NEW.completed_at := COALESCE(NEW.completed_at, now());
+  ELSE
+    NEW.completed_at := NULL;
+  END IF;
+  RETURN NEW;
+END;
+$fn$;
+
+DROP TRIGGER IF EXISTS t_subtasks_completion ON subtasks;
+CREATE TRIGGER t_subtasks_completion BEFORE INSERT OR UPDATE OF completed ON subtasks
+  FOR EACH ROW EXECUTE FUNCTION sync_subtask_completion();
+
+-- A duração sai sempre do par started_at/stopped_at, nunca do cliente.
+CREATE OR REPLACE FUNCTION sync_time_entry_duration() RETURNS trigger
+LANGUAGE plpgsql AS $fn$
+BEGIN
+  IF NEW.stopped_at IS NULL THEN
+    NEW.duration_seconds := NULL;
+  ELSE
+    NEW.duration_seconds := GREATEST(0, EXTRACT(EPOCH FROM (NEW.stopped_at - NEW.started_at))::int);
+  END IF;
+  RETURN NEW;
+END;
+$fn$;
+
+DROP TRIGGER IF EXISTS t_time_entries_duration ON time_entries;
+CREATE TRIGGER t_time_entries_duration BEFORE INSERT OR UPDATE ON time_entries
+  FOR EACH ROW EXECUTE FUNCTION sync_time_entry_duration();
 
 
 -- ───────────────────────────── manutenção ───────────────────────────────────

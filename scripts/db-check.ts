@@ -21,6 +21,16 @@ const EXPECTED_TABLES = [
   "recurring_rules",
   "investments",
   "goals",
+  "spaces",
+  "space_members",
+  "boards",
+  "board_members",
+  "board_statuses",
+  "tasks",
+  "task_participants",
+  "subtasks",
+  "time_entries",
+  "task_activity",
 ];
 
 async function main() {

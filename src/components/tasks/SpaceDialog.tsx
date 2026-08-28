@@ -1,0 +1,213 @@
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  useDeleteSpace,
+  useSaveSpace,
+  useSpaceMembers,
+  type AccountUser,
+  type Space,
+} from "@/lib/tasks";
+import { PALETTE, SPACE_ICONS } from "@/lib/tasks-analytics";
+import { formatDateBR } from "@/lib/format";
+import { UserMultiSelect } from "./UserPicker";
+
+export function SpaceDialog({
+  open,
+  onOpenChange,
+  accountId,
+  space,
+  users,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  accountId: string | null;
+  space: Space | null;
+  users: AccountUser[];
+}) {
+  const save = useSaveSpace(accountId);
+  const remove = useDeleteSpace();
+  const { data: currentMembers } = useSpaceMembers(space?.id ?? null);
+
+  const [form, setForm] = useState({
+    name: "",
+    description: "",
+    icon: "📁",
+    color: PALETTE[0]!,
+    archived: false,
+  });
+  const [members, setMembers] = useState<string[]>([]);
+  const [membersLoaded, setMembersLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setForm({
+      name: space?.name ?? "",
+      description: space?.description ?? "",
+      icon: space?.icon ?? "📁",
+      color: space?.color ?? PALETTE[0]!,
+      archived: !!space?.archived_at,
+    });
+    setMembers([]);
+    setMembersLoaded(!space);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, space?.id]);
+
+  // Os membros chegam de forma assíncrona; carregamos uma única vez por abertura
+  // para não descartar a seleção em andamento quando a consulta é revalidada.
+  useEffect(() => {
+    if (!open || membersLoaded || !currentMembers) return;
+    setMembers(currentMembers);
+    setMembersLoaded(true);
+  }, [open, membersLoaded, currentMembers]);
+
+  async function submit() {
+    if (!form.name.trim()) {
+      toast.error("Informe o nome do espaço");
+      return;
+    }
+    await save.mutateAsync({
+      ...(space ? { id: space.id } : {}),
+      name: form.name.trim(),
+      description: form.description.trim() || null,
+      icon: form.icon,
+      color: form.color,
+      archived: form.archived,
+      memberIds: members,
+    });
+    toast.success(space ? "Espaço atualizado" : "Espaço criado");
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{space ? "Editar espaço" : "Novo espaço"}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>Nome</Label>
+            <Input
+              autoFocus
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Ex.: Marketing, Desenvolvimento, Clientes…"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Descrição</Label>
+            <textarea
+              rows={2}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="w-full resize-y rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+              placeholder="Para que serve este espaço?"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Ícone</Label>
+            <div className="flex flex-wrap gap-1">
+              {SPACE_ICONS.map((icon) => (
+                <button
+                  key={icon}
+                  onClick={() => setForm({ ...form, icon })}
+                  className={`size-9 rounded-lg border text-lg transition-colors ${
+                    form.icon === icon ? "border-primary bg-primary/10" : "border-border"
+                  }`}
+                >
+                  {icon}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Cor</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {PALETTE.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => setForm({ ...form, color })}
+                  className={`size-7 rounded-full border-2 transition-transform ${
+                    form.color === color ? "scale-110 border-foreground" : "border-transparent"
+                  }`}
+                  style={{ backgroundColor: color }}
+                  aria-label={`Cor ${color}`}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Usuários com acesso</Label>
+            <UserMultiSelect users={users} value={members} onChange={setMembers} />
+            <p className="text-[11px] text-muted-foreground">
+              Sem ninguém selecionado, todos os membros da conta enxergam este espaço.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-border p-3">
+            <div>
+              <p className="text-sm font-medium">Arquivar espaço</p>
+              <p className="text-[11px] text-muted-foreground">
+                Espaços arquivados saem da navegação principal.
+              </p>
+            </div>
+            <Switch
+              checked={form.archived}
+              onCheckedChange={(v) => setForm({ ...form, archived: v })}
+            />
+          </div>
+
+          {space && (
+            <p className="text-[11px] text-muted-foreground">
+              Criado em {formatDateBR(space.created_at.slice(0, 10))} por{" "}
+              {users.find((u) => u.user_id === space.created_by)?.name ?? "—"}.
+            </p>
+          )}
+        </div>
+
+        <DialogFooter className="sm:justify-between">
+          {space ? (
+            <Button
+              variant="ghost"
+              className="text-destructive hover:text-destructive"
+              onClick={async () => {
+                await remove.mutateAsync(space.id);
+                toast.success("Espaço excluído");
+                onOpenChange(false);
+              }}
+            >
+              <Trash2 className="mr-1 size-3.5" /> Excluir
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={submit} disabled={save.isPending}>
+              Salvar
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

@@ -166,8 +166,9 @@ Configure em **Advanced → Health Check**:
 
 ## 6. Preparar o banco
 
-Antes do primeiro deploy, aplique o `db/schema.sql` no Postgres. Ele é SQL
-puro e idempotente — rodá-lo de novo em versões futuras do app não apaga dados.
+Antes do primeiro deploy — e a cada atualização que traga tabelas novas, como o
+módulo Tarefas e Projetos — aplique o `db/schema.sql` no Postgres. Ele é SQL
+puro e idempotente: rodá-lo de novo em um banco já populado não apaga dados.
 
 Do terminal, usando as mesmas variáveis `POSTGRES_*` do serviço:
 

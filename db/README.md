@@ -61,6 +61,16 @@ sem prefixo.
 | `recurring_rules` | Receitas e despesas recorrentes |
 | `investments` | Investimentos e rendimento esperado |
 | `goals` | Metas pessoais e financeiras |
+| `spaces` | Espaços do módulo Tarefas e Projetos (áreas, departamentos) |
+| `space_members` | Lista de acesso de um espaço; vazia = todos os membros da conta |
+| `boards` | Quadros (projetos, processos) dentro de um espaço |
+| `board_members` | Participantes de um quadro |
+| `board_statuses` | Status personalizados por quadro, cada um com sua polaridade |
+| `tasks` | Tarefas, com responsável, datas e status |
+| `task_participants` | Participantes de uma tarefa, além do responsável |
+| `subtasks` | Subtarefas, com responsável e datas próprias |
+| `time_entries` | Registros do cronômetro; `stopped_at` nulo = em execução |
+| `task_activity` | Trilha de auditoria da tarefa |
 
 ## Autorização
 
@@ -68,6 +78,23 @@ As policies de RLS do Supabase foram substituídas por checagens no servidor, em
 `src/integrations/postgres/access.server.ts`. Toda leitura ou escrita começa por
 `requireAccountRole` / `requireProfileAccess`, que confirmam o papel do usuário
 na conta dona do registro.
+
+O módulo Tarefas e Projetos segue a mesma regra, em
+`src/integrations/postgres/tasks.server.ts`: `requireSpaceAccess`,
+`requireBoardAccess` e `requireTaskAccess` sobem a hierarquia até a conta e
+conferem o papel, além da lista de acesso do espaço.
+
+## Regras que ficam no banco
+
+Poucas coisas são trigger, e só quando são integridade de dado:
+
+- `sync_task_completion` — a polaridade do status decide `completed_at` e
+  `archived_at` da tarefa, então renomear status não perde essa noção;
+- `sync_subtask_completion` — carimba `completed_at` da subtarefa;
+- `sync_time_entry_duration` — a duração sai sempre de `started_at`/`stopped_at`,
+  nunca do cliente;
+- `time_entries_single_running` — índice único parcial que impede dois
+  cronômetros em aberto para o mesmo usuário.
 
 Consequência prática: o usuário do banco configurado em `POSTGRES_USER` tem
 acesso total às tabelas. Trate essa credencial como segredo de produção e não a
