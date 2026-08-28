@@ -12,22 +12,16 @@ WORKDIR /app
 # "one or more build-args were not consumed" no log.
 ARG GIT_SHA
 
-# As variáveis VITE_* são inlined no bundle do cliente durante o build, então
-# precisam existir aqui como build args — defini-las só em runtime não adianta.
-# A contrapartida: mudar qualquer uma delas exige rebuild da imagem.
-ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_PUBLISHABLE_KEY
-ARG VITE_SUPABASE_PROJECT_ID
-
-# VITE_APP_URL é opcional e, em geral, é melhor deixar em branco: sem ela o
-# cliente usa o domínio de onde a página foi aberta (window.location.origin), e
-# trocar de domínio passa a ser só editar APP_URL em runtime, sem rebuild.
-# Informe apenas se o domínio canônico for diferente do domínio acessado.
+# O acesso ao banco acontece só no servidor Node, então nenhuma variável do
+# Postgres é build arg: host, senha e schema são lidos em runtime e podem mudar
+# sem rebuild da imagem.
+#
+# VITE_APP_URL é a única variável de build, e em geral é melhor deixá-la em
+# branco: sem ela o cliente usa o domínio de onde a página foi aberta
+# (window.location.origin), e trocar de domínio passa a ser só editar APP_URL em
+# runtime. Informe apenas se o domínio canônico for diferente do acessado.
 ARG VITE_APP_URL
-ENV VITE_APP_URL=$VITE_APP_URL \
-    VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
-    VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY \
-    VITE_SUPABASE_PROJECT_ID=$VITE_SUPABASE_PROJECT_ID
+ENV VITE_APP_URL=$VITE_APP_URL
 
 # Fora do build da Lovable esta env escolhe o alvo do Nitro; o padrão seria
 # Cloudflare Workers, que não roda em container. Dentro da Lovable ela é

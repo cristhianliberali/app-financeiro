@@ -33,9 +33,9 @@ export const Route = createFileRoute("/convite")({
 function InvitePage() {
   const { token } = Route.useSearch();
   const navigate = useNavigate();
-  const { session, loading } = useAuth();
+  const { user, loading } = useAuth();
   const { setAccountId } = useAppState();
-  const { data: preview, isLoading } = useInvitePreview(session ? (token ?? null) : null);
+  const { data: preview, isLoading } = useInvitePreview(user ? (token ?? null) : null);
   const accept = useAcceptInvite();
 
   return (
@@ -45,7 +45,7 @@ function InvitePage() {
 
         {!token && <p className="text-sm text-muted-foreground">Link de convite inválido.</p>}
 
-        {token && !loading && !session && (
+        {token && !loading && !user && (
           <>
             <p className="text-sm text-muted-foreground">
               Entre com a sua conta para aceitar o convite.
@@ -56,15 +56,15 @@ function InvitePage() {
           </>
         )}
 
-        {token && session && isLoading && (
+        {token && user && isLoading && (
           <p className="text-sm text-muted-foreground">Carregando convite…</p>
         )}
 
-        {token && session && !isLoading && !preview && (
+        {token && user && !isLoading && !preview && (
           <p className="text-sm text-muted-foreground">Convite não encontrado.</p>
         )}
 
-        {token && session && preview && (
+        {token && user && preview && (
           <>
             <p className="text-sm text-muted-foreground">
               Você foi convidado para a conta{" "}

@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuth } from "@/integrations/postgres/auth-middleware";
 
 export type ParsedRow = {
   description: string;
@@ -13,7 +13,7 @@ export type ParsedRow = {
 };
 
 export const parseStatement = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input: { text: string; categories: string[] }) => {
     if (!input?.text || input.text.trim().length < 10) throw new Error("Cole o texto da fatura");
     return { text: input.text.slice(0, 20000), categories: input.categories ?? [] };

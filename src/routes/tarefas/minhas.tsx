@@ -7,9 +7,8 @@ import { TaskDialog } from "@/components/tasks/TaskDialog";
 import { TaskKanban } from "@/components/tasks/TaskKanban";
 import { TaskListView } from "@/components/tasks/TaskListView";
 import { useTasksModule } from "@/components/tasks/useTasksModule";
-import { useBoardStatuses, useMoveTask, useTasks, type Task } from "@/lib/tasks";
-import { BOARD_VIEWS, POLARITIES, type BoardView } from "@/lib/tasks-analytics";
-import { supabase } from "@/integrations/supabase/client";
+import { useBoardStatuses, useMoveTaskByPolarity, useTasks, type Task } from "@/lib/tasks";
+import { BOARD_VIEWS, POLARITIES, type BoardView, type Polarity } from "@/lib/tasks-analytics";
 
 export const Route = createFileRoute("/tarefas/minhas")({
   head: () => ({
@@ -28,7 +27,7 @@ export const Route = createFileRoute("/tarefas/minhas")({
 function MyTasksPage() {
   const { accountId, users, currentUserId, toggleTimer } = useTasksModule();
   const { data: allTasks = [] } = useTasks({ accountId });
-  const move = useMoveTask();
+  const moveByPolarity = useMoveTaskByPolarity();
   const [view, setView] = useState<BoardView>("list");
   const [selected, setSelected] = useState<Task | null>(null);
   const { data: statuses = [] } = useBoardStatuses(selected?.board_id ?? null);
@@ -47,28 +46,20 @@ function MyTasksPage() {
 
   /**
    * No Kanban de "Minhas Tarefas" as colunas são as polaridades, pois as
-   * tarefas vêm de quadros diferentes. Ao mover, a tarefa recebe o primeiro
-   * status daquela polaridade dentro do próprio quadro.
+   * tarefas vêm de quadros diferentes. O servidor resolve qual status daquela
+   * polaridade usar dentro do quadro da própria tarefa.
    */
-  async function moveByPolarity(task: Task, polarity: string) {
-    const { data, error } = await supabase
-      .from("board_statuses")
-      .select("id,name")
-      .eq("board_id", task.board_id)
-      .eq("polarity", polarity)
-      .order("sort_order")
-      .limit(1);
-    if (error) {
-      toast.error(error.message);
-      return;
+  async function moveToPolarity(task: Task, polarity: Polarity) {
+    try {
+      const result = await moveByPolarity.mutateAsync({ id: task.id, polarity });
+      if (!result) {
+        toast.error(`O quadro “${task.board.name}” não possui status com essa polaridade.`);
+        return;
+      }
+      toast.success(`“${task.title}” movida para ${result.statusName}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível mover a tarefa");
     }
-    const target = (data ?? [])[0];
-    if (!target) {
-      toast.error(`O quadro “${task.board.name}” não possui status com a polaridade selecionada.`);
-      return;
-    }
-    await move.mutateAsync({ id: task.id, status_id: target.id as string });
-    toast.success(`“${task.title}” movida para ${target.name as string}`);
   }
 
   return (
@@ -121,7 +112,7 @@ function MyTasksPage() {
           currentUserId={currentUserId}
           showBoard
           columnOf={(t) => t.status?.polarity ?? null}
-          onMove={(task, columnId) => moveByPolarity(task, columnId)}
+          onMove={(task, columnId) => moveToPolarity(task, columnId as Polarity)}
           onOpen={setSelected}
           onToggleTimer={toggleTimer}
         />

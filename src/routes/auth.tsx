@@ -1,10 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
-import { useAuth } from "@/hooks/useAuth";
-import { getSiteUrl, siteUrl } from "@/lib/site-url";
+import { useAuth, useAuthConfig } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,51 +26,38 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const { session, loading } = useAuth();
+  const { user, loading, signIn, signUp } = useAuth();
+  // `CREATE_USERS_HOME=false` no servidor esconde o cadastro daqui e faz o
+  // back-end recusar qualquer tentativa — o app passa a ser só por convite.
+  const { data: config } = useAuthConfig();
+  const signupEnabled = config?.signupEnabled ?? false;
+
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!loading && session) navigate({ to: "/" });
-  }, [loading, session, navigate]);
+    if (!loading && user) navigate({ to: "/" });
+  }, [loading, user, navigate]);
+
+  useEffect(() => {
+    if (!signupEnabled && mode === "signup") setMode("login");
+  }, [signupEnabled, mode]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        navigate({ to: "/" });
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: siteUrl("/") },
-        });
-        if (error) throw error;
-        toast.success("Conta criada! Você já pode entrar.");
-        setMode("login");
-      }
+      if (mode === "login") await signIn(email, password);
+      else await signUp(email, password, name);
+      navigate({ to: "/" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível continuar");
     } finally {
       setBusy(false);
     }
-  }
-
-  async function google() {
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: getSiteUrl(),
-    });
-    if (result.error) {
-      toast.error("Não foi possível entrar com Google");
-      return;
-    }
-    if (result.redirected) return;
-    navigate({ to: "/" });
   }
 
   return (
@@ -91,12 +75,24 @@ function AuthPage() {
         </p>
 
         <form onSubmit={submit} className="mt-8 space-y-4">
+          {mode === "signup" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="name">Nome</Label>
+              <Input
+                id="name"
+                autoComplete="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="email">E-mail</Label>
             <Input
               id="email"
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -107,26 +103,32 @@ function AuthPage() {
               id="password"
               type="password"
               required
-              minLength={6}
+              minLength={8}
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+            {mode === "signup" && (
+              <p className="text-xs text-muted-foreground">Use pelo menos 8 caracteres.</p>
+            )}
           </div>
           <Button type="submit" className="w-full" disabled={busy}>
             {mode === "login" ? "Entrar" : "Criar conta"}
           </Button>
         </form>
 
-        <Button variant="outline" className="mt-3 w-full" onClick={google}>
-          Continuar com Google
-        </Button>
-
-        <button
-          onClick={() => setMode(mode === "login" ? "signup" : "login")}
-          className="mt-6 w-full text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
-        >
-          {mode === "login" ? "Não tem conta? Criar agora" : "Já tem conta? Entrar"}
-        </button>
+        {signupEnabled ? (
+          <button
+            onClick={() => setMode(mode === "login" ? "signup" : "login")}
+            className="mt-6 w-full text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {mode === "login" ? "Não tem conta? Criar agora" : "Já tem conta? Entrar"}
+          </button>
+        ) : (
+          <p className="mt-6 text-center text-xs text-muted-foreground">
+            O cadastro está fechado. Peça um convite a quem já usa o app.
+          </p>
+        )}
       </div>
     </div>
   );
