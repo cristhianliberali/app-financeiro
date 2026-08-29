@@ -43,6 +43,7 @@ const empty = {
   color: "#3B82F6",
   emoji: "💸",
   monthly_cap: "",
+  description: "",
 };
 
 function CategoriesPage() {
@@ -61,6 +62,7 @@ function CategoriesPage() {
       color: c.color,
       emoji: c.emoji,
       monthly_cap: c.monthly_cap != null ? String(c.monthly_cap) : "",
+      description: c.description ?? "",
     });
     setOpen(true);
   }
@@ -81,6 +83,7 @@ function CategoriesPage() {
         form.kind === "expense" && form.monthly_cap
           ? Number(form.monthly_cap.replace(",", "."))
           : null,
+      description: form.description.trim() || null,
     });
     toast.success("Categoria salva");
     setOpen(false);
@@ -157,15 +160,16 @@ function CategoriesPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
               <Label>Nome</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <Input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Tipo</Label>
               <select
                 value={form.kind}
-                onChange={(e) =>
-                  setForm({ ...form, kind: e.target.value as "income" | "expense" })
-                }
+                onChange={(e) => setForm({ ...form, kind: e.target.value as "income" | "expense" })}
                 className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="expense">Saída</option>
@@ -199,6 +203,20 @@ function CategoriesPage() {
                 />
               </div>
             )}
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Palavras-chave da fatura</Label>
+              <textarea
+                rows={2}
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="Ex.: IFOOD, RESTAURANTE, PADARIA, MERCADO"
+                className="w-full resize-y rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Como esses lançamentos aparecem na fatura. A importação por IA usa esses termos para
+                classificar as linhas nesta categoria.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>

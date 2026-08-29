@@ -56,7 +56,7 @@ sem prefixo.
 | `account_members` | Quem participa de cada conta e com qual papel (`owner`/`editor`/`viewer`) |
 | `account_invites` | Convites pendentes, por e-mail, com token e prazo |
 | `budget_profiles` | Perfis (Pessoal, Empresa…) que isolam os dados dentro de uma conta |
-| `categories` | Categorias de entrada e saída, com teto mensal |
+| `categories` | Categorias de entrada e saída, com teto mensal e palavras-chave usadas pela importação por IA |
 | `transactions` | Lançamentos, inclusive parcelas |
 | `recurring_rules` | Receitas e despesas recorrentes |
 | `investments` | Investimentos e rendimento esperado |

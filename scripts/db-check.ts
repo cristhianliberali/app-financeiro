@@ -31,6 +31,9 @@ const EXPECTED_TABLES = [
   "subtasks",
   "time_entries",
   "task_activity",
+  "labels",
+  "task_label_links",
+  "task_reminders",
 ];
 
 async function main() {

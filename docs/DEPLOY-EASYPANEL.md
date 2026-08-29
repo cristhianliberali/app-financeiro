@@ -83,7 +83,10 @@ POSTGRES_PASSWORD=<segredo>
 POSTGRES_SSL=false
 POSTGRES_SCHEMA=public
 CREATE_USERS_HOME=true
-LOVABLE_API_KEY=<opcional, segredo>
+PROVEDOR_IA=openai
+MODELO_IA=gpt-4o-mini
+OPENAI_API_KEY=<opcional, segredo>
+LIMITE_TOKENS=12000
 PORT=3000
 HOST=0.0.0.0
 NODE_ENV=production
@@ -110,7 +113,10 @@ interna `5432` — assim o tráfego não sai para a internet.
 | `CREATE_USERS_HOME` | runtime | não | `true` mostra o cadastro na tela inicial; `false` deixa o app só por convite |
 | `SESSION_COOKIE_NAME` | runtime | não | Nome do cookie de sessão (padrão `aura_session`) |
 | `SESSION_TTL_DAYS` | runtime | não | Validade da sessão em dias (padrão `30`) |
-| `LOVABLE_API_KEY` | runtime | não | Importação de faturas por IA. **Segredo** |
+| `PROVEDOR_IA` | runtime | não | Provedor de IA da importação de faturas (padrão e único aceito hoje: `openai`) |
+| `MODELO_IA` | runtime | não | Modelo usado nas requisições de importação (ex.: `gpt-4o-mini`) |
+| `OPENAI_API_KEY` | runtime | não | Chave do provedor. Sem ela a importação por IA fica indisponível. **Segredo** |
+| `LIMITE_TOKENS` | runtime | não | Tokens do documento por requisição (padrão `12000`); acima disso vira lote |
 | `PORT` | runtime | não | Porta do servidor (padrão `3000`) |
 | `HOST` | runtime | sim | Precisa ser `0.0.0.0` para o proxy alcançar |
 
@@ -248,7 +254,8 @@ docker run --rm -p 3000:3000 \
 | Link de convite gerado com domínio errado | `VITE_APP_URL` com barra no final ou apontando para outro host |
 | `502 Bad Gateway` no EasyPanel | `HOST` diferente de `0.0.0.0`, ou porta do domínio diferente de `PORT` |
 | `403 Forbidden` ao salvar transações | `APP_URL` não bate com o domínio de onde a página foi aberta |
-| Importação por IA responde "IA indisponível no momento" | `LOVABLE_API_KEY` não configurada |
+| Importação por IA aparece desabilitada na tela | Falta `MODELO_IA` ou `OPENAI_API_KEY` |
+| `PROVEDOR_IA "x" não é suportado` | Só `openai` é aceito hoje |
 
 ---
 

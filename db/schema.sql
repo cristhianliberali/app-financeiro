@@ -159,6 +159,11 @@ CREATE TABLE IF NOT EXISTS categories (
 
 CREATE INDEX IF NOT EXISTS categories_profile_idx ON categories(profile_id);
 
+-- Descrição/palavras-chave da categoria. Vai junto na requisição de importação
+-- por IA: termos como "IFOOD, RESTAURANTE, PADARIA" ajudam o modelo a
+-- classificar as linhas da fatura sem depender só do nome da categoria.
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS description text;
+
 CREATE TABLE IF NOT EXISTS transactions (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id           uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
