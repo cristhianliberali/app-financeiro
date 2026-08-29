@@ -9,18 +9,16 @@ import {
   Users,
   LogOut,
   ChevronDown,
-  KanbanSquare,
-  CalendarDays,
-  UserCheck,
-  Layers,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppState } from "@/lib/app-state";
 import { useProfiles } from "@/lib/data";
 import { useAccounts } from "@/lib/accounts";
-import { useSpaces } from "@/lib/tasks";
 import { PeriodControls } from "@/components/PeriodControls";
+import { ModuleSwitcher } from "@/components/ModuleSwitcher";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { ActiveTimerBar } from "@/components/tasks/ActiveTimerBar";
+import { NotificationBell } from "@/components/tasks/NotificationBell";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,43 +26,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+/**
+ * Casca do módulo Finanças. O módulo Projetos e Tarefas tem a sua própria
+ * (`TasksShell`); a passagem entre os dois é o `ModuleSwitcher` aqui no topo.
+ */
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/transacoes", label: "Transações", icon: ArrowLeftRight },
   { to: "/categorias", label: "Categorias", icon: Tags },
   { to: "/investimentos", label: "Investimentos", icon: TrendingUp },
   { to: "/metas", label: "Metas", icon: Target },
-  { to: "/tarefas", label: "Tarefas e Projetos", icon: KanbanSquare },
   { to: "/conta", label: "Conta & equipe", icon: Users },
 ] as const;
 
-const tasksNav = [
-  { to: "/tarefas", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { to: "/tarefas/minhas", label: "Minhas Tarefas", icon: UserCheck, exact: false },
-  { to: "/tarefas/calendario", label: "Calendário", icon: CalendarDays, exact: false },
-  { to: "/tarefas/espacos", label: "Espaços", icon: Layers, exact: false },
-] as const;
-
-export function AppShell({
-  children,
-  actions,
-  /** O módulo Tarefas e Projetos não usa perfil de orçamento nem período financeiro. */
-  hideFinanceControls = false,
-  breadcrumb,
-}: {
-  children: ReactNode;
-  actions?: ReactNode;
-  hideFinanceControls?: boolean;
-  breadcrumb?: ReactNode;
-}) {
+export function AppShell({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { accountId, setAccountId, profileId, setProfileId } = useAppState();
   const { data: accounts } = useAccounts();
   const { data: profiles } = useProfiles(accountId);
-  const inTasks = pathname.startsWith("/tarefas");
-  const { data: spaces } = useSpaces(inTasks ? accountId : null);
 
   useEffect(() => {
     if (accounts?.length && !accounts.some((a) => a.id === accountId)) {
@@ -96,9 +77,12 @@ export function AppShell({
   return (
     <div className="min-h-screen bg-background text-foreground">
       <aside className="fixed left-0 top-0 z-10 hidden h-full w-64 flex-col border-r border-border bg-card p-6 lg:flex">
-        <div className="mb-10 flex items-center gap-2">
+        <div className="mb-6 flex items-center gap-2">
           <div className="size-8 rounded-lg bg-primary" />
           <span className="text-xl font-bold tracking-tight">AURA</span>
+        </div>
+        <div className="mb-6">
+          <ModuleSwitcher />
         </div>
         <nav className="space-y-1">
           {nav.map((item) => {
@@ -118,66 +102,27 @@ export function AppShell({
               </Link>
             );
           })}
-          {inTasks && (
-            <div className="ml-3 space-y-1 border-l border-border pl-3 pt-1">
-              {tasksNav.map((item) => {
-                const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
-                return (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors ${
-                      active
-                        ? "bg-secondary font-medium text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <item.icon className="size-3.5" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-              {(spaces ?? [])
-                .filter((s) => !s.archived_at)
-                .map((space) => (
-                  <Link
-                    key={space.id}
-                    to="/tarefas/espacos/$spaceId"
-                    params={{ spaceId: space.id }}
-                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors ${
-                      pathname === `/tarefas/espacos/${space.id}`
-                        ? "bg-secondary font-medium text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <span>{space.icon}</span>
-                    <span className="truncate">{space.name}</span>
-                  </Link>
-                ))}
-            </div>
-          )}
         </nav>
         <div className="mt-auto space-y-4">
-          {!hideFinanceControls && (
-            <div className="rounded-xl border border-primary/10 bg-primary/5 p-4">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">
-                Perfil ativo
-              </p>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Os lançamentos, categorias e metas exibidos pertencem ao perfil{" "}
-                <span className="font-semibold text-foreground">{current?.name ?? "—"}</span>.
-              </p>
-            </div>
-          )}
-          <button
-            onClick={async () => {
-              await signOut();
-              navigate({ to: "/auth" });
-            }}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <LogOut className="size-4" /> Sair
-          </button>
+          <div className="rounded-xl border border-border bg-secondary/50 p-4">
+            <p className="label-caps mb-2">Perfil ativo</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Os lançamentos, categorias e metas exibidos pertencem ao perfil{" "}
+              <span className="font-semibold text-foreground">{current?.name ?? "—"}</span>.
+            </p>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <button
+              onClick={async () => {
+                await signOut();
+                navigate({ to: "/auth" });
+              }}
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <LogOut className="size-4" /> Sair
+            </button>
+            <ThemeToggle />
+          </div>
         </div>
       </aside>
 
@@ -188,7 +133,7 @@ export function AppShell({
               <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-border bg-secondary/60 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary">
                 <span
                   className="size-2 rounded-full"
-                  style={{ backgroundColor: currentAccount?.color ?? "#3B82F6" }}
+                  style={{ backgroundColor: currentAccount?.color ?? "var(--foreground)" }}
                 />
                 {currentAccount?.name ?? "Conta"}
                 <ChevronDown className="size-3 opacity-50" />
@@ -211,43 +156,35 @@ export function AppShell({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            {!hideFinanceControls && (
-              <>
-                <div className="hidden h-4 w-px bg-border sm:block" />
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary">
+            <div className="hidden h-4 w-px bg-border sm:block" />
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary">
+                <span
+                  className="size-2 rounded-full"
+                  style={{ backgroundColor: current?.color ?? "var(--foreground)" }}
+                />
+                Perfil: {current?.name ?? "—"}
+                <ChevronDown className="size-3 opacity-50" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {profiles?.map((p) => (
+                  <DropdownMenuItem key={p.id} onClick={() => setProfileId(p.id)}>
                     <span
-                      className="size-2 rounded-full"
-                      style={{ backgroundColor: current?.color ?? "#3B82F6" }}
+                      className="mr-2 size-2 rounded-full"
+                      style={{ backgroundColor: p.color }}
                     />
-                    Perfil: {current?.name ?? "—"}
-                    <ChevronDown className="size-3 opacity-50" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    {profiles?.map((p) => (
-                      <DropdownMenuItem key={p.id} onClick={() => setProfileId(p.id)}>
-                        <span
-                          className="mr-2 size-2 rounded-full"
-                          style={{ backgroundColor: p.color }}
-                        />
-                        {p.name}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <div className="hidden h-4 w-px bg-border sm:block" />
-                <PeriodControls />
-              </>
-            )}
-            {breadcrumb && (
-              <>
-                <div className="hidden h-4 w-px bg-border sm:block" />
-                {breadcrumb}
-              </>
-            )}
+                    {p.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <div className="hidden h-4 w-px bg-border sm:block" />
+            <PeriodControls />
           </div>
           <div className="flex items-center gap-2">
             <ActiveTimerBar />
+            {/* Os lembretes de tarefa também alcançam quem está no Finanças. */}
+            <NotificationBell />
             {actions}
           </div>
         </header>

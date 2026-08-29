@@ -1,7 +1,17 @@
-import { Clock, ListChecks, Pause, Play } from "lucide-react";
+import { BellRing, Clock, ListChecks, Pause, Play, Timer } from "lucide-react";
 import { useNow } from "@/hooks/use-now";
 import type { AccountUser, Task } from "@/lib/tasks";
-import { deadlineClass, deadlineState, formatClock, formatDuration } from "@/lib/tasks-analytics";
+import {
+  deadlineClass,
+  deadlineState,
+  estimateClass,
+  estimateState,
+  formatClock,
+  formatDuration,
+  formatHours,
+} from "@/lib/tasks-analytics";
+import { LabelChip } from "./LabelPicker";
+import { PriorityBadge } from "./PriorityPicker";
 import { UserAvatar, UserStack } from "./UserPicker";
 
 export function TaskCard({
@@ -32,6 +42,8 @@ export function TaskCard({
   });
   const doneSubtasks = task.subtasks.filter((s) => s.completed).length;
   const isMine = running?.user_id === currentUserId;
+  const estimate = estimateState(task.estimate_hours, seconds);
+  const pendingReminders = task.reminders.filter((r) => !r.delivered_at).length;
 
   return (
     <div
@@ -42,6 +54,7 @@ export function TaskCard({
     >
       <div className="flex items-start gap-2">
         <p className="flex-1 text-sm font-medium leading-snug">{task.title}</p>
+        <PriorityBadge priority={task.priority} showLabel={false} className="mt-0.5 shrink-0" />
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -65,6 +78,17 @@ export function TaskCard({
         </p>
       )}
 
+      {task.labels.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {task.labels.slice(0, 3).map((label) => (
+            <LabelChip key={label.id} label={label} />
+          ))}
+          {task.labels.length > 3 && (
+            <span className="text-[10px] text-muted-foreground">+{task.labels.length - 3}</span>
+          )}
+        </div>
+      )}
+
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
         {task.due_date && (
           <span className={deadlineClass(state)}>
@@ -81,11 +105,31 @@ export function TaskCard({
           </span>
         )}
         {seconds > 0 && (
-          <span className={`inline-flex items-center gap-1 ${running ? "text-primary" : ""}`}>
+          <span
+            className={`inline-flex items-center gap-1 ${running ? "font-semibold text-foreground" : ""}`}
+          >
             <Clock className="size-3" />
             <span className="font-mono tabular-nums">
               {running ? formatClock(seconds) : formatDuration(seconds)}
             </span>
+          </span>
+        )}
+        {task.estimate_hours ? (
+          <span
+            className={`inline-flex items-center gap-1 ${estimateClass(estimate)}`}
+            title={`Estimativa: ${formatHours(task.estimate_hours)}`}
+          >
+            <Timer className="size-3" />
+            <span className="font-mono tabular-nums">{formatHours(task.estimate_hours)}</span>
+          </span>
+        ) : null}
+        {pendingReminders > 0 && (
+          <span
+            className="inline-flex items-center gap-1"
+            title={`${pendingReminders} lembrete(s) agendado(s)`}
+          >
+            <BellRing className="size-3" />
+            {pendingReminders}
           </span>
         )}
         <span className="ml-auto flex items-center gap-1">

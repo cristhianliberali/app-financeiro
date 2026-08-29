@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
+import { useTone } from "@/hooks/use-tone";
 import type { AccountUser, Task } from "@/lib/tasks";
 import { TaskCard } from "./TaskCard";
 
@@ -34,6 +35,7 @@ export function TaskKanban({
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
+  const tone = useTone();
 
   if (columns.length === 0) {
     return (
@@ -68,7 +70,10 @@ export function TaskKanban({
             }}
           >
             <div className="mb-2 flex items-center gap-2 px-2 pt-1">
-              <span className="size-2 rounded-full" style={{ backgroundColor: col.color }} />
+              <span
+                className="size-2 rounded-full ring-1 ring-border"
+                style={{ backgroundColor: tone(col.color) }}
+              />
               <span className="text-sm font-semibold" title={col.hint}>
                 {col.name}
               </span>

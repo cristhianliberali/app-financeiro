@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { AppShell } from "@/components/AppShell";
+import { TasksShell } from "@/components/tasks/TasksShell";
 import { TaskCalendar } from "@/components/tasks/TaskCalendar";
 import { TaskDialog } from "@/components/tasks/TaskDialog";
 import { useTasksModule } from "@/components/tasks/useTasksModule";
@@ -9,7 +9,7 @@ import { useBoardStatuses, useBoards, useSpaces, useTasks, type Task } from "@/l
 export const Route = createFileRoute("/tarefas/calendario")({
   head: () => ({
     meta: [
-      { title: "Calendário — Tarefas e Projetos" },
+      { title: "Calendário — Projetos e Tarefas" },
       {
         name: "description",
         content:
@@ -48,7 +48,7 @@ function CalendarPage() {
   const openTask = selected ? (allTasks.find((t) => t.id === selected.id) ?? selected) : null;
 
   return (
-    <AppShell hideFinanceControls>
+    <TasksShell breadcrumbCurrent="Calendário">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Calendário</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -114,6 +114,6 @@ function CalendarPage() {
           currentUserId={currentUserId}
         />
       )}
-    </AppShell>
+    </TasksShell>
   );
 }

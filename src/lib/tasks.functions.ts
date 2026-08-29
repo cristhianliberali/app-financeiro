@@ -6,6 +6,7 @@ import { requireAuth } from "@/integrations/postgres/auth-middleware";
 // o módulo do servidor entra por `await import()` dentro de cada handler.
 
 const POLARITIES = ["IN_PROGRESS", "SUCCESS", "ARCHIVED"] as const;
+const PRIORITIES = ["urgent", "high", "normal", "low", "none"] as const;
 const BOARD_VIEWS = ["kanban", "list", "calendar"] as const;
 const BOARD_STAGES = ["planning", "active", "paused", "done"] as const;
 
@@ -37,6 +38,13 @@ function optionalTimestamp(value: unknown): string | null {
 /** Data pura, no formato YYYY-MM-DD. */
 function optionalDate(value: unknown): string | null {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+/** Número >= 0 com duas casas; qualquer outra coisa vira `null`. */
+function optionalHours(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return Math.round(Math.min(parsed, 99_999) * 100) / 100;
 }
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
@@ -338,10 +346,13 @@ export const saveTask = createServerFn({ method: "POST" })
       title: string;
       description?: string | null;
       responsibleUserId?: string | null;
+      priority?: string;
+      estimateHours?: number | null;
       startDate?: string | null;
       dueDate?: string | null;
       sortOrder?: number;
       participantIds?: string[] | null;
+      labelIds?: string[] | null;
     }) => ({
       ...(input?.id ? { id: input.id } : {}),
       boardId: requireId(input?.boardId, "boardId"),
@@ -351,12 +362,21 @@ export const saveTask = createServerFn({ method: "POST" })
       ...("responsibleUserId" in (input ?? {})
         ? { responsibleUserId: optionalId(input.responsibleUserId) }
         : {}),
+      ...("priority" in (input ?? {})
+        ? { priority: oneOf(input.priority, PRIORITIES, "normal") }
+        : {}),
+      ...("estimateHours" in (input ?? {})
+        ? { estimateHours: optionalHours(input.estimateHours) }
+        : {}),
       ...("startDate" in (input ?? {}) ? { startDate: optionalTimestamp(input.startDate) } : {}),
       ...("dueDate" in (input ?? {}) ? { dueDate: optionalTimestamp(input.dueDate) } : {}),
       ...(Number.isInteger(input?.sortOrder) ? { sortOrder: input!.sortOrder as number } : {}),
       ...(input?.participantIds === undefined || input.participantIds === null
         ? {}
         : { participantIds: idList(input.participantIds) }),
+      ...(input?.labelIds === undefined || input.labelIds === null
+        ? {}
+        : { labelIds: idList(input.labelIds) }),
     }),
   )
   .handler(async ({ data, context }) =>
@@ -395,6 +415,99 @@ export const deleteTask = createServerFn({ method: "POST" })
     await (
       await import("@/integrations/postgres/tasks.server")
     ).deleteTask(context.user.id, data.id);
+    return null;
+  });
+
+// ─────────────────────────────── etiquetas ──────────────────────────────
+
+export const fetchLabels = createServerFn({ method: "GET" })
+  .middleware([requireAuth])
+  .inputValidator((input: { accountId: string }) => ({ accountId: requireId(input?.accountId) }))
+  .handler(async ({ data, context }) =>
+    (await import("@/integrations/postgres/tasks.server")).listLabels(
+      context.user.id,
+      data.accountId,
+    ),
+  );
+
+export const saveLabel = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((input: { id?: string; accountId: string; name: string; color?: string }) => ({
+    ...(input?.id ? { id: input.id } : {}),
+    accountId: requireId(input?.accountId, "accountId"),
+    name: requireText(input?.name, "Nome da etiqueta", 40),
+    color: typeof input?.color === "string" ? input.color.slice(0, 32) : "#737373",
+  }))
+  .handler(async ({ data, context }) =>
+    (await import("@/integrations/postgres/tasks.server")).saveLabel(context.user.id, data),
+  );
+
+export const deleteLabel = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((input: { id: string }) => ({ id: requireId(input?.id) }))
+  .handler(async ({ data, context }): Promise<null> => {
+    await (
+      await import("@/integrations/postgres/tasks.server")
+    ).deleteLabel(context.user.id, data.id);
+    return null;
+  });
+
+// ─────────────────────────────── lembretes ──────────────────────────────
+
+export const saveReminder = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator(
+    (input: {
+      id?: string;
+      taskId: string;
+      userId?: string | null;
+      remindAt: string;
+      note?: string | null;
+    }) => {
+      const remindAt = optionalTimestamp(input?.remindAt);
+      if (!remindAt) throw new Error("Informe a data e a hora do lembrete");
+      return {
+        ...(input?.id ? { id: input.id } : {}),
+        taskId: requireId(input?.taskId, "taskId"),
+        userId: optionalId(input?.userId),
+        remindAt,
+        note: optionalText(input?.note, 300),
+      };
+    },
+  )
+  .handler(async ({ data, context }) =>
+    (await import("@/integrations/postgres/tasks.server")).saveReminder(context.user.id, data),
+  );
+
+export const deleteReminder = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((input: { id: string }) => ({ id: requireId(input?.id) }))
+  .handler(async ({ data, context }): Promise<null> => {
+    await (
+      await import("@/integrations/postgres/tasks.server")
+    ).deleteReminder(context.user.id, data.id);
+    return null;
+  });
+
+export const fetchDueReminders = createServerFn({ method: "GET" })
+  .middleware([requireAuth])
+  .handler(async ({ context }) =>
+    (await import("@/integrations/postgres/tasks.server")).listDueReminders(context.user.id),
+  );
+
+export const fetchUpcomingReminders = createServerFn({ method: "GET" })
+  .middleware([requireAuth])
+  .handler(async ({ context }) =>
+    (await import("@/integrations/postgres/tasks.server")).listUpcomingReminders(context.user.id),
+  );
+
+export const ackReminders = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((input: { ids: string[] }) => ({ ids: idList(input?.ids) }))
+  .handler(async ({ data, context }): Promise<null> => {
+    await (
+      await import("@/integrations/postgres/tasks.server")
+    ).markRemindersDelivered(context.user.id, data.ids);
     return null;
   });
 
