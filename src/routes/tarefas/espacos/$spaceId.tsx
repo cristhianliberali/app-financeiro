@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ChevronLeft, Pencil, Plus } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
+import { Pencil, Plus } from "lucide-react";
+import { TasksShell } from "@/components/tasks/TasksShell";
 import { Button } from "@/components/ui/button";
 import { BoardDialog } from "@/components/tasks/BoardDialog";
 import { SpaceDialog } from "@/components/tasks/SpaceDialog";
 import { useTasksModule } from "@/components/tasks/useTasksModule";
+import { useTone } from "@/hooks/use-tone";
 import { useBoards, useSpaces, useTasks, type Board } from "@/lib/tasks";
 import { BOARD_STAGES, formatDateTimeBR } from "@/lib/tasks-analytics";
 import { UserAvatar } from "@/components/tasks/UserPicker";
@@ -13,7 +14,7 @@ import { UserAvatar } from "@/components/tasks/UserPicker";
 export const Route = createFileRoute("/tarefas/espacos/$spaceId")({
   head: () => ({
     meta: [
-      { title: "Quadros do espaço — Tarefas e Projetos" },
+      { title: "Quadros do espaço — Projetos e Tarefas" },
       {
         name: "description",
         content: "Quadros do espaço: projetos, processos e fluxos de trabalho com suas tarefas.",
@@ -27,6 +28,7 @@ function SpacePage() {
   const { spaceId } = Route.useParams();
   const navigate = useNavigate();
   const { accountId, users } = useTasksModule();
+  const tone = useTone();
   const { data: spaces = [] } = useSpaces(accountId);
   const { data: boards = [] } = useBoards({ accountId, spaceId });
   const { data: tasks = [] } = useTasks({ accountId });
@@ -40,16 +42,8 @@ function SpacePage() {
   const space = spaces.find((s) => s.id === spaceId) ?? null;
 
   return (
-    <AppShell
-      hideFinanceControls
-      breadcrumb={
-        <Link
-          to="/tarefas/espacos"
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="size-3.5" /> Espaços
-        </Link>
-      }
+    <TasksShell
+      spaceId={spaceId}
       actions={
         <>
           <Button variant="outline" size="sm" onClick={() => setSpaceDialog(true)}>
@@ -62,10 +56,7 @@ function SpacePage() {
       }
     >
       <div className="flex items-center gap-3">
-        <span
-          className="flex size-12 items-center justify-center rounded-xl text-2xl"
-          style={{ backgroundColor: `${space?.color ?? "#3B82F6"}1A` }}
-        >
+        <span className="flex size-12 items-center justify-center rounded-xl border border-border bg-secondary text-2xl">
           {space?.icon ?? "📁"}
         </span>
         <div>
@@ -97,8 +88,8 @@ function SpacePage() {
               <Link to="/tarefas/quadros/$boardId" params={{ boardId: board.id }} className="block">
                 <div className="flex items-center gap-2">
                   <span
-                    className="size-2.5 rounded-full"
-                    style={{ backgroundColor: board.color }}
+                    className="size-2.5 rounded-full ring-1 ring-border"
+                    style={{ backgroundColor: tone(board.color) }}
                   />
                   <p className="font-semibold">{board.name}</p>
                 </div>
@@ -151,7 +142,6 @@ function SpacePage() {
         spaces={spaces}
         defaultSpaceId={spaceId}
         board={boardDialog.board}
-        users={users}
         onCreated={(boardId) =>
           navigate({ to: "/tarefas/quadros/$boardId", params: { boardId }, search: {} })
         }
@@ -162,8 +152,7 @@ function SpacePage() {
         onOpenChange={setSpaceDialog}
         accountId={accountId}
         space={space}
-        users={users}
       />
-    </AppShell>
+    </TasksShell>
   );
 }

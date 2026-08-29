@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
+import { useAppState } from "@/lib/app-state";
 import {
   Dialog,
   DialogContent,
@@ -13,14 +14,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
+  useAccountUsers,
+  useBoards,
   useDeleteSpace,
   useSaveSpace,
   useSpaceMembers,
-  type AccountUser,
+  useTasks,
   type Space,
 } from "@/lib/tasks";
 import { PALETTE, SPACE_ICONS } from "@/lib/tasks-analytics";
 import { formatDateBR } from "@/lib/format";
+import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import { UserMultiSelect } from "./UserPicker";
 
 export function SpaceDialog({
@@ -28,17 +32,23 @@ export function SpaceDialog({
   onOpenChange,
   accountId,
   space,
-  users,
+  onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accountId: string | null;
+  /** Espaço existente; nulo abre o formulário de criação. */
   space: Space | null;
-  users: AccountUser[];
+  onCreated?: (spaceId: string) => void;
 }) {
+  const { accountId: activeAccountId } = useAppState();
+  const { data: users = [] } = useAccountUsers(accountId ?? activeAccountId);
+  const { data: boards = [] } = useBoards({ accountId });
+  const { data: tasks = [] } = useTasks({ accountId });
   const save = useSaveSpace(accountId);
   const remove = useDeleteSpace();
   const { data: currentMembers } = useSpaceMembers(space?.id ?? null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -77,7 +87,7 @@ export function SpaceDialog({
       toast.error("Informe o nome do espaço");
       return;
     }
-    await save.mutateAsync({
+    const savedId = await save.mutateAsync({
       ...(space ? { id: space.id } : {}),
       name: form.name.trim(),
       description: form.description.trim() || null,
@@ -88,6 +98,7 @@ export function SpaceDialog({
     });
     toast.success(space ? "Espaço atualizado" : "Espaço criado");
     onOpenChange(false);
+    if (!space) onCreated?.(savedId as string);
   }
 
   return (
@@ -187,11 +198,7 @@ export function SpaceDialog({
             <Button
               variant="ghost"
               className="text-destructive hover:text-destructive"
-              onClick={async () => {
-                await remove.mutateAsync(space.id);
-                toast.success("Espaço excluído");
-                onOpenChange(false);
-              }}
+              onClick={() => setConfirmDelete(true)}
             >
               <Trash2 className="mr-1 size-3.5" /> Excluir
             </Button>
@@ -208,6 +215,24 @@ export function SpaceDialog({
           </div>
         </DialogFooter>
       </DialogContent>
+
+      {space && (
+        <ConfirmDeleteDialog
+          open={confirmDelete}
+          onOpenChange={setConfirmDelete}
+          itemLabel="espaço"
+          itemName={space.name}
+          consequences={[
+            `${boards.filter((b) => b.space_id === space.id).length} quadro(s) deste espaço`,
+            `${tasks.filter((t) => t.space.id === space.id).length} tarefa(s), com subtarefas e tempo registrado`,
+          ]}
+          onConfirm={async () => {
+            await remove.mutateAsync(space.id);
+            toast.success(`Espaço “${space.name}” excluído`);
+            onOpenChange(false);
+          }}
+        />
+      )}
     </Dialog>
   );
 }

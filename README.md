@@ -32,6 +32,31 @@ Metas de economia
 Metas pessoais
 Metas financeiras
 
+#Projetos e Tarefas
+Segundo módulo do app, com tela própria. A troca entre os dois é o seletor
+**Finanças / Projetos e Tarefas** no topo do menu lateral.
+
+Hierarquia: conta → espaços → quadros → tarefas → subtarefas. O menu lateral traz
+a árvore de espaços e quadros (recolhível), e o cabeçalho mostra o caminho
+`Espaço / Quadro`, com uma seta em cada nível para pular direto para outro espaço
+ou quadro.
+
+- Kanban, lista e calendário por quadro, com busca e filtros por prioridade,
+  etiqueta e responsável;
+- **Responsável**: se ninguém for escolhido, quem criou a tarefa fica responsável;
+- **Prioridade** (urgente, alta, normal, baixa) visível no cartão e na lista;
+- **Etiquetas** da conta, reaproveitadas entre quadros, com filtro próprio;
+- **Estimativa de horas** por tarefa, comparada com o tempo cronometrado no
+  dashboard (estimado x realizado, saldo de horas, o que estourou);
+- **Lembretes** por tarefa, entregues como notificação do navegador e no sininho
+  do cabeçalho;
+- Exclusão protegida: espaço e quadro pedem o nome digitado, tarefa pede
+  confirmação.
+
+#Tema
+Preto e branco, claro e escuro, no sistema inteiro. A escolha fica no rodapé do
+menu lateral (claro / escuro / seguir o sistema) e é lembrada no navegador.
+
 This project was built with [Lovable](https://lovable.dev).
 
 ## Build with Lovable

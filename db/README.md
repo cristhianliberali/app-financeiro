@@ -61,14 +61,17 @@ sem prefixo.
 | `recurring_rules` | Receitas e despesas recorrentes |
 | `investments` | Investimentos e rendimento esperado |
 | `goals` | Metas pessoais e financeiras |
-| `spaces` | Espaços do módulo Tarefas e Projetos (áreas, departamentos) |
+| `spaces` | Espaços do módulo Projetos e Tarefas (áreas, departamentos) |
 | `space_members` | Lista de acesso de um espaço; vazia = todos os membros da conta |
 | `boards` | Quadros (projetos, processos) dentro de um espaço |
 | `board_members` | Participantes de um quadro |
 | `board_statuses` | Status personalizados por quadro, cada um com sua polaridade |
-| `tasks` | Tarefas, com responsável, datas e status |
+| `tasks` | Tarefas, com responsável, prioridade, estimativa de horas, datas e status |
 | `task_participants` | Participantes de uma tarefa, além do responsável |
+| `labels` | Etiquetas da conta, reaproveitadas entre espaços e quadros |
+| `task_label_links` | Quais etiquetas cada tarefa tem |
 | `subtasks` | Subtarefas, com responsável e datas próprias |
+| `task_reminders` | Lembretes agendados por tarefa; `delivered_at` marca o que já foi notificado |
 | `time_entries` | Registros do cronômetro; `stopped_at` nulo = em execução |
 | `task_activity` | Trilha de auditoria da tarefa |
 
@@ -79,7 +82,7 @@ As policies de RLS do Supabase foram substituídas por checagens no servidor, em
 `requireAccountRole` / `requireProfileAccess`, que confirmam o papel do usuário
 na conta dona do registro.
 
-O módulo Tarefas e Projetos segue a mesma regra, em
+O módulo Projetos e Tarefas segue a mesma regra, em
 `src/integrations/postgres/tasks.server.ts`: `requireSpaceAccess`,
 `requireBoardAccess` e `requireTaskAccess` sobem a hierarquia até a conta e
 conferem o papel, além da lista de acesso do espaço.

@@ -12,18 +12,24 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AlarmClock, CalendarCheck, CheckCircle2, Clock, Loader, Plus } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
+import { AlarmClock, CalendarCheck, CheckCircle2, Clock, Loader, Plus, Timer } from "lucide-react";
+import { TasksShell } from "@/components/tasks/TasksShell";
 import { Button } from "@/components/ui/button";
 import { useTasksModule } from "@/components/tasks/useTasksModule";
 import { useNow } from "@/hooks/use-now";
+import { useTone } from "@/hooks/use-tone";
 import { useBoards, useSpaces, useTasks, useAccountTimeEntries } from "@/lib/tasks";
 import { toISODate } from "@/lib/format";
 import {
   PALETTE,
+  PRIORITIES,
   deadlineState,
+  estimateClass,
+  estimateState,
   formatDuration,
+  formatHours,
   hoursOf,
+  priorityOf,
   todayKey,
   dayKey,
 } from "@/lib/tasks-analytics";
@@ -31,13 +37,13 @@ import {
 export const Route = createFileRoute("/tarefas/")({
   head: () => ({
     meta: [
-      { title: "Tarefas e Projetos — Aura" },
+      { title: "Projetos e Tarefas — Aura" },
       {
         name: "description",
         content:
           "Dashboard de tarefas, prazos e produtividade: tarefas em andamento, atrasadas, concluídas e tempo trabalhado por período.",
       },
-      { property: "og:title", content: "Tarefas e Projetos — Aura" },
+      { property: "og:title", content: "Projetos e Tarefas — Aura" },
       {
         property: "og:description",
         content: "Gestão de projetos, atividades, responsáveis, prazos e produtividade.",
@@ -104,6 +110,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 function TasksDashboard() {
   const { accountId, users, currentUserId } = useTasksModule();
   const now = useNow(30_000);
+  const tone = useTone();
   const [rangeKey, setRangeKey] = useState<RangeKey>("month");
   const [custom, setCustom] = useState(() => rangeOf("month"));
   const [spaceId, setSpaceId] = useState("");
@@ -216,12 +223,70 @@ function TasksDashboard() {
     const map = new Map<string, { value: number; color: string }>();
     for (const task of tasks) {
       const name = task.status?.name ?? "Sem status";
-      const color = task.status?.color ?? "#94A3B8";
+      const color = tone(task.status?.color ?? "#8A8A8A");
       const current = map.get(name);
       map.set(name, { value: (current?.value ?? 0) + 1, color });
     }
     return [...map.entries()].map(([name, v]) => ({ name, value: v.value, color: v.color }));
+  }, [tasks, tone]);
+
+  /**
+   * Estimado x realizado. O realizado vem do tempo cronometrado na própria
+   * tarefa (não dos registros do período), para que a comparação seja sempre
+   * entre a estimativa da tarefa e todo o esforço que ela já consumiu.
+   */
+  const estimates = useMemo(() => {
+    let estimated = 0;
+    let trackedOnEstimated = 0;
+    let withEstimate = 0;
+    let over = 0;
+    for (const task of tasks) {
+      if (!task.estimate_hours) continue;
+      withEstimate++;
+      estimated += task.estimate_hours;
+      trackedOnEstimated += hoursOf(task.trackedSeconds);
+      if (estimateState(task.estimate_hours, task.trackedSeconds) === "over") over++;
+    }
+    return {
+      estimated,
+      tracked: Math.round(trackedOnEstimated * 100) / 100,
+      withEstimate,
+      without: tasks.length - withEstimate,
+      over,
+      balance: Math.round((estimated - trackedOnEstimated) * 100) / 100,
+    };
   }, [tasks]);
+
+  /** Estimado x realizado por quadro — onde o esforço está estourando. */
+  const estimateByBoard = useMemo(() => {
+    const map = new Map<string, { estimado: number; realizado: number }>();
+    for (const task of tasks) {
+      if (!task.estimate_hours) continue;
+      const current = map.get(task.board.name) ?? { estimado: 0, realizado: 0 };
+      map.set(task.board.name, {
+        estimado: current.estimado + task.estimate_hours,
+        realizado: current.realizado + hoursOf(task.trackedSeconds),
+      });
+    }
+    return [...map.entries()]
+      .map(([label, value]) => ({
+        label,
+        estimado: Math.round(value.estimado * 100) / 100,
+        realizado: Math.round(value.realizado * 100) / 100,
+      }))
+      .sort((a, b) => b.estimado - a.estimado)
+      .slice(0, 8);
+  }, [tasks]);
+
+  const byPriority = useMemo(
+    () =>
+      PRIORITIES.map((option) => ({
+        name: option.label,
+        color: tone(option.color),
+        value: tasks.filter((task) => task.priority === option.value).length,
+      })).filter((row) => row.value > 0),
+    [tasks, tone],
+  );
 
   const byResponsible = useMemo(() => {
     const map = new Map<string, number>();
@@ -239,8 +304,8 @@ function TasksDashboard() {
   const hasData = allTasks.length > 0;
 
   return (
-    <AppShell
-      hideFinanceControls
+    <TasksShell
+      breadcrumbCurrent="Visão geral"
       actions={
         <Button size="sm" asChild>
           <Link to="/tarefas/espacos">
@@ -250,7 +315,7 @@ function TasksDashboard() {
       }
     >
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Tarefas e Projetos</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Projetos e Tarefas</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Visão consolidada de todos os espaços e quadros aos quais você tem acesso.
         </p>
@@ -379,6 +444,35 @@ function TasksDashboard() {
         />
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Indicator
+          icon={Timer}
+          label="Horas estimadas"
+          value={formatHours(estimates.estimated)}
+          hint={`${estimates.withEstimate} tarefa(s) com estimativa · ${estimates.without} sem`}
+        />
+        <Indicator
+          icon={Clock}
+          label="Realizado nelas"
+          value={formatHours(estimates.tracked)}
+          hint="Tempo cronometrado nas tarefas estimadas"
+        />
+        <Indicator
+          icon={Timer}
+          label={estimates.balance >= 0 ? "Saldo de horas" : "Horas excedidas"}
+          value={formatHours(Math.abs(estimates.balance))}
+          hint={estimates.balance >= 0 ? "Ainda dentro do estimado" : "Acima do estimado"}
+          tone={estimates.balance >= 0 ? "" : "text-negative"}
+        />
+        <Indicator
+          icon={AlarmClock}
+          label="Estouraram a estimativa"
+          value={String(estimates.over)}
+          hint="Tarefas com tempo acima do estimado"
+          tone={estimates.over > 0 ? "text-negative" : ""}
+        />
+      </div>
+
       {!hasData && (
         <div className="rounded-2xl border border-dashed border-border p-10 text-center">
           <p className="text-sm text-muted-foreground">
@@ -489,6 +583,71 @@ function TasksDashboard() {
             </div>
           </Panel>
 
+          <Panel title="Estimado x realizado por quadro">
+            {estimateByBoard.length === 0 ? (
+              <p className="py-14 text-center text-sm text-muted-foreground">
+                Nenhuma tarefa com estimativa de horas ainda. Informe a estimativa dentro da tarefa
+                para acompanhar aqui.
+              </p>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={estimateByBoard} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.2} />
+                    <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} />
+                    <YAxis
+                      type="category"
+                      dataKey="label"
+                      width={120}
+                      tickLine={false}
+                      axisLine={false}
+                      fontSize={11}
+                    />
+                    <Tooltip formatter={(v: number) => `${v} h`} />
+                    <Bar dataKey="estimado" fill="var(--chart-4)" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="realizado" fill="var(--chart-1)" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-chart-4" /> Estimado
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-chart-1" /> Realizado
+                  </span>
+                </div>
+              </>
+            )}
+          </Panel>
+
+          <Panel title="Distribuição por prioridade">
+            <ResponsiveContainer width="100%" height={240}>
+              <PieChart>
+                <Pie
+                  data={byPriority}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={55}
+                  outerRadius={85}
+                  paddingAngle={2}
+                >
+                  {byPriority.map((row) => (
+                    <Cell key={row.name} fill={row.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v: number, n: string) => [`${v} tarefas`, n]} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              {byPriority.map((row) => (
+                <span key={row.name} className="flex items-center gap-1.5">
+                  <span className="size-2 rounded-full" style={{ backgroundColor: row.color }} />
+                  {row.name} · {row.value}
+                </span>
+              ))}
+            </div>
+          </Panel>
+
           <Panel title="Tarefas por responsável">
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={byResponsible} layout="vertical">
@@ -505,7 +664,7 @@ function TasksDashboard() {
                 <Tooltip formatter={(v: number) => `${v} tarefas`} />
                 <Bar dataKey="tarefas" radius={[0, 4, 4, 0]}>
                   {byResponsible.map((_, i) => (
-                    <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
+                    <Cell key={i} fill={tone(PALETTE[i % PALETTE.length]!)} />
                   ))}
                 </Bar>
               </BarChart>
@@ -527,10 +686,7 @@ function TasksDashboard() {
                   params={{ spaceId: space.id }}
                   className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-md"
                 >
-                  <span
-                    className="flex size-9 items-center justify-center rounded-lg"
-                    style={{ backgroundColor: `${space.color}1A` }}
-                  >
+                  <span className="flex size-9 items-center justify-center rounded-lg border border-border bg-secondary">
                     {space.icon}
                   </span>
                   <div className="min-w-0">
@@ -544,6 +700,6 @@ function TasksDashboard() {
           </div>
         </div>
       )}
-    </AppShell>
+    </TasksShell>
   );
 }

@@ -11,6 +11,7 @@ import {
   todayKey,
   weekDays,
 } from "@/lib/tasks-analytics";
+import { useTone } from "@/hooks/use-tone";
 
 type Mode = "month" | "week" | "day";
 
@@ -46,7 +47,7 @@ function buildEvents(tasks: Task[]): CalendarEvent[] {
         id: `sub-${sub.id}`,
         day,
         title: `↳ ${sub.title}`,
-        color: "#94A3B8",
+        color: "#8A8A8A",
         kind: "subtask",
         task,
       });
@@ -89,6 +90,7 @@ export function TaskCalendar({
   const days =
     mode === "month" ? monthMatrix(anchor) : mode === "week" ? weekDays(anchor) : [anchor];
   const today = todayKey();
+  const tone = useTone();
 
   const eventChip = (e: CalendarEvent) => (
     <button
@@ -97,7 +99,10 @@ export function TaskCalendar({
       className="flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[11px] transition-colors hover:bg-secondary"
       title={`${e.title} · ${e.task.board.name}`}
     >
-      <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: e.color }} />
+      <span
+        className="size-1.5 shrink-0 rounded-full ring-1 ring-border"
+        style={{ backgroundColor: tone(e.color) }}
+      />
       <span className={`truncate ${e.kind === "subtask" ? "text-muted-foreground" : ""}`}>
         {e.title}
       </span>

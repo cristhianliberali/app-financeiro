@@ -2,19 +2,28 @@ import { Fragment, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Clock, Pause, Play, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useNow } from "@/hooks/use-now";
-import type { AccountUser, Task } from "@/lib/tasks";
+import { useTone } from "@/hooks/use-tone";
+import { useAppState } from "@/lib/app-state";
+import { useLabels, type AccountUser, type Task } from "@/lib/tasks";
 import {
   DEADLINE_LABEL,
+  PRIORITIES,
   deadlineClass,
   deadlineState,
+  estimateClass,
+  estimateState,
   formatClock,
   formatDuration,
   formatDateTimeBR,
+  formatHours,
+  priorityOf,
 } from "@/lib/tasks-analytics";
+import { LabelChip, LabelFilter } from "./LabelPicker";
+import { PriorityBadge } from "./PriorityPicker";
 import { UserAvatar, UserStack } from "./UserPicker";
 
-type SortKey = "title" | "status" | "responsible" | "start" | "due" | "tracked";
-type GroupKey = "none" | "status" | "responsible" | "board" | "space";
+type SortKey = "title" | "status" | "priority" | "responsible" | "start" | "due" | "tracked";
+type GroupKey = "none" | "status" | "priority" | "responsible" | "board" | "space";
 
 const SELECT_CLASS =
   "h-9 rounded-md border border-input bg-card px-2 text-sm outline-none focus:ring-1 focus:ring-ring";
@@ -35,10 +44,15 @@ export function TaskListView({
   showBoard?: boolean;
 }) {
   const now = useNow(30_000);
+  const tone = useTone();
+  const { accountId } = useAppState();
+  const { data: labels = [] } = useLabels(accountId);
   const [term, setTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
   const [responsibleFilter, setResponsibleFilter] = useState("");
   const [deadlineFilter, setDeadlineFilter] = useState("");
+  const [labelFilter, setLabelFilter] = useState<string[]>([]);
   const [sort, setSort] = useState<{ key: SortKey; asc: boolean }>({ key: "due", asc: true });
   const [group, setGroup] = useState<GroupKey>("none");
 
@@ -57,9 +71,24 @@ export function TaskListView({
   const filtered = useMemo(() => {
     const t = term.trim().toLowerCase();
     return tasks.filter((task) => {
-      if (t && !task.title.toLowerCase().includes(t)) return false;
+      // A busca cobre título e etiquetas — é como se procura "tudo do cliente X".
+      if (
+        t &&
+        !task.title.toLowerCase().includes(t) &&
+        !task.labels.some((label) => label.name.toLowerCase().includes(t))
+      ) {
+        return false;
+      }
       if (statusFilter && task.status?.name !== statusFilter) return false;
+      if (priorityFilter && task.priority !== priorityFilter) return false;
       if (responsibleFilter && (task.responsible_user_id ?? "") !== responsibleFilter) return false;
+      // Etiquetas somam: a tarefa precisa ter todas as escolhidas.
+      if (
+        labelFilter.length > 0 &&
+        !labelFilter.every((id) => task.labels.some((label) => label.id === id))
+      ) {
+        return false;
+      }
       if (
         deadlineFilter &&
         deadlineState({ due_date: task.due_date, polarity: task.status?.polarity ?? null }) !==
@@ -68,7 +97,7 @@ export function TaskListView({
         return false;
       return true;
     });
-  }, [tasks, term, statusFilter, responsibleFilter, deadlineFilter]);
+  }, [tasks, term, statusFilter, priorityFilter, responsibleFilter, deadlineFilter, labelFilter]);
 
   const sorted = useMemo(() => {
     const dir = sort.asc ? 1 : -1;
@@ -78,6 +107,9 @@ export function TaskListView({
           return task.title.toLowerCase();
         case "status":
           return `${task.status?.sort_order ?? 99}${task.status?.name ?? ""}`;
+        case "priority":
+          // Invertido para que "crescente" traga o mais urgente no topo.
+          return String(9 - priorityOf(task.priority).weight);
         case "responsible":
           return nameOf(task.responsible_user_id).toLowerCase();
         case "start":
@@ -100,11 +132,13 @@ export function TaskListView({
       const label =
         group === "status"
           ? (task.status?.name ?? "Sem status")
-          : group === "responsible"
-            ? nameOf(task.responsible_user_id)
-            : group === "board"
-              ? task.board.name
-              : task.space.name;
+          : group === "priority"
+            ? priorityOf(task.priority).label
+            : group === "responsible"
+              ? nameOf(task.responsible_user_id)
+              : group === "board"
+                ? task.board.name
+                : task.space.name;
       map.set(label, [...(map.get(label) ?? []), task]);
     }
     return [...map.entries()]
@@ -151,6 +185,19 @@ export function TaskListView({
         </select>
         <select
           className={SELECT_CLASS}
+          value={priorityFilter}
+          onChange={(e) => setPriorityFilter(e.target.value)}
+        >
+          <option value="">Todas as prioridades</option>
+          {PRIORITIES.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+        <LabelFilter labels={labels} value={labelFilter} onChange={setLabelFilter} />
+        <select
+          className={SELECT_CLASS}
           value={responsibleFilter}
           onChange={(e) => setResponsibleFilter(e.target.value)}
         >
@@ -180,6 +227,7 @@ export function TaskListView({
         >
           <option value="none">Sem agrupamento</option>
           <option value="status">Agrupar por status</option>
+          <option value="priority">Agrupar por prioridade</option>
           <option value="responsible">Agrupar por responsável</option>
           <option value="board">Agrupar por quadro</option>
           <option value="space">Agrupar por espaço</option>
@@ -187,15 +235,16 @@ export function TaskListView({
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-        <table className="w-full min-w-[52rem] text-sm">
+        <table className="w-full min-w-[62rem] text-sm">
           <thead className="border-b border-border text-xs text-muted-foreground">
             <tr>
               {header("title", "Tarefa")}
               {header("status", "Status")}
+              {header("priority", "Prioridade")}
               {header("responsible", "Responsável")}
               {header("start", "Início")}
               {header("due", "Prazo")}
-              {header("tracked", "Tempo")}
+              {header("tracked", "Tempo / estimativa")}
               <th className="px-3 py-2 text-left font-medium">Participantes</th>
               <th className="w-10 px-3 py-2" />
             </tr>
@@ -205,7 +254,7 @@ export function TaskListView({
               <Fragment key={`grp-${g.key}`}>
                 {g.label && (
                   <tr className="bg-secondary/40">
-                    <td colSpan={8} className="px-3 py-1.5 text-xs font-semibold">
+                    <td colSpan={9} className="px-3 py-1.5 text-xs font-semibold">
                       {g.label} · {g.items.length}
                     </td>
                   </tr>
@@ -230,15 +279,29 @@ export function TaskListView({
                             {task.space.icon} {task.space.name} › {task.board.name}
                           </p>
                         )}
+                        {task.labels.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {task.labels.map((label) => (
+                              <LabelChip key={label.id} label={label} />
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className="px-3 py-2">
                         <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border px-2 py-0.5 text-xs">
                           <span
-                            className="size-1.5 rounded-full"
-                            style={{ backgroundColor: task.status?.color ?? "#94A3B8" }}
+                            className="size-1.5 rounded-full ring-1 ring-border"
+                            style={{ backgroundColor: tone(task.status?.color ?? "#8A8A8A") }}
                           />
                           {task.status?.name ?? "—"}
                         </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        {task.priority === "none" ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : (
+                          <PriorityBadge priority={task.priority} />
+                        )}
                       </td>
                       <td className="px-3 py-2">
                         <span className="flex items-center gap-1.5">
@@ -259,6 +322,14 @@ export function TaskListView({
                       </td>
                       <td className="whitespace-nowrap px-3 py-2 font-mono text-xs tabular-nums">
                         {task.running ? formatClock(seconds) : formatDuration(seconds)}
+                        {task.estimate_hours ? (
+                          <span
+                            className={estimateClass(estimateState(task.estimate_hours, seconds))}
+                          >
+                            {" / "}
+                            {formatHours(task.estimate_hours)}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2">
                         {task.participants.length > 0 ? (
@@ -274,7 +345,7 @@ export function TaskListView({
                             onToggleTimer(task);
                           }}
                           className={`rounded-full p-1 transition-colors hover:bg-secondary ${
-                            task.running && isMine ? "text-primary" : "text-muted-foreground"
+                            task.running && isMine ? "text-foreground" : "text-muted-foreground"
                           }`}
                           aria-label={
                             task.running && isMine ? "Pausar cronômetro" : "Iniciar cronômetro"
@@ -294,7 +365,7 @@ export function TaskListView({
             ))}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-10 text-center text-sm text-muted-foreground">
+                <td colSpan={9} className="px-3 py-10 text-center text-sm text-muted-foreground">
                   <Clock className="mx-auto mb-2 size-5 opacity-40" />
                   Nenhuma tarefa encontrada com os filtros atuais.
                 </td>

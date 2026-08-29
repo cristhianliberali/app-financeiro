@@ -147,7 +147,7 @@ export function StatusManagerDialog({
             if (!newName.trim()) return;
             await save.mutateAsync({
               name: newName.trim(),
-              color: "#64748B",
+              color: "#737373",
               polarity: "IN_PROGRESS",
               sort_order: draft.length,
             });

@@ -444,7 +444,8 @@ export async function deleteStatus(
  */
 const TASK_SELECT = `
   t.id, t.board_id, t.status_id, t.title, t.description, t.responsible_user_id, t.sort_order,
-  t.created_by,
+  t.created_by, t.priority,
+  t.estimate_hours::float8 AS estimate_hours,
   ${iso("t.start_date", "start_date")},
   ${iso("t.due_date", "due_date")},
   ${iso("t.created_at", "created_at")},
@@ -471,7 +472,18 @@ const TASK_SELECT = `
               'started_at', ${isoValue("te.started_at")},
               'stopped_at', ${isoValue("te.stopped_at")},
               'duration_seconds', te.duration_seconds) ORDER BY te.started_at DESC)
-              FROM time_entries te WHERE te.task_id = t.id), '[]'::jsonb) AS entries`;
+              FROM time_entries te WHERE te.task_id = t.id), '[]'::jsonb) AS entries,
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name, 'color', l.color)
+                             ORDER BY lower(l.name))
+              FROM task_label_links tll
+              JOIN labels l ON l.id = tll.label_id
+             WHERE tll.task_id = t.id), '[]'::jsonb) AS labels,
+  COALESCE((SELECT jsonb_agg(jsonb_build_object(
+              'id', tr.id, 'task_id', tr.task_id, 'user_id', tr.user_id,
+              'remind_at', ${isoValue("tr.remind_at")},
+              'delivered_at', ${isoValue("tr.delivered_at")},
+              'note', tr.note) ORDER BY tr.remind_at)
+              FROM task_reminders tr WHERE tr.task_id = t.id), '[]'::jsonb) AS reminders`;
 
 const TASK_FROM = `
   FROM tasks t
@@ -505,16 +517,21 @@ export type SaveTaskInput = {
   title: string;
   description?: string | null;
   responsibleUserId?: string | null;
+  priority?: string;
+  estimateHours?: number | null;
   startDate?: string | null;
   dueDate?: string | null;
   sortOrder?: number;
   participantIds?: string[];
+  labelIds?: string[];
 };
 
 /** Colunas que o cliente pode gravar, e a chave equivalente na entrada. */
 const TASK_FIELDS = [
   ["description", "description"],
   ["responsible_user_id", "responsibleUserId"],
+  ["priority", "priority"],
+  ["estimate_hours", "estimateHours"],
   ["start_date", "startDate"],
   ["due_date", "dueDate"],
   ["sort_order", "sortOrder"],
@@ -541,10 +558,11 @@ export async function saveTask(userId: string, input: SaveTaskInput): Promise<st
         title: string;
         status_id: string | null;
         responsible_user_id: string | null;
+        priority: string;
         start_date: Date | null;
         due_date: Date | null;
       }>(
-        `SELECT title, status_id, responsible_user_id, start_date, due_date
+        `SELECT title, status_id, responsible_user_id, priority, start_date, due_date
            FROM tasks WHERE id = $1`,
         [taskId],
       );
@@ -560,16 +578,23 @@ export async function saveTask(userId: string, input: SaveTaskInput): Promise<st
 
       await recordTaskChanges(client, taskId, userId, previous, input);
     } else {
+      // Tarefa sem responsável escolhido fica com quem a criou: toda tarefa
+      // nasce com um dono, e é isso que "Minhas tarefas" e os lembretes usam.
       const created = await client.query<{ id: string }>(
         `INSERT INTO tasks (board_id, status_id, title, description, responsible_user_id,
-                            start_date, due_date, sort_order, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, 0), $9) RETURNING id`,
+                            priority, estimate_hours, start_date, due_date, sort_order,
+                            created_by)
+         VALUES ($1, $2, $3, $4, COALESCE($5::uuid, $11::uuid), COALESCE($6::text, 'normal'),
+                 $7::numeric, $8::timestamptz, $9::timestamptz, COALESCE($10::int, 0), $11::uuid)
+         RETURNING id`,
         [
           input.boardId,
           input.statusId,
           input.title,
           input.description ?? null,
           input.responsibleUserId ?? null,
+          input.priority ?? null,
+          input.estimateHours ?? null,
           input.startDate ?? null,
           input.dueDate ?? null,
           input.sortOrder ?? null,
@@ -583,8 +608,26 @@ export async function saveTask(userId: string, input: SaveTaskInput): Promise<st
     if (input.participantIds) {
       await syncParticipants(client, taskId!, userId, input.participantIds);
     }
+    if (input.labelIds) {
+      await syncLabels(client, taskId!, input.labelIds);
+    }
     return taskId!;
   });
+}
+
+/** Substitui as etiquetas da tarefa pelo conjunto informado. */
+async function syncLabels(client: PoolClient, taskId: string, labelIds: string[]): Promise<void> {
+  await client.query(
+    `DELETE FROM task_label_links WHERE task_id = $1 AND NOT (label_id = ANY($2::uuid[]))`,
+    [taskId, labelIds],
+  );
+  for (const labelId of labelIds) {
+    await client.query(
+      `INSERT INTO task_label_links (task_id, label_id) VALUES ($1, $2)
+       ON CONFLICT (task_id, label_id) DO NOTHING`,
+      [taskId, labelId],
+    );
+  }
 }
 
 async function recordTaskChanges(
@@ -595,6 +638,7 @@ async function recordTaskChanges(
     title: string;
     status_id: string | null;
     responsible_user_id: string | null;
+    priority: string;
     start_date: Date | null;
     due_date: Date | null;
   },
@@ -628,6 +672,9 @@ async function recordTaskChanges(
     await logActivity(client, taskId, userId, "responsible_changed", {
       user_id: input.responsibleUserId,
     });
+  }
+  if (input.priority !== undefined && input.priority !== previous.priority) {
+    await logActivity(client, taskId, userId, "priority_changed", { to: input.priority });
   }
   if (input.dueDate !== undefined && !sameInstant(previous.due_date, input.dueDate)) {
     await logActivity(client, taskId, userId, "due_date_changed", { to: input.dueDate });
@@ -733,6 +780,168 @@ export async function moveTaskByPolarity(
 export async function deleteTask(userId: string, taskId: string): Promise<void> {
   await requireTaskAccess(userId, taskId, "editor");
   await query(`DELETE FROM tasks WHERE id = $1`, [taskId]);
+}
+
+// ─────────────────────────────── etiquetas ──────────────────────────────
+
+export async function listLabels(userId: string, accountId: string) {
+  await requireAccountRole(userId, accountId, "viewer");
+  return query(
+    `SELECT id, account_id, name, color FROM labels WHERE account_id = $1 ORDER BY lower(name)`,
+    [accountId],
+  );
+}
+
+/**
+ * Cria ou renomeia uma etiqueta. Sem `id`, um nome já existente na conta é
+ * reaproveitado em vez de duplicar — é o que permite digitar a etiqueta direto
+ * na tarefa sem se preocupar se ela já existe.
+ */
+export async function saveLabel(
+  userId: string,
+  input: { id?: string; accountId: string; name: string; color: string },
+): Promise<string> {
+  await requireAccountRole(userId, input.accountId, "editor");
+
+  if (input.id) {
+    const existing = await queryOne<{ account_id: string }>(
+      `SELECT account_id FROM labels WHERE id = $1`,
+      [input.id],
+    );
+    if (!existing || existing.account_id !== input.accountId) {
+      throw new ForbiddenError("Etiqueta não encontrada");
+    }
+    await query(`UPDATE labels SET name = $2, color = $3 WHERE id = $1`, [
+      input.id,
+      input.name,
+      input.color,
+    ]);
+    return input.id;
+  }
+
+  const row = await queryOne<{ id: string }>(
+    `INSERT INTO labels (account_id, name, color, created_by) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (account_id, lower(name)) DO UPDATE SET name = EXCLUDED.name
+     RETURNING id`,
+    [input.accountId, input.name, input.color, userId],
+  );
+  return row!.id;
+}
+
+export async function deleteLabel(userId: string, labelId: string): Promise<void> {
+  const row = await queryOne<{ account_id: string }>(
+    `SELECT account_id FROM labels WHERE id = $1`,
+    [labelId],
+  );
+  if (!row) throw new ForbiddenError("Etiqueta não encontrada");
+  await requireAccountRole(userId, row.account_id, "editor");
+  await query(`DELETE FROM labels WHERE id = $1`, [labelId]);
+}
+
+// ─────────────────────────────── lembretes ──────────────────────────────
+
+/**
+ * Agenda um lembrete. Sem destinatário informado, avisa quem está criando —
+ * o caso comum é "me lembre desta tarefa".
+ */
+export async function saveReminder(
+  userId: string,
+  input: {
+    id?: string;
+    taskId: string;
+    userId: string | null;
+    remindAt: string;
+    note: string | null;
+  },
+): Promise<string> {
+  await requireTaskAccess(userId, input.taskId, "editor");
+  const target = input.userId ?? userId;
+
+  if (input.id) {
+    const existing = await queryOne<{ task_id: string }>(
+      `SELECT task_id FROM task_reminders WHERE id = $1`,
+      [input.id],
+    );
+    if (!existing || existing.task_id !== input.taskId) {
+      throw new ForbiddenError("Lembrete não encontrado");
+    }
+    // Reagendar reabre o lembrete: o que já foi entregue volta para a fila.
+    await query(
+      `UPDATE task_reminders SET user_id = $2, remind_at = $3, note = $4, delivered_at = NULL
+        WHERE id = $1`,
+      [input.id, target, input.remindAt, input.note],
+    );
+    return input.id;
+  }
+
+  const row = await queryOne<{ id: string }>(
+    `INSERT INTO task_reminders (task_id, user_id, remind_at, note, created_by)
+     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+    [input.taskId, target, input.remindAt, input.note, userId],
+  );
+  await logActivity(null, input.taskId, userId, "reminder_created", { remind_at: input.remindAt });
+  return row!.id;
+}
+
+export async function deleteReminder(userId: string, reminderId: string): Promise<void> {
+  const row = await queryOne<{ task_id: string; user_id: string }>(
+    `SELECT task_id, user_id FROM task_reminders WHERE id = $1`,
+    [reminderId],
+  );
+  if (!row) throw new ForbiddenError("Lembrete não encontrado");
+  // O destinatário sempre pode dispensar o próprio lembrete.
+  if (row.user_id !== userId) await requireTaskAccess(userId, row.task_id, "editor");
+  else await requireTaskAccess(userId, row.task_id, "viewer");
+  await query(`DELETE FROM task_reminders WHERE id = $1`, [reminderId]);
+}
+
+const REMINDER_COLUMNS = `r.id, r.task_id, r.user_id, r.note,
+  ${iso("r.remind_at", "remind_at")}, ${iso("r.delivered_at", "delivered_at")},
+  t.title AS task_title, b.id AS board_id, b.name AS board_name,
+  s.id AS space_id, s.name AS space_name`;
+
+const REMINDER_FROM = `
+  FROM task_reminders r
+  JOIN tasks t ON t.id = r.task_id
+  JOIN boards b ON b.id = t.board_id
+  JOIN spaces s ON s.id = b.space_id`;
+
+/**
+ * Lembretes do usuário logado que já venceram e ainda não foram entregues.
+ * É o que o app consulta em segundo plano para disparar a notificação.
+ */
+export async function listDueReminders(userId: string) {
+  return query(
+    `SELECT ${REMINDER_COLUMNS} ${REMINDER_FROM}
+      WHERE r.user_id = $1 AND r.delivered_at IS NULL AND r.remind_at <= now()
+        AND (${VISIBLE_SPACE})
+      ORDER BY r.remind_at LIMIT 20`,
+    [userId],
+  );
+}
+
+/** Próximos lembretes ainda no futuro — alimenta o sininho do cabeçalho. */
+export async function listUpcomingReminders(userId: string) {
+  return query(
+    `SELECT ${REMINDER_COLUMNS} ${REMINDER_FROM}
+      WHERE r.user_id = $1 AND r.delivered_at IS NULL AND r.remind_at > now()
+        AND (${VISIBLE_SPACE})
+      ORDER BY r.remind_at LIMIT 20`,
+    [userId],
+  );
+}
+
+/**
+ * Marca lembretes como entregues. Só mexe nos do próprio usuário, então um id
+ * de outra pessoa simplesmente não casa com o WHERE.
+ */
+export async function markRemindersDelivered(userId: string, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await query(
+    `UPDATE task_reminders SET delivered_at = now()
+      WHERE user_id = $1 AND delivered_at IS NULL AND id = ANY($2::uuid[])`,
+    [userId, ids],
+  );
 }
 
 // ─────────────────────────────── subtarefas ─────────────────────────────
