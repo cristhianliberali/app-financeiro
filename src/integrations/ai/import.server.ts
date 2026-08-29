@@ -26,6 +26,11 @@ export type ImportedRow = ExtractedRow & {
    * entrar despercebido.
    */
   amountFound: boolean;
+  /**
+   * Lançamento já existente no perfil com a mesma descrição, valor e data.
+   * A tela mostra a linha, mas não deixa lançar de novo.
+   */
+  duplicateOf: { id: string; description: string; date: string } | null;
 };
 
 export type BatchResult = {
@@ -65,7 +70,48 @@ function amountAppearsIn(text: string, amount: number): boolean {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-function sanitize(row: ExtractedRow, text: string, today: string): ImportedRow {
+/**
+ * Chave de comparação de um lançamento: data, valor e descrição.
+ *
+ * A descrição é normalizada só no que não muda o significado — espaços
+ * repetidos e maiúsculas —, para "MERCADOLIVRE*4PRODUT" e
+ * "Mercadolivre*4produt" contarem como o mesmo lançamento.
+ */
+function duplicateKey(date: string, amount: number, description: string): string {
+  const normalized = description.trim().replace(/\s+/g, " ").toLowerCase();
+  return `${date}|${amount.toFixed(2)}|${normalized}`;
+}
+
+type ExistingRow = { id: string; description: string; amount: number; transaction_date: string };
+
+/**
+ * Indexa os lançamentos que o perfil já tem nas datas em questão. A janela é
+ * limitada às datas que a IA devolveu, então não varre o histórico inteiro.
+ */
+async function existingByKey(
+  profileId: string,
+  dates: string[],
+): Promise<Map<string, ExistingRow>> {
+  const index = new Map<string, ExistingRow>();
+  if (dates.length === 0) return index;
+
+  const rows = await query<ExistingRow>(
+    `SELECT id, description, amount, transaction_date::text AS transaction_date
+       FROM transactions
+      WHERE profile_id = $1 AND transaction_date = ANY($2::date[])`,
+    [profileId, dates],
+  );
+  for (const row of rows) {
+    index.set(duplicateKey(row.transaction_date, Number(row.amount), row.description), row);
+  }
+  return index;
+}
+
+function sanitize(
+  row: ExtractedRow,
+  text: string,
+  today: string,
+): Omit<ImportedRow, "duplicateOf"> {
   const amount = Math.abs(Number(row.amount)) || 0;
   const date = ISO_DATE.test(row.date) ? row.date : today;
   return {
@@ -143,8 +189,21 @@ export async function processNextBatch(
   if (done) dropJob(userId, job.id);
 
   const today = new Date().toISOString().slice(0, 10);
+  const clean = rows.map((row) => sanitize(row, batch.text, today));
+
+  // Marca o que o perfil já tem lançado, para a tela mostrar sem deixar repetir.
+  const existing = await existingByKey(input.profileId, [...new Set(clean.map((r) => r.date))]);
+
   return {
-    rows: rows.map((row) => sanitize(row, batch.text, today)),
+    rows: clean.map((row) => {
+      const found = existing.get(duplicateKey(row.date, row.amount, row.description));
+      return {
+        ...row,
+        duplicateOf: found
+          ? { id: found.id, description: found.description, date: found.transaction_date }
+          : null,
+      };
+    }),
     batchNumber: job.nextIndex,
     totalBatches: job.batches.length,
     done,
