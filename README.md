@@ -44,14 +44,16 @@ ou quadro.
 - Kanban, lista e calendário por quadro, com busca e filtros por prioridade,
   etiqueta e responsável;
 - **Responsável**: se ninguém for escolhido, quem criou a tarefa fica responsável;
-- **Prioridade** (urgente, alta, normal, baixa) visível no cartão e na lista;
+- **Prioridade** (urgente, alta, normal, baixa) com nome e cor no cartão e na
+  lista — junto de entrada/saída de dinheiro, é o que escapa do preto e branco;
 - **Etiquetas** da conta, reaproveitadas entre quadros, com filtro próprio;
 - **Estimativa de horas** por tarefa, comparada com o tempo cronometrado no
   dashboard (estimado x realizado, saldo de horas, o que estourou);
 - **Lembretes** por tarefa, entregues como notificação do navegador e no sininho
   do cabeçalho;
 - Exclusão protegida: espaço e quadro pedem o nome digitado, tarefa pede
-  confirmação.
+  confirmação, e uma etapa com tarefas não pode ser excluída — mova ou exclua as
+  tarefas dela antes.
 
 #Tema
 Preto e branco, claro e escuro, no sistema inteiro. A escolha fica no rodapé do

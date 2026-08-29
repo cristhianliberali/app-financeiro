@@ -29,7 +29,6 @@ import {
   formatDuration,
   formatHours,
   hoursOf,
-  priorityOf,
   todayKey,
   dayKey,
 } from "@/lib/tasks-analytics";
@@ -280,12 +279,14 @@ function TasksDashboard() {
 
   const byPriority = useMemo(
     () =>
+      // Sem `tone` aqui: a cor da prioridade é escolhida, não é um tom da paleta
+      // cinza — espelhá-la no tema escuro trocaria vermelho por verde-água.
       PRIORITIES.map((option) => ({
         name: option.label,
-        color: tone(option.color),
+        color: option.color,
         value: tasks.filter((task) => task.priority === option.value).length,
       })).filter((row) => row.value > 0),
-    [tasks, tone],
+    [tasks],
   );
 
   const byResponsible = useMemo(() => {

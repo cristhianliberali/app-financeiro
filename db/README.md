@@ -65,7 +65,7 @@ sem prefixo.
 | `space_members` | Lista de acesso de um espaço; vazia = todos os membros da conta |
 | `boards` | Quadros (projetos, processos) dentro de um espaço |
 | `board_members` | Participantes de um quadro |
-| `board_statuses` | Status personalizados por quadro, cada um com sua polaridade |
+| `board_statuses` | Etapas personalizadas por quadro, cada uma com sua polaridade; só saem quando ficam sem tarefas |
 | `tasks` | Tarefas, com responsável, prioridade, estimativa de horas, datas e status |
 | `task_participants` | Participantes de uma tarefa, além do responsável |
 | `labels` | Etiquetas da conta, reaproveitadas entre espaços e quadros |

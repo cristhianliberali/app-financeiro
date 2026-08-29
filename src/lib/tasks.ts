@@ -428,11 +428,12 @@ export function useReorderStatuses() {
   });
 }
 
+/** Só remove etapas vazias; o servidor recusa uma que ainda tenha tarefas. */
 export function useDeleteStatus() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { id: string; moveToStatusId: string | null }) => {
-      await deleteStatus({ data: input });
+    mutationFn: async (id: string) => {
+      await deleteStatus({ data: { id } });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
   });

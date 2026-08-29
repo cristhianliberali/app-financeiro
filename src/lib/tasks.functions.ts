@@ -303,10 +303,7 @@ export const reorderStatuses = createServerFn({ method: "POST" })
 
 export const deleteStatus = createServerFn({ method: "POST" })
   .middleware([requireAuth])
-  .inputValidator((input: { id: string; moveToStatusId?: string | null }) => ({
-    id: requireId(input?.id),
-    moveToStatusId: optionalId(input?.moveToStatusId),
-  }))
+  .inputValidator((input: { id: string }) => ({ id: requireId(input?.id) }))
   .handler(async ({ data, context }): Promise<null> => {
     await (
       await import("@/integrations/postgres/tasks.server")

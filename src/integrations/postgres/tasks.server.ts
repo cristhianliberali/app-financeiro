@@ -413,26 +413,36 @@ export async function reorderStatuses(
   });
 }
 
-export async function deleteStatus(
-  userId: string,
-  input: { id: string; moveToStatusId: string | null },
-): Promise<void> {
+/**
+ * Exclui um status do quadro.
+ *
+ * Um status com tarefas não pode ser excluído: mover as tarefas para outra
+ * coluna por conta própria esconderia trabalho de quem não pediu isso. Quem
+ * quiser remover a etapa move (ou exclui) as tarefas antes. O quadro também
+ * precisa continuar com pelo menos um status, senão as tarefas ficariam sem
+ * lugar nenhum.
+ */
+export async function deleteStatus(userId: string, input: { id: string }): Promise<void> {
   const boardId = await requireStatusBoard(userId, input.id, "editor");
-  await withTransaction(async (client) => {
-    if (input.moveToStatusId) {
-      // O destino precisa ser do mesmo quadro — senão a tarefa mudaria de lugar.
-      const target = await client.query(
-        `SELECT 1 FROM board_statuses WHERE id = $1 AND board_id = $2`,
-        [input.moveToStatusId, boardId],
-      );
-      if (!target.rowCount) throw new ForbiddenError("Status de destino inválido");
-      await client.query(`UPDATE tasks SET status_id = $2 WHERE status_id = $1`, [
-        input.id,
-        input.moveToStatusId,
-      ]);
-    }
-    await client.query(`DELETE FROM board_statuses WHERE id = $1`, [input.id]);
-  });
+
+  const usage = await queryOne<{ tasks: number; statuses: number }>(
+    `SELECT (SELECT count(*) FROM tasks WHERE status_id = $1)::int AS tasks,
+            (SELECT count(*) FROM board_statuses WHERE board_id = $2)::int AS statuses`,
+    [input.id, boardId],
+  );
+
+  if ((usage?.tasks ?? 0) > 0) {
+    const total = usage!.tasks;
+    throw new Error(
+      `Esta etapa tem ${total} ${total === 1 ? "tarefa" : "tarefas"}. ` +
+        "Mova ou exclua as tarefas antes de removê-la.",
+    );
+  }
+  if ((usage?.statuses ?? 0) <= 1) {
+    throw new Error("O quadro precisa de ao menos uma etapa.");
+  }
+
+  await query(`DELETE FROM board_statuses WHERE id = $1`, [input.id]);
 }
 
 // ──────────────────────────────── tarefas ───────────────────────────────
