@@ -11,12 +11,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAppState } from "@/lib/app-state";
 import {
+  useAccountUsers,
   useBoardMembers,
   useCreateBoard,
   useDeleteBoard,
+  useTasks,
   useUpdateBoard,
-  type AccountUser,
   type Board,
   type Space,
 } from "@/lib/tasks";
@@ -31,6 +33,7 @@ import {
   type Polarity,
   type StatusSeed,
 } from "@/lib/tasks-analytics";
+import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 import { UserMultiSelect, UserSelect } from "./UserPicker";
 
 const SELECT_CLASS =
@@ -42,7 +45,6 @@ export function BoardDialog({
   spaces,
   defaultSpaceId,
   board,
-  users,
   onCreated,
 }: {
   open: boolean;
@@ -51,13 +53,16 @@ export function BoardDialog({
   defaultSpaceId: string | null;
   /** Quadro existente; nulo abre o formulário de criação. */
   board: Board | null;
-  users: AccountUser[];
   onCreated?: (boardId: string) => void;
 }) {
+  const { accountId } = useAppState();
+  const { data: users = [] } = useAccountUsers(accountId);
+  const { data: tasks = [] } = useTasks({ accountId });
   const create = useCreateBoard();
   const update = useUpdateBoard();
   const remove = useDeleteBoard();
   const { data: currentMembers } = useBoardMembers(board?.id ?? null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [form, setForm] = useState({
     space_id: defaultSpaceId ?? "",
@@ -384,7 +389,7 @@ export function BoardDialog({
               onClick={() => {
                 setStatuses((list) => [
                   ...list,
-                  { name: "Novo status", color: "#64748B", polarity: "IN_PROGRESS" },
+                  { name: "Novo status", color: "#737373", polarity: "IN_PROGRESS" },
                 ]);
                 setPreset("custom");
               }}
@@ -403,11 +408,7 @@ export function BoardDialog({
             <Button
               variant="ghost"
               className="text-destructive hover:text-destructive"
-              onClick={async () => {
-                await remove.mutateAsync(board.id);
-                toast.success("Quadro excluído");
-                onOpenChange(false);
-              }}
+              onClick={() => setConfirmDelete(true)}
             >
               <Trash2 className="mr-1 size-3.5" /> Excluir
             </Button>
@@ -424,6 +425,24 @@ export function BoardDialog({
           </div>
         </DialogFooter>
       </DialogContent>
+
+      {board && (
+        <ConfirmDeleteDialog
+          open={confirmDelete}
+          onOpenChange={setConfirmDelete}
+          itemLabel="quadro"
+          itemName={board.name}
+          consequences={[
+            `${tasks.filter((t) => t.board_id === board.id).length} tarefa(s) do quadro`,
+            "Status personalizados, subtarefas e todo o tempo registrado",
+          ]}
+          onConfirm={async () => {
+            await remove.mutateAsync(board.id);
+            toast.success(`Quadro “${board.name}” excluído`);
+            onOpenChange(false);
+          }}
+        />
+      )}
     </Dialog>
   );
 }

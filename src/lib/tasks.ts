@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  ackReminders,
   createBoard,
   deleteBoard,
+  deleteLabel,
+  deleteReminder,
   deleteSpace,
   deleteStatus,
   deleteSubtask,
@@ -15,13 +18,18 @@ import {
   fetchBoardMembers,
   fetchBoardStatuses,
   fetchBoards,
+  fetchDueReminders,
+  fetchLabels,
   fetchSpaceMembers,
   fetchSpaces,
   fetchTaskActivity,
   fetchTasks,
+  fetchUpcomingReminders,
   moveTask,
   moveTaskByPolarity,
   reorderStatuses,
+  saveLabel,
+  saveReminder,
   saveSpace,
   saveStatus,
   saveSubtask,
@@ -30,7 +38,7 @@ import {
   stopTimer,
   updateBoard,
 } from "./tasks.functions";
-import type { BoardStage, BoardView, Polarity, StatusSeed } from "./tasks-analytics";
+import type { BoardStage, BoardView, Polarity, Priority, StatusSeed } from "./tasks-analytics";
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -86,6 +94,34 @@ export type Subtask = {
   sort_order: number;
 };
 
+export type Label = {
+  id: string;
+  account_id: string;
+  name: string;
+  color: string;
+};
+
+/** Etiqueta como vem embutida na tarefa — só o necessário para exibir o chip. */
+export type TaskLabel = Pick<Label, "id" | "name" | "color">;
+
+export type Reminder = {
+  id: string;
+  task_id: string;
+  user_id: string;
+  remind_at: string;
+  delivered_at: string | null;
+  note: string | null;
+};
+
+/** Lembrete com o caminho da tarefa — usado no sininho e na notificação. */
+export type ReminderFeedItem = Reminder & {
+  task_title: string;
+  board_id: string;
+  board_name: string;
+  space_id: string;
+  space_name: string;
+};
+
 export type TimeEntry = {
   id: string;
   task_id: string;
@@ -111,6 +147,9 @@ export type Task = {
   title: string;
   description: string | null;
   responsible_user_id: string | null;
+  priority: Priority;
+  /** Estimativa de esforço em horas; `null` quando não foi informada. */
+  estimate_hours: number | null;
   start_date: string | null;
   due_date: string | null;
   sort_order: number;
@@ -124,6 +163,8 @@ export type Task = {
   participants: string[];
   subtasks: Subtask[];
   entries: TimeEntry[];
+  labels: TaskLabel[];
+  reminders: Reminder[];
   /** Soma dos registros já encerrados, em segundos. */
   trackedSeconds: number;
   /** Registro em execução, quando houver. */
@@ -159,6 +200,8 @@ function normalizeTask(row: unknown): Task {
     ...task,
     participants: task.participants ?? [],
     subtasks: task.subtasks ?? [],
+    labels: task.labels ?? [],
+    reminders: task.reminders ?? [],
     entries,
     trackedSeconds: entries.reduce((sum, entry) => sum + (entry.duration_seconds ?? 0), 0),
     running: entries.find((entry) => !entry.stopped_at) ?? null,
@@ -385,11 +428,12 @@ export function useReorderStatuses() {
   });
 }
 
+/** Só remove etapas vazias; o servidor recusa uma que ainda tenha tarefas. */
 export function useDeleteStatus() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { id: string; moveToStatusId: string | null }) => {
-      await deleteStatus({ data: input });
+    mutationFn: async (id: string) => {
+      await deleteStatus({ data: { id } });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
   });
@@ -433,10 +477,13 @@ export function useSaveTask() {
       title: string;
       description?: string | null;
       responsible_user_id?: string | null;
+      priority?: Priority;
+      estimate_hours?: number | null;
       start_date?: string | null;
       due_date?: string | null;
       sort_order?: number;
       participantIds?: string[];
+      labelIds?: string[];
     }) =>
       (await saveTask({
         data: {
@@ -448,10 +495,13 @@ export function useSaveTask() {
           ...("responsible_user_id" in input
             ? { responsibleUserId: input.responsible_user_id }
             : {}),
+          ...("priority" in input ? { priority: input.priority } : {}),
+          ...("estimate_hours" in input ? { estimateHours: input.estimate_hours } : {}),
           ...("start_date" in input ? { startDate: input.start_date } : {}),
           ...("due_date" in input ? { dueDate: input.due_date } : {}),
           ...(input.sort_order !== undefined ? { sortOrder: input.sort_order } : {}),
           ...(input.participantIds ? { participantIds: input.participantIds } : {}),
+          ...(input.labelIds ? { labelIds: input.labelIds } : {}),
         },
       })) as string,
     onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
@@ -495,6 +545,120 @@ export function useDeleteTask() {
       await deleteTask({ data: { id } });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Etiquetas
+// ---------------------------------------------------------------------------
+
+export function useLabels(accountId: string | null) {
+  return useQuery({
+    queryKey: [KEY, "labels", accountId],
+    enabled: !!accountId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<Label[]> =>
+      (await fetchLabels({ data: { accountId: accountId! } })) as Label[],
+  });
+}
+
+export function useSaveLabel(accountId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id?: string; name: string; color: string }) =>
+      (await saveLabel({
+        data: {
+          ...(input.id ? { id: input.id } : {}),
+          accountId: accountId!,
+          name: input.name,
+          color: input.color,
+        },
+      })) as string,
+    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
+  });
+}
+
+export function useDeleteLabel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await deleteLabel({ data: { id } });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Lembretes
+// ---------------------------------------------------------------------------
+
+export function useSaveReminder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      id?: string;
+      task_id: string;
+      user_id: string | null;
+      remind_at: string;
+      note: string | null;
+    }) =>
+      (await saveReminder({
+        data: {
+          ...(input.id ? { id: input.id } : {}),
+          taskId: input.task_id,
+          userId: input.user_id,
+          remindAt: input.remind_at,
+          note: input.note,
+        },
+      })) as string,
+    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
+  });
+}
+
+export function useDeleteReminder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await deleteReminder({ data: { id } });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }),
+  });
+}
+
+/**
+ * Lembretes vencidos e ainda não entregues. É a fila que o app consulta em
+ * segundo plano para disparar a notificação — por isso o refetch curto.
+ */
+export function useDueReminders(enabled: boolean) {
+  return useQuery({
+    queryKey: [KEY, "reminders", "due"],
+    enabled,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    queryFn: async (): Promise<ReminderFeedItem[]> =>
+      (await fetchDueReminders()) as ReminderFeedItem[],
+  });
+}
+
+/** Próximos lembretes agendados — o que o sininho lista. */
+export function useUpcomingReminders(enabled: boolean) {
+  return useQuery({
+    queryKey: [KEY, "reminders", "upcoming"],
+    enabled,
+    refetchInterval: 5 * 60_000,
+    queryFn: async (): Promise<ReminderFeedItem[]> =>
+      (await fetchUpcomingReminders()) as ReminderFeedItem[],
+  });
+}
+
+/** Marca lembretes como entregues, para não notificarem de novo. */
+export function useAckReminders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      await ackReminders({ data: { ids } });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY, "reminders"] }),
   });
 }
 

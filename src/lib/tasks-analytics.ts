@@ -9,19 +9,19 @@ export const POLARITIES: Array<{ value: Polarity; label: string; hint: string; c
     value: "IN_PROGRESS",
     label: "Em andamento",
     hint: "Tarefa ainda ativa no fluxo de trabalho",
-    color: "#3B82F6",
+    color: "#737373",
   },
   {
     value: "SUCCESS",
     label: "Sucesso",
     hint: "Tarefa finalizada com sucesso",
-    color: "#10B981",
+    color: "#171717",
   },
   {
     value: "ARCHIVED",
     label: "Arquivado",
     hint: "Fora do fluxo ativo (arquivada, cancelada, descartada)",
-    color: "#94A3B8",
+    color: "#BDBDBD",
   },
 ];
 
@@ -41,6 +41,70 @@ export const BOARD_VIEWS: Array<{ value: BoardView; label: string }> = [
   { value: "calendar", label: "Calendário" },
 ];
 
+export type Priority = "urgent" | "high" | "normal" | "low" | "none";
+
+/**
+ * Prioridade da tarefa.
+ *
+ * É a única informação do módulo que foge do preto e branco: urgência precisa
+ * saltar aos olhos num quadro cheio, e o nome por extenso mais a cor são o que
+ * dá essa leitura imediata. `color` é o hex usado nos gráficos; `chip` e `dot`
+ * trazem a mesma cor em classes com variante escura, para o contraste se manter
+ * nos dois temas.
+ */
+export const PRIORITIES: Array<{
+  value: Priority;
+  label: string;
+  chip: string;
+  dot: string;
+  color: string;
+  weight: number;
+}> = [
+  {
+    value: "urgent",
+    label: "Urgente",
+    chip: "border-red-500/40 bg-red-500/10 text-red-600 dark:border-red-400/40 dark:bg-red-400/15 dark:text-red-400",
+    dot: "bg-red-500 dark:bg-red-400",
+    color: "#EF4444",
+    weight: 4,
+  },
+  {
+    value: "high",
+    label: "Alta",
+    chip: "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:border-amber-400/40 dark:bg-amber-400/15 dark:text-amber-400",
+    dot: "bg-amber-500 dark:bg-amber-400",
+    color: "#F59E0B",
+    weight: 3,
+  },
+  {
+    value: "normal",
+    label: "Normal",
+    chip: "border-blue-500/40 bg-blue-500/10 text-blue-600 dark:border-blue-400/40 dark:bg-blue-400/15 dark:text-blue-400",
+    dot: "bg-blue-500 dark:bg-blue-400",
+    color: "#3B82F6",
+    weight: 2,
+  },
+  {
+    value: "low",
+    label: "Baixa",
+    chip: "border-border bg-secondary text-muted-foreground",
+    dot: "bg-muted-foreground",
+    color: "#94A3B8",
+    weight: 1,
+  },
+  {
+    value: "none",
+    label: "Sem prioridade",
+    chip: "border-dashed border-border text-muted-foreground",
+    dot: "bg-transparent ring-1 ring-border",
+    color: "#D4D4D4",
+    weight: 0,
+  },
+];
+
+export const priorityOf = (value: Priority | null | undefined) =>
+  PRIORITIES.find((p) => p.value === value) ?? PRIORITIES[2]!;
+
 export type StatusSeed = { name: string; color: string; polarity: Polarity };
 
 /** Conjuntos de status oferecidos na criação do quadro. */
@@ -49,47 +113,63 @@ export const STATUS_PRESETS: Array<{ id: string; label: string; statuses: Status
     id: "default",
     label: "Padrão",
     statuses: [
-      { name: "Em andamento", color: "#3B82F6", polarity: "IN_PROGRESS" },
-      { name: "Concluído", color: "#10B981", polarity: "SUCCESS" },
-      { name: "Arquivado", color: "#94A3B8", polarity: "ARCHIVED" },
+      { name: "Em andamento", color: "#525252", polarity: "IN_PROGRESS" },
+      { name: "Concluído", color: "#171717", polarity: "SUCCESS" },
+      { name: "Arquivado", color: "#BDBDBD", polarity: "ARCHIVED" },
     ],
   },
   {
     id: "dev",
     label: "Desenvolvimento",
     statuses: [
-      { name: "Backlog", color: "#94A3B8", polarity: "IN_PROGRESS" },
-      { name: "A fazer", color: "#64748B", polarity: "IN_PROGRESS" },
-      { name: "Em desenvolvimento", color: "#3B82F6", polarity: "IN_PROGRESS" },
-      { name: "Em revisão", color: "#A855F7", polarity: "IN_PROGRESS" },
-      { name: "Concluído", color: "#10B981", polarity: "SUCCESS" },
-      { name: "Cancelado", color: "#F43F5E", polarity: "ARCHIVED" },
+      { name: "Backlog", color: "#BDBDBD", polarity: "IN_PROGRESS" },
+      { name: "A fazer", color: "#A3A3A3", polarity: "IN_PROGRESS" },
+      { name: "Em desenvolvimento", color: "#737373", polarity: "IN_PROGRESS" },
+      { name: "Em revisão", color: "#525252", polarity: "IN_PROGRESS" },
+      { name: "Concluído", color: "#171717", polarity: "SUCCESS" },
+      { name: "Cancelado", color: "#D4D4D4", polarity: "ARCHIVED" },
     ],
   },
   {
     id: "comercial",
     label: "Comercial",
     statuses: [
-      { name: "Pendente", color: "#64748B", polarity: "IN_PROGRESS" },
-      { name: "Em contato", color: "#3B82F6", polarity: "IN_PROGRESS" },
-      { name: "Aguardando cliente", color: "#F59E0B", polarity: "IN_PROGRESS" },
-      { name: "Resolvido", color: "#10B981", polarity: "SUCCESS" },
-      { name: "Arquivado", color: "#94A3B8", polarity: "ARCHIVED" },
+      { name: "Pendente", color: "#BDBDBD", polarity: "IN_PROGRESS" },
+      { name: "Em contato", color: "#737373", polarity: "IN_PROGRESS" },
+      { name: "Aguardando cliente", color: "#525252", polarity: "IN_PROGRESS" },
+      { name: "Resolvido", color: "#171717", polarity: "SUCCESS" },
+      { name: "Arquivado", color: "#BDBDBD", polarity: "ARCHIVED" },
     ],
   },
 ];
 
 export const SPACE_ICONS = ["📁", "📣", "💼", "💻", "💰", "🎯", "🧩", "🏢", "🛠️", "🎨", "📊", "🤝"];
 
+/**
+ * Paleta do sistema: uma escala de cinzas, do quase-preto ao quase-branco.
+ * É o que dá aos espaços, quadros, status e avatares uma identidade própria
+ * sem quebrar o tema preto e branco.
+ */
 export const PALETTE = [
-  "#3B82F6",
-  "#10B981",
-  "#F59E0B",
-  "#EF4444",
-  "#A855F7",
-  "#EC4899",
-  "#14B8A6",
-  "#64748B",
+  "#171717",
+  "#404040",
+  "#525252",
+  "#737373",
+  "#8A8A8A",
+  "#A3A3A3",
+  "#BDBDBD",
+  "#D4D4D4",
+];
+
+/** Tons usados nas etiquetas — a mesma escala, começando um pouco mais clara. */
+export const LABEL_PALETTE = [
+  "#171717",
+  "#404040",
+  "#525252",
+  "#737373",
+  "#8A8A8A",
+  "#A3A3A3",
+  "#BDBDBD",
 ];
 
 // ---------------------------------------------------------------------------
@@ -116,6 +196,36 @@ export const formatDuration = (seconds: number) => {
 };
 
 export const hoursOf = (seconds: number) => Math.round((seconds / 3600) * 100) / 100;
+
+/** 2.5 -> "2h30" · 3 -> "3h" */
+export const formatHours = (hours: number) => {
+  const total = Math.max(0, Math.round(hours * 60));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return `${m}min`;
+  return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, "0")}`;
+};
+
+export type EstimateState = "none" | "under" | "near" | "over";
+
+/**
+ * Compara o tempo já registrado com a estimativa da tarefa.
+ * `near` começa em 80% do estimado — é o aviso antes de estourar.
+ */
+export function estimateState(estimateHours: number | null, trackedSeconds: number): EstimateState {
+  if (!estimateHours || estimateHours <= 0) return "none";
+  const ratio = hoursOf(trackedSeconds) / estimateHours;
+  if (ratio > 1) return "over";
+  if (ratio >= 0.8) return "near";
+  return "under";
+}
+
+export const estimateClass = (state: EstimateState) =>
+  state === "over"
+    ? "text-negative font-semibold"
+    : state === "near"
+      ? "text-foreground font-medium"
+      : "text-muted-foreground";
 
 // ---------------------------------------------------------------------------
 // Datas / prazos
@@ -178,9 +288,9 @@ export function deadlineState(input: {
 
 export const deadlineClass = (state: DeadlineState) =>
   state === "late"
-    ? "text-negative"
+    ? "text-negative font-semibold"
     : state === "due_today"
-      ? "text-[#F59E0B]"
+      ? "text-foreground font-semibold"
       : state === "done"
         ? "text-positive"
         : "text-muted-foreground";
@@ -237,3 +347,39 @@ export const avatarColor = (seed: string) => {
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
   return PALETTE[hash % PALETTE.length]!;
 };
+
+/**
+ * Espelha um tom da paleta na escala de cinza (#171717 ↔ #E8E8E8).
+ *
+ * As cores de espaços, quadros, status e etiquetas ficam gravadas no banco como
+ * hexadecimal fixo. No tema escuro um tom escuro desapareceria contra o fundo,
+ * então invertemos: como a paleta é cinza, inverter cada canal devolve
+ * exatamente o tom oposto, preservando a distinção entre um item e outro.
+ */
+export function invertTone(hex: string): string {
+  const value = hex.replace("#", "");
+  if (value.length !== 6) return hex;
+  const flipped = [0, 2, 4]
+    .map((i) => (255 - parseInt(value.slice(i, i + 2), 16)).toString(16).padStart(2, "0"))
+    .join("");
+  return `#${flipped.toUpperCase()}`;
+}
+
+/**
+ * Preto ou branco sobre um fundo hexadecimal, o que tiver mais contraste.
+ * Com a paleta em escala de cinza, um tom claro precisa de texto escuro —
+ * senão as iniciais do avatar somem.
+ */
+export function contrastText(hex: string): "#FFFFFF" | "#111111" {
+  const value = hex.replace("#", "");
+  if (value.length !== 6) return "#FFFFFF";
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(value.slice(i, i + 2), 16) / 255) as [
+    number,
+    number,
+    number,
+  ];
+  // Luminância relativa (WCAG), simplificada com a aproximação sRGB.
+  const channel = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const luminance = 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  return luminance > 0.42 ? "#111111" : "#FFFFFF";
+}

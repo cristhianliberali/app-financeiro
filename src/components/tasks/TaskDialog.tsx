@@ -16,11 +16,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useNow } from "@/hooks/use-now";
+import { useAppState } from "@/lib/app-state";
 import {
   useDeleteSubtask,
   useDeleteTask,
   useDeleteTimeEntry,
+  useLabels,
   useSaveSubtask,
   useSaveTask,
   useStartTimer,
@@ -35,12 +47,20 @@ import {
   DEADLINE_LABEL,
   deadlineClass,
   deadlineState,
+  estimateClass,
+  estimateState,
   formatClock,
   formatDuration,
+  formatHours,
   fromLocalInput,
+  hoursOf,
   toLocalInput,
+  type Priority,
 } from "@/lib/tasks-analytics";
+import { LabelPicker } from "./LabelPicker";
+import { PrioritySelect } from "./PriorityPicker";
 import { RichTextEditor, RichTextView } from "./RichText";
+import { TaskReminders } from "./TaskReminders";
 import { UserAvatar, UserMultiSelect, UserSelect } from "./UserPicker";
 
 const ACTIVITY_TEXT: Record<string, string> = {
@@ -59,6 +79,8 @@ const ACTIVITY_TEXT: Record<string, string> = {
   time_logged: "registrou tempo",
   task_completed: "concluiu a tarefa",
   task_archived: "arquivou a tarefa",
+  priority_changed: "alterou a prioridade",
+  reminder_created: "agendou um lembrete",
 };
 
 function StatusSelect({
@@ -181,6 +203,12 @@ function SubtaskRow({
   );
 }
 
+/** "2,5" e "2.5" viram 2.5; vazio vira `null` (sem estimativa). */
+function parseEstimate(value: string): number | null {
+  const parsed = Number(value.replace(",", "."));
+  return value.trim() && Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
 export function TaskDialog({
   open,
   onOpenChange,
@@ -212,6 +240,8 @@ export function TaskDialog({
   const startTimer = useStartTimer();
   const stopTimer = useStopTimer();
   const { data: activity = [] } = useTaskActivity(task?.id ?? null);
+  const { accountId } = useAppState();
+  const { data: labels = [] } = useLabels(accountId);
   const now = useNow();
 
   const [draft, setDraft] = useState({
@@ -219,12 +249,16 @@ export function TaskDialog({
     description: "",
     status_id: statuses[0]?.id ?? "",
     responsible_user_id: null as string | null,
+    priority: "normal" as Priority,
+    estimate_hours: "",
     participants: [] as string[],
+    labels: [] as string[],
     start_date: "",
     due_date: "",
   });
   const [descDirty, setDescDirty] = useState(false);
   const [newSubtask, setNewSubtask] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Recarrega o rascunho somente ao abrir ou ao trocar de tarefa — recargas de
   // dados em segundo plano não podem descartar o que está sendo editado.
@@ -232,12 +266,16 @@ export function TaskDialog({
     if (!open) return;
     setDescDirty(false);
     setNewSubtask("");
+    setConfirmDelete(false);
     setDraft({
       title: task?.title ?? "",
       description: task?.description ?? "",
       status_id: task?.status_id ?? defaultStatusId ?? statuses[0]?.id ?? "",
       responsible_user_id: task?.responsible_user_id ?? null,
+      priority: task?.priority ?? "normal",
+      estimate_hours: task?.estimate_hours != null ? String(task.estimate_hours) : "",
       participants: task?.participants ?? [],
+      labels: (task?.labels ?? []).map((label) => label.id),
       start_date: toLocalInput(task?.start_date ?? null),
       due_date: toLocalInput(task?.due_date ?? null),
     });
@@ -254,6 +292,8 @@ export function TaskDialog({
   const state = task
     ? deadlineState({ due_date: task.due_date, polarity: task.status?.polarity ?? null })
     : "none";
+
+  const estimate = estimateState(task?.estimate_hours ?? null, totalSeconds);
 
   const userName = useMemo(
     () => (id: string | null | undefined) =>
@@ -287,12 +327,18 @@ export function TaskDialog({
       status_id: draft.status_id,
       title: draft.title.trim(),
       description: draft.description || null,
+      // Sem responsável escolhido o servidor assume quem criou a tarefa.
       responsible_user_id: draft.responsible_user_id,
+      priority: draft.priority,
+      estimate_hours: parseEstimate(draft.estimate_hours),
       start_date: fromLocalInput(draft.start_date),
       due_date: fromLocalInput(draft.due_date),
       participantIds: draft.participants,
+      labelIds: draft.labels,
     });
-    toast.success("Tarefa criada");
+    toast.success(
+      draft.responsible_user_id ? "Tarefa criada" : "Tarefa criada — você ficou como responsável",
+    );
     onOpenChange(false);
   }
 
@@ -358,6 +404,11 @@ export function TaskDialog({
                 if (!isNew) void patch({ responsible_user_id: id });
               }}
             />
+            {isNew && !draft.responsible_user_id && (
+              <p className="text-[11px] text-muted-foreground">
+                Sem ninguém escolhido, você fica como responsável.
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>Data de início</Label>
@@ -399,6 +450,55 @@ export function TaskDialog({
               }}
             />
           </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Prioridade</Label>
+            <PrioritySelect
+              value={draft.priority}
+              disabled={!canEdit}
+              onChange={(priority) => {
+                setDraft({ ...draft, priority });
+                if (!isNew) void patch({ priority });
+              }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-2">
+              Estimativa (horas)
+              {!isNew && task.estimate_hours ? (
+                <span className={`text-[11px] font-normal ${estimateClass(estimate)}`}>
+                  · {formatHours(hoursOf(totalSeconds))} de {formatHours(task.estimate_hours)}
+                </span>
+              ) : null}
+            </Label>
+            <Input
+              type="number"
+              min={0}
+              step="0.25"
+              inputMode="decimal"
+              disabled={!canEdit}
+              value={draft.estimate_hours}
+              onChange={(e) => setDraft({ ...draft, estimate_hours: e.target.value })}
+              onBlur={() => {
+                if (isNew) return;
+                const next = parseEstimate(draft.estimate_hours);
+                if (next !== (task.estimate_hours ?? null)) void patch({ estimate_hours: next });
+              }}
+              placeholder="Ex.: 4"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Etiquetas</Label>
+            <LabelPicker
+              accountId={accountId}
+              labels={labels}
+              value={draft.labels}
+              disabled={!canEdit}
+              onChange={(ids) => {
+                setDraft({ ...draft, labels: ids });
+                if (!isNew) void patch({ labelIds: ids });
+              }}
+            />
+          </div>
         </div>
 
         {!isNew && (
@@ -412,6 +512,19 @@ export function TaskDialog({
                 {task.running ? formatClock(totalSeconds) : formatDuration(totalSeconds)}
               </p>
             </div>
+            {task.estimate_hours ? (
+              <div className="border-l border-border pl-3">
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  Estimativa
+                </p>
+                <p className={`font-mono text-sm tabular-nums ${estimateClass(estimate)}`}>
+                  {formatHours(task.estimate_hours)}
+                  <span className="ml-1 text-[11px] font-normal">
+                    ({Math.round((hoursOf(totalSeconds) / task.estimate_hours) * 100)}%)
+                  </span>
+                </p>
+              </div>
+            ) : null}
             <div className="ml-auto">
               {task.running && task.running.user_id === currentUserId ? (
                 <Button
@@ -570,6 +683,14 @@ export function TaskDialog({
               </div>
             </div>
 
+            <TaskReminders
+              taskId={task.id}
+              reminders={task.reminders}
+              users={users}
+              currentUserId={currentUserId}
+              canEdit={canEdit}
+            />
+
             <div className="space-y-2">
               <Label>Atividade</Label>
               <div className="space-y-1.5">
@@ -607,11 +728,7 @@ export function TaskDialog({
               variant="ghost"
               size="sm"
               className="text-destructive hover:text-destructive"
-              onClick={async () => {
-                await deleteTask.mutateAsync(task.id);
-                toast.success("Tarefa excluída");
-                onOpenChange(false);
-              }}
+              onClick={() => setConfirmDelete(true)}
             >
               <Trash2 className="mr-1 size-3.5" /> Excluir tarefa
             </Button>
@@ -630,6 +747,34 @@ export function TaskDialog({
           </div>
         </div>
       </DialogContent>
+
+      {task && (
+        <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir esta tarefa?</AlertDialogTitle>
+              <AlertDialogDescription>
+                “{task.title}” será removida junto com suas {task.subtasks.length} subtarefa(s),
+                lembretes e {formatDuration(task.trackedSeconds)} de tempo registrado. A ação não
+                pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={async () => {
+                  await deleteTask.mutateAsync(task.id);
+                  toast.success("Tarefa excluída");
+                  onOpenChange(false);
+                }}
+              >
+                Excluir tarefa
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </Dialog>
   );
 }

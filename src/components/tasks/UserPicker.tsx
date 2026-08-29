@@ -3,7 +3,7 @@ import { Check, ChevronDown, UserPlus, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import type { AccountUser } from "@/lib/tasks";
-import { avatarColor, initialsOf } from "@/lib/tasks-analytics";
+import { avatarColor, contrastText, initialsOf } from "@/lib/tasks-analytics";
 
 export function UserAvatar({
   user,
@@ -25,14 +25,18 @@ export function UserAvatar({
       </span>
     );
   }
+  const background = avatarColor(user.user_id);
   return (
     <span
-      className="inline-flex items-center justify-center rounded-full font-semibold text-white"
+      // O anel mantém o avatar recortado do fundo mesmo quando o tom do usuário
+      // é próximo da cor do cartão — inevitável numa paleta de cinzas.
+      className="inline-flex items-center justify-center rounded-full font-semibold ring-1 ring-border"
       style={{
         width: size,
         height: size,
         fontSize: size * 0.4,
-        backgroundColor: avatarColor(user.user_id),
+        backgroundColor: background,
+        color: contrastText(background),
       }}
       title={title ?? user.name}
     >

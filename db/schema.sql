@@ -327,6 +327,11 @@ CREATE TABLE IF NOT EXISTS tasks (
   title               text NOT NULL,
   description         text,
   responsible_user_id uuid REFERENCES app_users(id) ON DELETE SET NULL,
+  -- Urgência da tarefa, independente do status. `none` = sem prioridade definida.
+  priority            text NOT NULL DEFAULT 'normal'
+                        CHECK (priority IN ('urgent','high','normal','low','none')),
+  -- Estimativa de esforço em horas; comparada com o tempo real no dashboard.
+  estimate_hours      numeric(7,2) CHECK (estimate_hours IS NULL OR estimate_hours >= 0),
   start_date          timestamptz,
   due_date            timestamptz,
   sort_order          int NOT NULL DEFAULT 0,
@@ -340,6 +345,26 @@ CREATE INDEX IF NOT EXISTS tasks_board_idx ON tasks(board_id, sort_order);
 CREATE INDEX IF NOT EXISTS tasks_responsible_idx ON tasks(responsible_user_id);
 CREATE INDEX IF NOT EXISTS tasks_due_idx ON tasks(due_date);
 
+-- Bancos criados antes de prioridade/estimativa existirem. `ADD COLUMN IF NOT
+-- EXISTS` é no-op quando a coluna já veio do CREATE TABLE acima.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS priority text NOT NULL DEFAULT 'normal';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS estimate_hours numeric(7,2);
+
+DO $chk$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tasks_priority_check') THEN
+    ALTER TABLE tasks ADD CONSTRAINT tasks_priority_check
+      CHECK (priority IN ('urgent','high','normal','low','none'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tasks_estimate_hours_check') THEN
+    ALTER TABLE tasks ADD CONSTRAINT tasks_estimate_hours_check
+      CHECK (estimate_hours IS NULL OR estimate_hours >= 0);
+  END IF;
+END;
+$chk$;
+
+CREATE INDEX IF NOT EXISTS tasks_priority_idx ON tasks(priority);
+
 CREATE TABLE IF NOT EXISTS task_participants (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   task_id    uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -348,6 +373,51 @@ CREATE TABLE IF NOT EXISTS task_participants (
   UNIQUE (task_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS task_participants_user_idx ON task_participants(user_id);
+
+-- Etiquetas são da conta inteira, não do quadro: assim a mesma etiqueta
+-- ("Bug", "Cliente A") organiza tarefas de espaços e quadros diferentes, e o
+-- filtro por etiqueta funciona nas telas que cruzam vários quadros.
+CREATE TABLE IF NOT EXISTS labels (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  name       text NOT NULL,
+  color      text NOT NULL DEFAULT '#737373',
+  created_by uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS labels_account_idx ON labels(account_id);
+-- Nomes de etiqueta são únicos por conta, sem diferenciar maiúsculas: é também
+-- o índice usado pelo ON CONFLICT que reaproveita a etiqueta já existente.
+CREATE UNIQUE INDEX IF NOT EXISTS labels_account_name_key ON labels(account_id, lower(name));
+
+CREATE TABLE IF NOT EXISTS task_label_links (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id    uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  label_id   uuid NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (task_id, label_id)
+);
+CREATE INDEX IF NOT EXISTS task_label_links_label_idx ON task_label_links(label_id);
+
+-- Lembretes. Uma linha por destinatário: quem for avisado recebe a notificação
+-- no app quando `remind_at` chega. `delivered_at` marca o que já foi entregue,
+-- e é o que impede o mesmo lembrete de aparecer a cada recarga da página.
+CREATE TABLE IF NOT EXISTS task_reminders (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id      uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  user_id      uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  remind_at    timestamptz NOT NULL,
+  note         text,
+  delivered_at timestamptz,
+  created_by   uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS task_reminders_task_idx ON task_reminders(task_id, remind_at);
+-- A consulta quente é "o que já venceu e ainda não entreguei para este usuário".
+CREATE INDEX IF NOT EXISTS task_reminders_pending_idx
+  ON task_reminders(user_id, remind_at) WHERE delivered_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS subtasks (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -420,7 +490,8 @@ BEGIN
     SELECT unnest(ARRAY[
       'app_users','accounts','account_members','account_invites','budget_profiles',
       'categories','transactions','recurring_rules','investments','goals',
-      'spaces','boards','board_statuses','tasks','subtasks','time_entries'
+      'spaces','boards','board_statuses','tasks','subtasks','time_entries',
+      'labels','task_reminders'
     ]) AS name
   LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS t_%1$s_updated ON %1$I', t.name);

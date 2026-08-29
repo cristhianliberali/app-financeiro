@@ -259,8 +259,8 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
             )}
 
             {unverified > 0 && (
-              <p className="flex items-center gap-2 rounded-lg border border-[#F59E0B]/40 bg-[#F59E0B]/10 p-2.5 text-xs">
-                <AlertTriangle className="size-4 shrink-0 text-[#F59E0B]" />
+              <p className="flex items-center gap-2 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-xs">
+                <AlertTriangle className="size-4 shrink-0 text-negative" />
                 {unverified === 1
                   ? "1 lançamento tem valor que não foi encontrado no documento. Confira antes de lançar."
                   : `${unverified} lançamentos têm valor que não foi encontrado no documento. Confira antes de lançar.`}
@@ -271,7 +271,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
               <div
                 key={i}
                 className={`grid grid-cols-12 items-center gap-2 rounded-xl border p-2 ${
-                  r.amountFound ? "border-border" : "border-[#F59E0B]/60 bg-[#F59E0B]/5"
+                  r.amountFound ? "border-border" : "border-negative/50 bg-negative/5"
                 }`}
               >
                 <input
@@ -312,7 +312,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                   }`}
                   title={r.amountFound ? undefined : "Valor não localizado no documento"}
                 >
-                  {!r.amountFound && <AlertTriangle className="size-3 text-[#F59E0B]" />}
+                  {!r.amountFound && <AlertTriangle className="size-3 text-negative" />}
                   {r.kind === "income" ? "+" : "−"}
                   {brl(r.amount)}
                 </span>

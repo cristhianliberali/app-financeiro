@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/AppShell";
+import { TasksShell } from "@/components/tasks/TasksShell";
 import { TaskCalendar } from "@/components/tasks/TaskCalendar";
 import { TaskDialog } from "@/components/tasks/TaskDialog";
 import { TaskKanban } from "@/components/tasks/TaskKanban";
@@ -13,7 +13,7 @@ import { BOARD_VIEWS, POLARITIES, type BoardView, type Polarity } from "@/lib/ta
 export const Route = createFileRoute("/tarefas/minhas")({
   head: () => ({
     meta: [
-      { title: "Minhas tarefas — Tarefas e Projetos" },
+      { title: "Minhas tarefas — Projetos e Tarefas" },
       {
         name: "description",
         content:
@@ -63,7 +63,7 @@ function MyTasksPage() {
   }
 
   return (
-    <AppShell hideFinanceControls>
+    <TasksShell breadcrumbCurrent="Minhas tarefas">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Minhas tarefas</h1>
@@ -131,6 +131,6 @@ function MyTasksPage() {
           currentUserId={currentUserId}
         />
       )}
-    </AppShell>
+    </TasksShell>
   );
 }

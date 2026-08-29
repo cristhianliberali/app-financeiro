@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Archive, Pencil, Plus } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
+import { TasksShell } from "@/components/tasks/TasksShell";
 import { Button } from "@/components/ui/button";
 import { SpaceDialog } from "@/components/tasks/SpaceDialog";
 import { useTasksModule } from "@/components/tasks/useTasksModule";
@@ -10,7 +10,7 @@ import { useBoards, useSpaces, useTasks, type Space } from "@/lib/tasks";
 export const Route = createFileRoute("/tarefas/espacos/")({
   head: () => ({
     meta: [
-      { title: "Espaços — Tarefas e Projetos" },
+      { title: "Espaços — Projetos e Tarefas" },
       {
         name: "description",
         content:
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/tarefas/espacos/")({
 });
 
 function SpacesPage() {
-  const { accountId, users } = useTasksModule();
+  const { accountId } = useTasksModule();
   const { data: spaces = [] } = useSpaces(accountId);
   const { data: boards = [] } = useBoards({ accountId });
   const { data: tasks = [] } = useTasks({ accountId });
@@ -52,10 +52,7 @@ function SpacesPage() {
         </button>
         <Link to="/tarefas/espacos/$spaceId" params={{ spaceId: space.id }} className="block">
           <div className="flex items-center gap-3">
-            <span
-              className="flex size-11 items-center justify-center rounded-xl text-xl"
-              style={{ backgroundColor: `${space.color}1A` }}
-            >
+            <span className="flex size-11 items-center justify-center rounded-xl border border-border bg-secondary text-xl">
               {space.icon}
             </span>
             <div>
@@ -74,7 +71,7 @@ function SpacesPage() {
               tarefas
             </span>
             <span>
-              <span className="font-mono font-semibold text-primary">{open}</span> em andamento
+              <span className="font-mono font-semibold text-foreground">{open}</span> em andamento
             </span>
           </div>
           {spaceBoards.length > 0 && (
@@ -98,8 +95,8 @@ function SpacesPage() {
   };
 
   return (
-    <AppShell
-      hideFinanceControls
+    <TasksShell
+      breadcrumbCurrent="Espaços"
       actions={
         <Button size="sm" onClick={() => setDialog({ open: true, space: null })}>
           <Plus className="mr-1 size-3.5" /> Novo espaço
@@ -144,8 +141,7 @@ function SpacesPage() {
         onOpenChange={(open) => setDialog({ open, space: open ? dialog.space : null })}
         accountId={accountId}
         space={dialog.space}
-        users={users}
       />
-    </AppShell>
+    </TasksShell>
   );
 }

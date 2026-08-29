@@ -5,9 +5,17 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design system — "Modern Swiss Minimalist" (Aura Finanças)
- * Inter + JetBrains Mono, calm slate surfaces, blue primary,
- * emerald for entradas, rose for saídas.
+ * Design system — preto e branco (Aura)
+ *
+ * Toda a interface vive numa escala de cinzas: o tema claro é papel branco com
+ * tinta preta, o escuro é o inverso, e `primary` é sempre o extremo oposto do
+ * fundo. Hierarquia e ênfase vêm de contraste, peso e espaço — não de matiz.
+ *
+ * As exceções são as informações que precisam ser lidas num relance, e não numa
+ * leitura atenta. `--positive` e `--negative` guardam um resto mínimo de cor
+ * (verde e vermelho bem dessaturados) para entrada e saída de dinheiro; a
+ * prioridade da tarefa é a outra, e vive em `PRIORITIES`, dentro de
+ * `src/lib/tasks-analytics.ts`.
  */
 
 @theme inline {
@@ -63,72 +71,89 @@
 
 :root {
   --radius: 0.75rem;
-  --background: oklch(0.984 0.003 247.858);
-  --foreground: oklch(0.208 0.042 265.755);
-  --surface: oklch(0.968 0.007 247.896);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.16 0 0);
+  --surface: oklch(0.968 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.208 0.042 265.755);
+  --card-foreground: oklch(0.16 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.208 0.042 265.755);
-  --primary: oklch(0.623 0.214 259.815);
+  --popover-foreground: oklch(0.16 0 0);
+  --primary: oklch(0.18 0 0);
   --primary-foreground: oklch(1 0 0);
-  --ink: oklch(0.208 0.042 265.755);
-  --ink-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --positive: oklch(0.696 0.17 162.48);
+  --ink: oklch(0.16 0 0);
+  --ink-foreground: oklch(1 0 0);
+  --secondary: oklch(0.962 0 0);
+  --secondary-foreground: oklch(0.16 0 0);
+  --muted: oklch(0.962 0 0);
+  --muted-foreground: oklch(0.505 0 0);
+  --accent: oklch(0.945 0 0);
+  --accent-foreground: oklch(0.16 0 0);
+  /* Únicas cores do sistema: dinheiro que entra e dinheiro que sai. */
+  --positive: oklch(0.5 0.055 158);
   --positive-foreground: oklch(1 0 0);
-  --negative: oklch(0.645 0.246 16.439);
+  --negative: oklch(0.5 0.09 25);
   --negative-foreground: oklch(1 0 0);
-  --destructive: oklch(0.645 0.246 16.439);
+  --destructive: oklch(0.5 0.09 25);
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.623 0.214 259.815);
-  --chart-1: oklch(0.623 0.214 259.815);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.645 0.246 16.439);
-  --chart-4: oklch(0.769 0.188 70.08);
-  --chart-5: oklch(0.627 0.265 303.9);
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-primary: oklch(0.623 0.214 259.815);
+  --border: oklch(0.905 0 0);
+  --input: oklch(0.905 0 0);
+  --ring: oklch(0.18 0 0);
+  /* Rampa de cinzas dos gráficos, do mais escuro ao mais claro. */
+  --chart-1: oklch(0.22 0 0);
+  --chart-2: oklch(0.38 0 0);
+  --chart-3: oklch(0.53 0 0);
+  --chart-4: oklch(0.68 0 0);
+  --chart-5: oklch(0.82 0 0);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.16 0 0);
+  --sidebar-primary: oklch(0.18 0 0);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.623 0.214 259.815);
+  --sidebar-accent: oklch(0.945 0 0);
+  --sidebar-accent-foreground: oklch(0.16 0 0);
+  --sidebar-border: oklch(0.905 0 0);
+  --sidebar-ring: oklch(0.18 0 0);
 }
 
 .dark {
-  --background: oklch(0.19 0.03 265);
-  --foreground: oklch(0.984 0.003 247.858);
-  --surface: oklch(0.24 0.035 265);
-  --card: oklch(0.24 0.035 265);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.24 0.035 265);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.623 0.214 259.815);
-  --primary-foreground: oklch(1 0 0);
-  --ink: oklch(0.984 0.003 247.858);
-  --ink-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --sidebar: oklch(0.24 0.035 265);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --background: oklch(0.115 0 0);
+  --foreground: oklch(0.98 0 0);
+  --surface: oklch(0.165 0 0);
+  --card: oklch(0.165 0 0);
+  --card-foreground: oklch(0.98 0 0);
+  --popover: oklch(0.185 0 0);
+  --popover-foreground: oklch(0.98 0 0);
+  --primary: oklch(0.98 0 0);
+  --primary-foreground: oklch(0.13 0 0);
+  --ink: oklch(0.98 0 0);
+  --ink-foreground: oklch(0.13 0 0);
+  --secondary: oklch(0.225 0 0);
+  --secondary-foreground: oklch(0.98 0 0);
+  --muted: oklch(0.225 0 0);
+  --muted-foreground: oklch(0.66 0 0);
+  --accent: oklch(0.255 0 0);
+  --accent-foreground: oklch(0.98 0 0);
+  --positive: oklch(0.72 0.06 158);
+  --positive-foreground: oklch(0.13 0 0);
+  --negative: oklch(0.68 0.1 25);
+  --negative-foreground: oklch(0.13 0 0);
+  --destructive: oklch(0.68 0.1 25);
+  --destructive-foreground: oklch(0.13 0 0);
+  --border: oklch(1 0 0 / 13%);
+  --input: oklch(1 0 0 / 17%);
+  --ring: oklch(0.85 0 0);
+  --chart-1: oklch(0.95 0 0);
+  --chart-2: oklch(0.8 0 0);
+  --chart-3: oklch(0.66 0 0);
+  --chart-4: oklch(0.52 0 0);
+  --chart-5: oklch(0.4 0 0);
+  --sidebar: oklch(0.145 0 0);
+  --sidebar-foreground: oklch(0.98 0 0);
+  --sidebar-primary: oklch(0.98 0 0);
+  --sidebar-primary-foreground: oklch(0.13 0 0);
+  --sidebar-accent: oklch(0.245 0 0);
+  --sidebar-accent-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(1 0 0 / 13%);
+  --sidebar-ring: oklch(0.85 0 0);
 }
 
 @layer base {
@@ -156,4 +181,25 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-muted-foreground);
+}
+
+/*
+ * Barras de rolagem discretas — o módulo de Projetos e Tarefas tem colunas de
+ * Kanban e árvore lateral roláveis, e a barra padrão pesa demais no layout.
+ */
+@utility thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 9999px;
+  }
 }
