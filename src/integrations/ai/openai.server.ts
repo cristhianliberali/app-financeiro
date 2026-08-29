@@ -44,8 +44,17 @@ const ROW_SCHEMA = {
           description: { type: "string", description: "Nome do estabelecimento ou do lançamento" },
           amount: { type: "number", description: "Valor absoluto, sempre positivo" },
           kind: { type: "string", enum: ["income", "expense"] },
-          date: { type: "string", description: "Data do lançamento, YYYY-MM-DD" },
-          due_date: { type: "string", description: "Vencimento, YYYY-MM-DD" },
+          date: {
+            type: "string",
+            description:
+              "Data do lançamento (quando a compra/movimento aconteceu), YYYY-MM-DD. Obrigatória.",
+          },
+          due_date: {
+            type: "string",
+            description:
+              "Data de vencimento (quando o valor é cobrado/pago), YYYY-MM-DD. Obrigatória: " +
+              "numa fatura de cartão é o vencimento da fatura, igual para todas as linhas.",
+          },
           category: { type: "string", description: "Uma das categorias oferecidas" },
           installment_no: { type: ["integer", "null"] },
           installment_total: { type: ["integer", "null"] },
@@ -73,6 +82,15 @@ function buildSystemPrompt(categories: CategoryHint[], today: string): string {
     "- Copie os valores exatamente como aparecem, convertidos para número (1.234,56 vira 1234.56).",
     "- Valores sempre positivos: use kind=expense para gastos e kind=income para créditos, estornos e recebimentos.",
     "- Datas em YYYY-MM-DD. Quando o documento traz só dia e mês, use o ano mais provável em relação a hoje.",
+    "",
+    "As duas datas são obrigatórias e significam coisas diferentes:",
+    "- date: quando a compra ou o movimento aconteceu (a data que aparece ao lado da linha).",
+    "- due_date: quando o valor é efetivamente cobrado ou pago.",
+    "  Em fatura de cartão, é a data de vencimento da fatura — a mesma para todas as linhas,",
+    "  inclusive as de meses anteriores e as parcelas. Procure-a no cabeçalho do documento.",
+    "  Em extrato bancário, o movimento já aconteceu: repita a data de date.",
+    "  Só repita date em due_date quando o documento realmente não informar vencimento.",
+    "",
     "- Quando a linha indicar parcela (ex.: 03/10), preencha installment_no e installment_total.",
     "- Ignore cabeçalhos, totais, saldos, limites e linhas de resumo — só lançamentos.",
     "",

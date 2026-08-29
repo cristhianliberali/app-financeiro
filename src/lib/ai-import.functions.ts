@@ -13,6 +13,8 @@ export type ParsedRow = {
   installment_total: number | null;
   /** O valor foi conferido no texto do documento. */
   amountFound: boolean;
+  /** Lançamento igual que o perfil já tem: mesma descrição, valor e data. */
+  duplicateOf: { id: string; description: string; date: string } | null;
 };
 
 export type ImportSummary = {

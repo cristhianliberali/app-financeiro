@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, FileUp, Sparkles, Trash2, X } from "lucide-react";
+import { AlertTriangle, Ban, FileUp, Sparkles, Trash2, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import {
   type ImportSummary,
   type ParsedRow,
 } from "@/lib/ai-import.functions";
-import { brl } from "@/lib/format";
+import { brl, formatDateBR } from "@/lib/format";
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void };
 
@@ -74,7 +74,9 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
   function toDraft(row: ParsedRow): Draft {
     return {
       ...row,
-      include: true,
+      // Duplicado nasce desmarcado: aparece na lista para o usuário ver que foi
+      // reconhecido, mas não entra no lançamento em massa.
+      include: !row.duplicateOf,
       category_id:
         categories.find(
           (c) => c.kind === row.kind && c.name.toLowerCase() === row.category.toLowerCase(),
@@ -139,7 +141,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
   }
 
   async function commit() {
-    const selected = rows.filter((r) => r.include);
+    const selected = rows.filter((r) => r.include && !r.duplicateOf);
     if (!selected.length) {
       toast.error("Selecione ao menos um lançamento");
       return;
@@ -163,13 +165,14 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
   }
 
   const pendingBatches = summary && summary.importId ? summary.totalBatches - batchesDone : 0;
-  const unverified = rows.filter((r) => !r.amountFound).length;
+  const unverified = rows.filter((r) => !r.amountFound && !r.duplicateOf).length;
+  const duplicates = rows.filter((r) => r.duplicateOf).length;
   const started = rows.length > 0 || batchesDone > 0;
   const canStart = !!file || text.trim().length >= 10;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto">
+      <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="size-4 text-primary" /> Importar fatura ou extrato com IA
@@ -258,6 +261,15 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
               </p>
             )}
 
+            {duplicates > 0 && (
+              <p className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 p-2.5 text-xs text-muted-foreground">
+                <Ban className="size-4 shrink-0" />
+                {duplicates === 1
+                  ? "1 lançamento já existe no sistema e não será lançado de novo."
+                  : `${duplicates} lançamentos já existem no sistema e não serão lançados de novo.`}
+              </p>
+            )}
+
             {unverified > 0 && (
               <p className="flex items-center gap-2 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-xs">
                 <AlertTriangle className="size-4 shrink-0 text-negative" />
@@ -267,57 +279,102 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
               </p>
             )}
 
-            {rows.map((r, i) => (
-              <div
-                key={i}
-                className={`grid grid-cols-12 items-center gap-2 rounded-xl border p-2 ${
-                  r.amountFound ? "border-border" : "border-negative/50 bg-negative/5"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={r.include}
-                  onChange={(e) => patch(i, { include: e.target.checked })}
-                  className="col-span-1 size-4 accent-[var(--color-primary)]"
-                  aria-label="Incluir lançamento"
-                />
-                <Input
-                  className="col-span-4 h-8 text-xs"
-                  value={r.description}
-                  onChange={(e) => patch(i, { description: e.target.value })}
-                />
-                <Input
-                  type="date"
-                  className="col-span-2 h-8 text-xs"
-                  value={r.date}
-                  onChange={(e) => patch(i, { date: e.target.value, due_date: e.target.value })}
-                />
-                <select
-                  className="col-span-3 h-8 rounded-md border border-input bg-card px-2 text-xs"
-                  value={r.category_id}
-                  onChange={(e) => patch(i, { category_id: e.target.value })}
-                >
-                  <option value="">Sem categoria</option>
-                  {categories
-                    .filter((c) => c.kind === r.kind)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.emoji} {c.name}
-                      </option>
-                    ))}
-                </select>
-                <span
-                  className={`col-span-2 flex items-center justify-end gap-1 text-right font-mono text-xs font-semibold ${
-                    r.kind === "income" ? "text-positive" : "text-negative"
+            <div className="grid grid-cols-12 gap-2 px-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+              <span className="col-span-1" />
+              <span className="col-span-3">Descrição</span>
+              <span className="col-span-2">Lançamento</span>
+              <span className="col-span-2">Vencimento</span>
+              <span className="col-span-2">Categoria</span>
+              <span className="col-span-2 text-right">Valor</span>
+            </div>
+
+            {rows.map((r, i) => {
+              const blocked = !!r.duplicateOf;
+              return (
+                <div
+                  key={i}
+                  className={`grid grid-cols-12 items-center gap-2 rounded-xl border p-2 ${
+                    blocked
+                      ? "border-dashed border-border bg-muted/40 opacity-70"
+                      : r.amountFound
+                        ? "border-border"
+                        : "border-negative/50 bg-negative/5"
                   }`}
-                  title={r.amountFound ? undefined : "Valor não localizado no documento"}
                 >
-                  {!r.amountFound && <AlertTriangle className="size-3 text-negative" />}
-                  {r.kind === "income" ? "+" : "−"}
-                  {brl(r.amount)}
-                </span>
-              </div>
-            ))}
+                  <input
+                    type="checkbox"
+                    checked={r.include}
+                    disabled={blocked}
+                    onChange={(e) => patch(i, { include: e.target.checked })}
+                    className="col-span-1 size-4 accent-[var(--color-primary)] disabled:cursor-not-allowed"
+                    aria-label={blocked ? "Lançamento já existente" : "Incluir lançamento"}
+                  />
+                  <div className="col-span-3 space-y-1">
+                    <Input
+                      className="h-8 text-xs"
+                      value={r.description}
+                      disabled={blocked}
+                      onChange={(e) => patch(i, { description: e.target.value })}
+                    />
+                    {blocked && (
+                      <span
+                        className="flex items-center gap-1 text-[11px] text-muted-foreground"
+                        title={`Já lançado em ${formatDateBR(r.duplicateOf!.date)} como "${r.duplicateOf!.description}"`}
+                      >
+                        <Ban className="size-3 shrink-0" /> Já lançado no sistema
+                      </span>
+                    )}
+                  </div>
+                  <Input
+                    type="date"
+                    className="col-span-2 h-8 text-xs"
+                    value={r.date}
+                    disabled={blocked}
+                    onChange={(e) => patch(i, { date: e.target.value })}
+                    aria-label="Data do lançamento"
+                  />
+                  <Input
+                    type="date"
+                    className="col-span-2 h-8 text-xs"
+                    value={r.due_date}
+                    disabled={blocked}
+                    onChange={(e) => patch(i, { due_date: e.target.value })}
+                    aria-label="Data de vencimento"
+                  />
+                  <select
+                    className="col-span-2 h-8 rounded-md border border-input bg-card px-2 text-xs disabled:opacity-60"
+                    value={r.category_id}
+                    disabled={blocked}
+                    onChange={(e) => patch(i, { category_id: e.target.value })}
+                  >
+                    <option value="">Sem categoria</option>
+                    {categories
+                      .filter((c) => c.kind === r.kind)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.emoji} {c.name}
+                        </option>
+                      ))}
+                  </select>
+                  <span
+                    className={`col-span-2 flex items-center justify-end gap-1 text-right font-mono text-xs font-semibold ${
+                      blocked
+                        ? "text-muted-foreground line-through"
+                        : r.kind === "income"
+                          ? "text-positive"
+                          : "text-negative"
+                    }`}
+                    title={r.amountFound ? undefined : "Valor não localizado no documento"}
+                  >
+                    {!blocked && !r.amountFound && (
+                      <AlertTriangle className="size-3 text-negative" />
+                    )}
+                    {r.kind === "income" ? "+" : "−"}
+                    {brl(r.amount)}
+                  </span>
+                </div>
+              );
+            })}
 
             <button
               onClick={() => {
