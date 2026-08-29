@@ -54,7 +54,7 @@ export function TaskCard({
     >
       <div className="flex items-start gap-2">
         <p className="flex-1 text-sm font-medium leading-snug">{task.title}</p>
-        <PriorityBadge priority={task.priority} showLabel={false} className="mt-0.5 shrink-0" />
+        <PriorityBadge priority={task.priority} className="mt-0.5 shrink-0" />
         <button
           onClick={(e) => {
             e.stopPropagation();

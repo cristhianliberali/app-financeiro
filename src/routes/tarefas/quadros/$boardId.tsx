@@ -309,6 +309,7 @@ function BoardPage() {
         onOpenChange={setStatusDialog}
         boardId={boardId}
         statuses={statuses}
+        tasks={allTasks}
       />
     </TasksShell>
   );

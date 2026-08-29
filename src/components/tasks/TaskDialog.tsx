@@ -54,7 +54,6 @@ import {
   formatHours,
   fromLocalInput,
   hoursOf,
-  priorityOf,
   toLocalInput,
   type Priority,
 } from "@/lib/tasks-analytics";

@@ -46,15 +46,15 @@ export type Priority = "urgent" | "high" | "normal" | "low" | "none";
 /**
  * Prioridade da tarefa.
  *
- * O sistema é preto e branco, então a urgência não é sinalizada por matiz e sim
- * por contraste: `chip`/`dot` usam tokens do tema (foreground, muted…), que já
- * invertem sozinhos entre claro e escuro. `color` só existe para os gráficos,
- * onde o valor precisa ser um hex literal.
+ * É a única informação do módulo que foge do preto e branco: urgência precisa
+ * saltar aos olhos num quadro cheio, e o nome por extenso mais a cor são o que
+ * dá essa leitura imediata. `color` é o hex usado nos gráficos; `chip` e `dot`
+ * trazem a mesma cor em classes com variante escura, para o contraste se manter
+ * nos dois temas.
  */
 export const PRIORITIES: Array<{
   value: Priority;
   label: string;
-  short: string;
   chip: string;
   dot: string;
   color: string;
@@ -63,43 +63,38 @@ export const PRIORITIES: Array<{
   {
     value: "urgent",
     label: "Urgente",
-    short: "P1",
-    chip: "border-foreground bg-foreground text-background",
-    dot: "bg-foreground",
-    color: "#171717",
+    chip: "border-red-500/40 bg-red-500/10 text-red-600 dark:border-red-400/40 dark:bg-red-400/15 dark:text-red-400",
+    dot: "bg-red-500 dark:bg-red-400",
+    color: "#EF4444",
     weight: 4,
   },
   {
     value: "high",
     label: "Alta",
-    short: "P2",
-    chip: "border-foreground/50 bg-foreground/12 text-foreground",
-    dot: "bg-foreground/75",
-    color: "#525252",
+    chip: "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:border-amber-400/40 dark:bg-amber-400/15 dark:text-amber-400",
+    dot: "bg-amber-500 dark:bg-amber-400",
+    color: "#F59E0B",
     weight: 3,
   },
   {
     value: "normal",
     label: "Normal",
-    short: "P3",
-    chip: "border-border bg-secondary text-foreground",
-    dot: "bg-muted-foreground",
-    color: "#8A8A8A",
+    chip: "border-blue-500/40 bg-blue-500/10 text-blue-600 dark:border-blue-400/40 dark:bg-blue-400/15 dark:text-blue-400",
+    dot: "bg-blue-500 dark:bg-blue-400",
+    color: "#3B82F6",
     weight: 2,
   },
   {
     value: "low",
     label: "Baixa",
-    short: "P4",
-    chip: "border-border text-muted-foreground",
-    dot: "bg-muted-foreground/45",
-    color: "#BDBDBD",
+    chip: "border-border bg-secondary text-muted-foreground",
+    dot: "bg-muted-foreground",
+    color: "#94A3B8",
     weight: 1,
   },
   {
     value: "none",
     label: "Sem prioridade",
-    short: "—",
     chip: "border-dashed border-border text-muted-foreground",
     dot: "bg-transparent ring-1 ring-border",
     color: "#D4D4D4",

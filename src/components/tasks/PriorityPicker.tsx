@@ -1,14 +1,15 @@
 import { Flag } from "lucide-react";
 import { PRIORITIES, priorityOf, type Priority } from "@/lib/tasks-analytics";
 
-/** Selo compacto de prioridade — o que aparece no cartão e na lista. */
+/**
+ * Selo de prioridade do cartão e da lista: sempre o nome por extenso e a cor da
+ * urgência, que é o que se lê de longe num quadro cheio.
+ */
 export function PriorityBadge({
   priority,
-  showLabel = true,
   className = "",
 }: {
   priority: Priority;
-  showLabel?: boolean;
   className?: string;
 }) {
   const config = priorityOf(priority);
@@ -16,11 +17,11 @@ export function PriorityBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${config.chip} ${className}`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold ${config.chip} ${className}`}
       title={`Prioridade: ${config.label}`}
     >
-      <Flag className="size-2.5" />
-      {showLabel ? config.label : config.short}
+      <Flag className="size-2.5 shrink-0" />
+      {config.label}
     </span>
   );
 }

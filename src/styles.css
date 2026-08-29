@@ -11,10 +11,11 @@
  * tinta preta, o escuro é o inverso, e `primary` é sempre o extremo oposto do
  * fundo. Hierarquia e ênfase vêm de contraste, peso e espaço — não de matiz.
  *
- * As duas únicas exceções são `--positive` e `--negative`: entrada e saída de
- * dinheiro precisam ser distinguíveis num relance, então ficam com um resto
- * mínimo de cor (verde e vermelho bem dessaturados, quase cinza). Para um preto
- * e branco absoluto, basta igualá-las a `--foreground` nos dois temas.
+ * As exceções são as informações que precisam ser lidas num relance, e não numa
+ * leitura atenta. `--positive` e `--negative` guardam um resto mínimo de cor
+ * (verde e vermelho bem dessaturados) para entrada e saída de dinheiro; a
+ * prioridade da tarefa é a outra, e vive em `PRIORITIES`, dentro de
+ * `src/lib/tasks-analytics.ts`.
  */
 
 @theme inline {
