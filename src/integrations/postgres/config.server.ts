@@ -323,6 +323,81 @@ export function isS3Configured(): boolean {
   }
 }
 
+/**
+ * Integração com o Google Agenda.
+ *
+ * As credenciais vêm de um projeto no Google Cloud Console (OAuth 2.0, tipo
+ * "Aplicativo da Web"), e a conexão é por usuário: cada um autoriza o app na
+ * própria conta. Sem `GOOGLE_CLIENT_ID` o app segue igual — só a agenda fica
+ * indisponível, com a tela dizendo o que falta.
+ */
+export type GoogleSettings = {
+  clientId: string;
+  clientSecret: string;
+  /**
+   * Base das APIs do Google. Existe para poder apontar os testes para um
+   * servidor local; em produção fica no padrão.
+   */
+  apiBaseUrl: string;
+  authBaseUrl: string;
+  tokenUrl: string;
+  /** Fuso dos eventos criados na agenda. */
+  timeZone: string;
+  /** Minutos entre duas sincronizações automáticas do mesmo usuário. */
+  syncIntervalMinutes: number;
+  /** Teto de eventos lidos por sincronização, para não estourar a cota. */
+  maxEventsPerSync: number;
+};
+
+export function getGoogleSettings(): GoogleSettings {
+  const clientId = readEnv("GOOGLE_CLIENT_ID");
+  const clientSecret = readEnv("GOOGLE_CLIENT_SECRET");
+
+  const missing = [
+    ...(clientId ? [] : ["GOOGLE_CLIENT_ID"]),
+    ...(clientSecret ? [] : ["GOOGLE_CLIENT_SECRET"]),
+  ];
+  if (missing.length) {
+    throw new Error(
+      `Integração com o Google Agenda não configurada. Faltam as variáveis: ${missing.join(", ")}.`,
+    );
+  }
+
+  // Uma única variável redireciona todas as chamadas — é assim que o teste
+  // automatizado roda contra um Google falso, sem tocar no de verdade.
+  const base = readEnv("GOOGLE_API_BASE_URL");
+
+  return {
+    clientId: clientId!,
+    clientSecret: clientSecret!,
+    apiBaseUrl: base ?? "https://www.googleapis.com",
+    authBaseUrl: base ? `${base}/o/oauth2/v2/auth` : "https://accounts.google.com/o/oauth2/v2/auth",
+    tokenUrl: base ? `${base}/token` : "https://oauth2.googleapis.com/token",
+    timeZone: readEnv("GOOGLE_CALENDAR_TIMEZONE") ?? "America/Sao_Paulo",
+    syncIntervalMinutes: readInt("GOOGLE_SYNC_INTERVALO_MINUTOS", 10),
+    maxEventsPerSync: readInt("GOOGLE_MAX_EVENTOS_SYNC", 500),
+  };
+}
+
+/** A tela usa isto para explicar por que a agenda não pode ser conectada. */
+export function isGoogleConfigured(): boolean {
+  try {
+    getGoogleSettings();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Segredo que cifra os tokens do Google guardados no banco. Sem uma variável
+ * própria, deriva do segredo do cliente OAuth — que já é secreto e já precisa
+ * existir para a integração funcionar.
+ */
+export function getGoogleTokenSecret(): string {
+  return readEnv("GOOGLE_TOKEN_SECRET") ?? getGoogleSettings().clientSecret;
+}
+
 /** Nome do cookie que carrega o token de sessão. */
 export function getSessionCookieName(): string {
   return readEnv("SESSION_COOKIE_NAME") ?? "aura_session";

@@ -77,6 +77,8 @@ sem prefixo.
 | `time_entries` | Registros do cronômetro; `stopped_at` nulo = em execução |
 | `task_activity` | Trilha de auditoria da tarefa |
 | `task_attachments` | Metadados dos anexos; o arquivo em si fica no bucket S3, referenciado por `object_key` |
+| `google_accounts` | Conexão de cada usuário com o Google Agenda: tokens cifrados, agenda de destino e marcador de sincronização |
+| `task_calendar_events` | Liga a tarefa ao evento criado na agenda do responsável |
 
 ## Autorização
 

@@ -101,6 +101,10 @@ S3_SECRET_ACCESS_KEY=<opcional, segredo>
 S3_ENDPOINT=<opcional, para MinIO/R2/B2>
 S3_REGION=us-east-1
 S3_MAX_UPLOAD_MB=50
+GOOGLE_CLIENT_ID=<opcional>
+GOOGLE_CLIENT_SECRET=<opcional, segredo>
+GOOGLE_CALENDAR_TIMEZONE=America/Sao_Paulo
+GOOGLE_SYNC_INTERVALO_MINUTOS=10
 PORT=3000
 HOST=0.0.0.0
 NODE_ENV=production
@@ -151,6 +155,12 @@ interna `5432` — assim o tráfego não sai para a internet.
 | `S3_FORCE_PATH_STYLE` | runtime | não | `true` para `host/bucket/chave`. Em branco, segue o endpoint |
 | `S3_MAX_UPLOAD_MB` | runtime | não | Teto por arquivo em MB (padrão `50`) |
 | `S3_URL_TTL_SEGUNDOS` | runtime | não | Validade das URLs assinadas (padrão `900`) |
+| `GOOGLE_CLIENT_ID` | runtime | não | ID do cliente OAuth do Google Cloud. Sem ele, a agenda fica indisponível |
+| `GOOGLE_CLIENT_SECRET` | runtime | não | Segredo do cliente OAuth. **Segredo** |
+| `GOOGLE_CALENDAR_TIMEZONE` | runtime | não | Fuso dos compromissos criados (padrão `America/Sao_Paulo`) |
+| `GOOGLE_SYNC_INTERVALO_MINUTOS` | runtime | não | Intervalo da sincronização automática (padrão `10`) |
+| `GOOGLE_MAX_EVENTOS_SYNC` | runtime | não | Teto de eventos lidos por sincronização (padrão `500`) |
+| `GOOGLE_TOKEN_SECRET` | runtime | não | Chave que cifra os tokens no banco; sem valor, deriva de `GOOGLE_CLIENT_SECRET` |
 | `PORT` | runtime | não | Porta do servidor (padrão `3000`) |
 | `HOST` | runtime | sim | Precisa ser `0.0.0.0` para o proxy alcançar |
 
@@ -296,9 +306,39 @@ docker run --rm -p 3000:3000 \
 | "Envio de e-mail não configurado" na troca de e-mail ou na redefinição de senha | Falta `SMTP_HOST` (e as demais `SMTP_*`) |
 | E-mail não chega e o log mostra erro de certificado | SMTP interno com certificado autoassinado: use `SMTP_TLS_REJECT_UNAUTHORIZED=false` |
 | Link de redefinição de senha aponta para `localhost` | Falta `APP_URL` com o domínio público |
+| "A integração não está configurada" no perfil | Faltam `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` |
+| `redirect_uri_mismatch` ao conectar a agenda | O URI cadastrado no Google Cloud não é exatamente `APP_URL` + `/api/google/callback` |
+| "O Google não devolveu a autorização de longa duração" | A conta já havia autorizado antes; remova o acesso em myaccount.google.com/permissions e conecte de novo |
 | "O armazenamento de arquivos não está configurado" na tarefa | Faltam `S3_BUCKET`, `S3_ACCESS_KEY_ID` ou `S3_SECRET_ACCESS_KEY` |
 | "O navegador não conseguiu enviar o arquivo ao armazenamento" | CORS do bucket não libera o domínio do app — veja a seção CORS acima |
 | Anexo envia mas não aparece a miniatura | Endpoint acessível pelo servidor mas não pelo navegador, ou `S3_FORCE_PATH_STYLE` errado |
+
+---
+
+## Google Agenda
+
+A conexão é **por usuário**: cada pessoa abre o próprio perfil e autoriza o app
+na sua conta Google. A tarefa vira compromisso na agenda de quem é **responsável**
+por ela; tarefa sem responsável, ou com responsável que não conectou a conta,
+não vira evento.
+
+No Google Cloud Console:
+
+1. Ative a **Google Calendar API** no projeto;
+2. Na tela de permissão OAuth, declare o escopo
+   `https://www.googleapis.com/auth/calendar.events` (mais `openid` e `email`);
+3. Crie uma credencial **ID do cliente OAuth → Aplicativo da Web**;
+4. Em *URIs de redirecionamento autorizados*, cadastre exatamente
+   `https://SEU-DOMINIO/api/google/callback` — o mesmo host de `APP_URL`.
+
+Enquanto o app estiver como "Em teste" na tela de permissão, só os e-mails
+listados como usuários de teste conseguem conectar, e o consentimento expira em
+sete dias. Para uso contínuo, publique o app.
+
+**Cota**: a leitura é incremental (`syncToken`), então cada rodada traz só o que
+mudou — uma chamada por usuário conectado a cada `GOOGLE_SYNC_INTERVALO_MINUTOS`.
+Nos erros de limite (403 de cota, 429) e nas falhas temporárias, a chamada é
+repetida com espera crescente, até três vezes.
 
 ---
 

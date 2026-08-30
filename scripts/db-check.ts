@@ -34,6 +34,8 @@ const EXPECTED_TABLES = [
   "time_entries",
   "task_activity",
   "task_attachments",
+  "google_accounts",
+  "task_calendar_events",
   "labels",
   "task_label_links",
   "task_reminders",

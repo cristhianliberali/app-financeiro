@@ -20,6 +20,13 @@ export const requireAuth = createMiddleware({ type: "function" }).server(async (
   const { readSession } = await import("./session.server");
   const user = await readSession();
   if (!user) throw new Error(UNAUTHENTICATED);
+
+  // O app não tem processo de fundo próprio: quem levanta o agendador da agenda
+  // é o primeiro acesso autenticado depois de o servidor subir. A chamada é
+  // idempotente e não custa nada nas seguintes.
+  const { ensureCalendarScheduler } = await import("./calendar-scheduler.server");
+  ensureCalendarScheduler();
+
   return next({ context: { user } });
 });
 

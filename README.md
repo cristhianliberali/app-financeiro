@@ -118,6 +118,29 @@ perfil: nome, troca de e-mail e senha.
   (`SMTP_*`). Sem ele, o resto do app funciona normalmente e a tela avisa o que
   falta.
 
+#Integração com o Google Agenda
+A conexão é por pessoa: cada uma autoriza o app na própria conta, pelo perfil.
+A tarefa vira compromisso na agenda de quem é **responsável** por ela — sem
+responsável ou sem conta conectada, não há evento.
+
+- Tarefa criada, editada ou excluída → compromisso criado, editado ou excluído;
+- Compromisso apagado na agenda → a tarefa perde as datas, mas **não** é
+  excluída: a tarefa é o registro do trabalho, a agenda é onde ele aparece no
+  dia. Tudo isso fica na trilha de atividade da tarefa;
+- Sincronização automática a cada 10 minutos (`GOOGLE_SYNC_INTERVALO_MINUTOS`),
+  com leitura incremental para caber na cota, e um botão de sincronizar na hora
+  no calendário do painel.
+
+No painel de Projetos e Tarefas há três abas:
+
+- **Visão geral** — os indicadores e gráficos de sempre;
+- **Meu dia** — tarefas e compromissos de hoje separados por manhã, tarde e
+  noite, com as subtarefas do dia abaixo da tarefa-mãe. O checkbox risca e move
+  a tarefa para a etapa de polaridade "sucesso" do quadro dela; nas subtarefas,
+  só marca como concluída. Tem atalho para criar tarefa já com a data de hoje
+  (escolhendo espaço e quadro, com a etapa padrão do quadro);
+- **Calendário** — semana (padrão) ou mês, com tarefas e compromissos juntos.
+
 #Tema
 Preto e branco, claro e escuro, no sistema inteiro. A escolha fica no rodapé do
 menu lateral (claro / escuro / seguir o sistema) e é lembrada no navegador.

@@ -510,6 +510,48 @@ CREATE INDEX IF NOT EXISTS time_entries_user_idx ON time_entries(user_id, starte
 CREATE UNIQUE INDEX IF NOT EXISTS time_entries_single_running
   ON time_entries(user_id) WHERE stopped_at IS NULL;
 
+-- ─────────────────────── integração com o Google Agenda ─────────────────────
+--
+-- A conexão é por usuário: cada um autoriza o app no seu Google, e a tarefa vai
+-- para a agenda de quem é responsável por ela. Sem responsável conectado, não
+-- há evento — é o que mantém a agenda de cada um sendo a sua.
+
+CREATE TABLE IF NOT EXISTS google_accounts (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       uuid NOT NULL UNIQUE REFERENCES app_users(id) ON DELETE CASCADE,
+  google_email  text NOT NULL,
+  -- Agenda de destino. "primary" é a principal da conta.
+  calendar_id   text NOT NULL DEFAULT 'primary',
+  -- Tokens cifrados pela aplicação (AES-256-GCM). O banco nunca guarda o valor
+  -- em claro: um dump não dá acesso à agenda de ninguém.
+  access_token  text,
+  refresh_token text NOT NULL,
+  expires_at    timestamptz,
+  -- Marcador do Google para buscar só o que mudou desde a última sincronização.
+  sync_token    text,
+  last_sync_at  timestamptz,
+  -- Última falha, para a tela explicar por que parou (token revogado, cota…).
+  last_error    text,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+
+-- Liga a tarefa ao evento criado na agenda de um usuário. Uma tarefa pode ter,
+-- no máximo, um evento por pessoa — hoje só o responsável.
+CREATE TABLE IF NOT EXISTS task_calendar_events (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id     uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  user_id     uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  event_id    text NOT NULL,
+  calendar_id text NOT NULL DEFAULT 'primary',
+  synced_at   timestamptz NOT NULL DEFAULT now(),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (task_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS task_calendar_events_event_idx ON task_calendar_events(event_id);
+CREATE INDEX IF NOT EXISTS task_calendar_events_user_idx ON task_calendar_events(user_id);
+
+
 -- Trilha de auditoria da tarefa, escrita pela camada de servidor (que é quem
 -- sabe qual usuário está por trás da requisição).
 CREATE TABLE IF NOT EXISTS task_activity (
@@ -546,7 +588,7 @@ BEGIN
       'app_users','accounts','account_members','account_invites','budget_profiles',
       'categories','transactions','recurring_rules','investments','goals',
       'spaces','boards','board_statuses','tasks','subtasks','time_entries',
-      'labels','task_reminders'
+      'labels','task_reminders','google_accounts'
     ]) AS name
   LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS t_%1$s_updated ON %1$I', t.name);
