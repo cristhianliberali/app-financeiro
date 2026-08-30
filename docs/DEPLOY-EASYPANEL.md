@@ -290,6 +290,7 @@ docker run --rm -p 3000:3000 \
 | `403 Forbidden` ao salvar transações | `APP_URL` não bate com o domínio de onde a página foi aberta |
 | Importação por IA aparece desabilitada na tela | Falta `MODELO_IA` ou `OPENAI_API_KEY` |
 | A tela avisa "N linhas do documento não viraram lançamento" | O modelo não devolveu essas linhas nem quando o servidor cobrou. Baixe `LIMITE_LANCAMENTOS_LOTE` ou use um modelo melhor em `MODELO_IA`; o log do container lista as linhas |
+| A tela avisa "N linhas não correspondem a lançamentos datados" | O modelo leu totais e resumos da fatura como se fossem compras. Elas já vêm recolhidas e fora das somas; o log do container lista quais são |
 | "A resposta da IA foi cortada por tamanho" | O lote pede mais lançamentos do que cabem na resposta: baixe `LIMITE_LANCAMENTOS_LOTE` |
 | `PROVEDOR_IA "x" não é suportado` | Só `openai` é aceito hoje |
 | "Envio de e-mail não configurado" na troca de e-mail ou na redefinição de senha | Falta `SMTP_HOST` (e as demais `SMTP_*`) |

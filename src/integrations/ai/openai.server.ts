@@ -89,10 +89,24 @@ function buildSystemPrompt(
       ]
     : [];
 
+  const contextRules = [
+    "",
+    "O trecho pode começar com um bloco CABEÇALHO DO DOCUMENTO, entre marcadores.",
+    "Ele existe só para você saber datas e vencimento: não gere lançamento nenhum a partir dele.",
+    "",
+    "Um lançamento tem sempre data própria no documento. Linha com valor e sem data é",
+    "total, saldo, limite ou resumo — inclusive quando o nome parece de lançamento",
+    '("FATURA ANTERIOR", "PAGAMENTOS RECEBIDOS", "ENCARGOS", "DESPESAS/DÉBITOS",',
+    "resumo por categoria). Nada disso é lançamento.",
+    "Se o trecho não tiver nenhum lançamento, devolva a lista vazia. Lista vazia é uma",
+    "resposta correta; inventar lançamento a partir de um total, não.",
+  ];
+
   return [
     "Você extrai lançamentos financeiros de faturas de cartão e extratos bancários brasileiros.",
     `Hoje é ${today}.`,
     ...recoveryRules,
+    ...contextRules,
     "",
     "Regras:",
     "- Uma linha de saída para cada lançamento do documento. Não invente lançamentos.",
@@ -130,6 +144,8 @@ export async function extractRows(input: {
   log: AiLogContext;
   /** Segunda passada, com as linhas que a primeira deixou passar. */
   recovery?: boolean;
+  /** Começo do documento, só como referência de datas e vencimento. */
+  header?: string;
 }): Promise<ExtractedRow[]> {
   const settings = getAiSettings();
   const { default: OpenAI } = await import("openai");
@@ -141,11 +157,22 @@ export async function extractRows(input: {
     input.recovery ?? false,
   );
 
+  // O cabeçalho entra marcado, para o modelo saber o que é referência e o que é
+  // conteúdo a extrair.
+  const userText = input.header?.trim()
+    ? [
+        "===== CABEÇALHO DO DOCUMENTO (referência, não extraia) =====",
+        input.header.trim(),
+        "===== FIM DO CABEÇALHO. Extraia os lançamentos do trecho abaixo. =====",
+        input.text,
+      ].join("\n")
+    : input.text;
+
   logAiRequest(input.log, {
     provider: settings.provider,
     model: settings.model,
     systemPrompt,
-    userText: input.text,
+    userText,
     categories: input.categories.length,
   });
 
@@ -156,7 +183,7 @@ export async function extractRows(input: {
       model: settings.model,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: input.text },
+        { role: "user", content: userText },
       ],
       response_format: {
         type: "json_schema",

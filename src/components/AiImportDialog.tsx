@@ -73,7 +73,9 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
   const [batchesDone, setBatchesDone] = useState(0);
   const [rows, setRows] = useState<Draft[]>([]);
   /** Conferência do servidor: o que foi recuperado e o que ficou sem lançamento. */
-  const [coverage, setCoverage] = useState({ recovered: 0, missing: 0 });
+  const [coverage, setCoverage] = useState({ recovered: 0, missing: 0, summaryRows: 0 });
+  /** As linhas que parecem total/resumo ficam recolhidas até se pedir para ver. */
+  const [showSummaryRows, setShowSummaryRows] = useState(false);
   /** Última data mexida à mão, que abre a opção de repetir nas demais linhas. */
   const [lastDate, setLastDate] = useState<{ field: DateField; value: string } | null>(null);
   /** Campos em que "aplicar a todos" ficou marcado: seguem se repetindo sozinhos. */
@@ -90,7 +92,8 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
     setSummary(null);
     setBatchesDone(0);
     setRows([]);
-    setCoverage({ recovered: 0, missing: 0 });
+    setCoverage({ recovered: 0, missing: 0, summaryRows: 0 });
+    setShowSummaryRows(false);
     setLastDate(null);
     setRepeatDate({ date: false, due_date: false });
   }, [open]);
@@ -98,9 +101,9 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
   function toDraft(row: ParsedRow): Draft {
     return {
       ...row,
-      // Duplicado nasce desmarcado: aparece na lista para o usuário ver que foi
-      // reconhecido, mas não entra no lançamento em massa.
-      include: !row.duplicateOf,
+      // Duplicado e provável total nascem desmarcados: aparecem na lista para o
+      // usuário ver o que foi reconhecido, mas não entram no lançamento em massa.
+      include: !row.duplicateOf && !row.looksLikeSummary,
       category_id:
         categories.find(
           (c) => c.kind === row.kind && c.name.toLowerCase() === row.category.toLowerCase(),
@@ -146,6 +149,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
       setCoverage((prev) => ({
         recovered: prev.recovered + result.recovered,
         missing: prev.missing + result.missing,
+        summaryRows: prev.summaryRows + result.summaryRows,
       }));
       if (result.rows.length === 0) {
         toast.warning(`Lote ${result.batchNumber} não trouxe lançamentos.`);
@@ -212,6 +216,12 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
   const pendingBatches = summary && summary.importId ? summary.totalBatches - batchesDone : 0;
   const unverified = rows.filter((r) => !r.amountFound && !r.duplicateOf).length;
   const duplicates = rows.filter((r) => r.duplicateOf).length;
+
+  // As que parecem total/resumo saem da lista por padrão: são ruído até alguém
+  // querer conferir uma por uma.
+  const visibleRows = rows
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => showSummaryRows || !row.looksLikeSummary);
 
   // Somado aqui, no código, e não pedido à IA: conferir a extração com um número
   // que a própria IA produziu não conferiria nada.
@@ -323,9 +333,10 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="text-xs font-semibold">Resumo da extração</p>
                 <p className="text-[11px] text-muted-foreground">
-                  {rows.length} lançamento{rows.length === 1 ? "" : "s"} lido
-                  {rows.length === 1 ? "" : "s"} · {selected.length} selecionado
+                  {rows.length} linha{rows.length === 1 ? "" : "s"} lida
+                  {rows.length === 1 ? "" : "s"} · {selected.length} selecionada
                   {selected.length === 1 ? "" : "s"} para lançar
+                  {coverage.summaryRows > 0 && ` · ${coverage.summaryRows} fora (total/resumo)`}
                 </p>
               </div>
               <div className="mt-2 grid grid-cols-3 gap-2 text-center">
@@ -390,6 +401,23 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
               </p>
             )}
 
+            {coverage.summaryRows > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/50 p-2.5 text-xs text-muted-foreground">
+                <span className="flex items-center gap-2">
+                  <Ban className="size-4 shrink-0" />
+                  {coverage.summaryRows === 1
+                    ? "1 linha devolvida pela IA não corresponde a nenhum lançamento datado do documento (total, saldo ou resumo da fatura) e foi deixada de fora."
+                    : `${coverage.summaryRows} linhas devolvidas pela IA não correspondem a lançamentos datados do documento (totais, saldos e resumo da fatura) e foram deixadas de fora.`}
+                </span>
+                <button
+                  onClick={() => setShowSummaryRows((value) => !value)}
+                  className="shrink-0 font-medium text-foreground underline underline-offset-2"
+                >
+                  {showSummaryRows ? "Ocultar" : "Mostrar mesmo assim"}
+                </button>
+              </div>
+            )}
+
             {coverage.recovered > 0 && (
               <p className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 p-2.5 text-xs text-muted-foreground">
                 <Sparkles className="size-4 shrink-0" />
@@ -426,7 +454,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
               <span className="col-span-2 text-right">Valor</span>
             </div>
 
-            {rows.map((r, i) => {
+            {visibleRows.map(({ row: r, index: i }) => {
               const blocked = !!r.duplicateOf;
               return (
                 <div
@@ -434,9 +462,9 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                   className={`grid grid-cols-12 items-center gap-2 rounded-xl border p-2 ${
                     blocked
                       ? "border-dashed border-border bg-muted/40 opacity-70"
-                      : r.amountFound
-                        ? "border-border"
-                        : "border-negative/50 bg-negative/5"
+                      : r.looksLikeSummary || !r.amountFound
+                        ? "border-negative/50 bg-negative/5"
+                        : "border-border"
                   }`}
                 >
                   <input
@@ -460,6 +488,14 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                         title={`Já lançado em ${formatDateBR(r.duplicateOf!.date)} como "${r.duplicateOf!.description}"`}
                       >
                         <Ban className="size-3 shrink-0" /> Já lançado no sistema
+                      </span>
+                    )}
+                    {!blocked && r.looksLikeSummary && (
+                      <span
+                        className="flex items-center gap-1 text-[11px] text-negative"
+                        title="Nenhuma linha com data e este valor foi encontrada no documento. Costuma ser total, saldo ou resumo da fatura."
+                      >
+                        <AlertTriangle className="size-3 shrink-0" /> Parece total ou resumo
                       </span>
                     )}
                   </div>
@@ -519,7 +555,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                 setRows([]);
                 setSummary(null);
                 setBatchesDone(0);
-                setCoverage({ recovered: 0, missing: 0 });
+                setCoverage({ recovered: 0, missing: 0, summaryRows: 0 });
               }}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
             >

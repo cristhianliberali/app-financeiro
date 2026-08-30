@@ -93,3 +93,45 @@ export function uncoveredEntries(entries: EntryLine[], rows: { amount: number }[
 export function capacityByAmount(entries: EntryLine[]): Map<string, number> {
   return countByAmount(entries.flatMap((entry) => entry.amounts));
 }
+
+/**
+ * O caminho inverso da cobertura: cada lançamento devolvido corresponde mesmo a
+ * uma linha de lançamento do documento?
+ *
+ * Faturas trazem blocos com valor e sem data — "FATURA ANTERIOR 8.377,47",
+ * "DESPESAS/DÉBITOS 8.129,23", o resumo por categoria do fim. O modelo às vezes
+ * lê esses totais como se fossem compras, e o estrago é grande: um total entra
+ * somando de novo tudo o que já está lançado. Como o documento está aqui, dá
+ * para conferir — e o que não casar com nenhuma linha datada chega marcado, sem
+ * ser descartado: quem decide é quem está olhando a fatura.
+ */
+export function matchRowsToEntries<T extends { amount: number }>(
+  entries: EntryLine[],
+  rows: T[],
+): Array<T & { matchesEntry: boolean }> {
+  const available = capacityByAmount(entries);
+
+  return rows.map((row) => {
+    const key = Math.abs(Number(row.amount) || 0).toFixed(2);
+    const left = available.get(key) ?? 0;
+    if (left <= 0) return { ...row, matchesEntry: false };
+    available.set(key, left - 1);
+    return { ...row, matchesEntry: true };
+  });
+}
+
+/**
+ * Começo do documento, para ir junto em todo lote como contexto.
+ *
+ * Sem isso, só o primeiro lote enxerga o cabeçalho: os demais teriam de
+ * adivinhar o vencimento da fatura, que é a data que vale para todas as linhas.
+ * Vai limitado a poucas linhas — é referência, não conteúdo a extrair.
+ */
+export function documentHeader(text: string, maxLines = 12): string {
+  const lines = text.split("\n");
+  const firstEntry = entryLines(text)[0]?.index ?? lines.length;
+  return lines
+    .slice(0, Math.min(maxLines, firstEntry))
+    .filter((line) => line.trim())
+    .join("\n");
+}

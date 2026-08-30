@@ -11,7 +11,13 @@ import { countTokens, splitIntoBatches } from "./tokens.server";
 import { extractRows, type CategoryHint, type ExtractedRow } from "./openai.server";
 import { newRequestId, type AiLogContext } from "./logs.server";
 import { amountAppearsIn } from "./amounts.server";
-import { capacityByAmount, entryLines, uncoveredEntries } from "./coverage.server";
+import {
+  capacityByAmount,
+  documentHeader,
+  entryLines,
+  matchRowsToEntries,
+  uncoveredEntries,
+} from "./coverage.server";
 
 export type ImportSummary = {
   importId: string;
@@ -34,6 +40,13 @@ export type ImportedRow = ExtractedRow & {
    * A tela mostra a linha, mas não deixa lançar de novo.
    */
   duplicateOf: { id: string; description: string; date: string } | null;
+  /**
+   * O valor casa com alguma linha datada do documento. Quando é falso, a linha
+   * quase sempre saiu de um total ou resumo — "FATURA ANTERIOR", "DESPESAS/
+   * DÉBITOS", resumo por categoria —, e lançar isso somaria de novo o que já
+   * está lançado. Chega desmarcada na tela, para conferência.
+   */
+  looksLikeSummary: boolean;
 };
 
 export type BatchResult = {
@@ -45,6 +58,10 @@ export type BatchResult = {
   recovered: number;
   /** Linhas com data e valor que continuaram sem lançamento depois das passadas. */
   missing: number;
+  /** Lançamentos devolvidos que não casam com nenhuma linha datada do documento. */
+  summaryRows: number;
+  /** Lotes pulados por não terem lançamento nenhum — cabeçalho, resumo, totais. */
+  skippedBatches: number;
 };
 
 /**
@@ -103,7 +120,7 @@ function sanitize(
   row: ExtractedRow,
   text: string,
   today: string,
-): Omit<ImportedRow, "duplicateOf"> {
+): Omit<ImportedRow, "duplicateOf" | "looksLikeSummary"> {
   const amount = Math.abs(Number(row.amount)) || 0;
   const date = ISO_DATE.test(row.date) ? row.date : today;
   return {
@@ -147,7 +164,7 @@ export async function prepareImport(
 
   const totalTokens = await countTokens(text);
   const batches = await splitIntoBatches(text, settings.tokenLimit, settings.entryLimit);
-  const job = createJob({ userId, source, batches, totalTokens });
+  const job = createJob({ userId, source, batches, totalTokens, header: documentHeader(text) });
 
   console.info(
     `[ia] importação ${job.id} preparada: usuário=${userId} perfil=${input.profileId} ` +
@@ -244,8 +261,44 @@ export async function processNextBatch(
   await requireProfileAccess(userId, input.profileId, "editor");
   const job = getJob(userId, input.importId);
 
+  if (job.nextIndex >= job.batches.length) {
+    throw new Error("Todos os lotes desta importação já foram processados.");
+  }
+
+  /**
+   * Lote sem nenhuma linha datada é só cabeçalho, encargos e resumo da fatura —
+   * e é onde o modelo mais erra: mandado a extrair "um lançamento por linha" num
+   * trecho que só tem totais, ele devolve os totais. Esses lotes não vão para a
+   * IA; a fatura que motivou isto tinha 129 linhas assim, com um lançamento.
+   */
+  let skipped = 0;
+  while (job.nextIndex < job.batches.length) {
+    const candidate = job.batches[job.nextIndex]!;
+    if (entryLines(candidate.text).length > 0) break;
+    console.info(
+      `[ia] importação ${job.id}: lote ${job.nextIndex + 1}/${job.batches.length} ` +
+        `sem linha de lançamento (${candidate.text.split("\n").length} linhas de ` +
+        `cabeçalho/resumo) — não vai para a IA`,
+    );
+    job.nextIndex += 1;
+    skipped += 1;
+  }
+
   const batch = job.batches[job.nextIndex];
-  if (!batch) throw new Error("Todos os lotes desta importação já foram processados.");
+  if (!batch) {
+    // Só restavam lotes de cabeçalho: a importação acaba aqui, sem requisição.
+    dropJob(userId, job.id);
+    return {
+      rows: [],
+      batchNumber: job.nextIndex,
+      totalBatches: job.batches.length,
+      done: true,
+      recovered: 0,
+      missing: 0,
+      summaryRows: 0,
+      skippedBatches: skipped,
+    };
+  }
 
   const log: AiLogContext = {
     requestId: newRequestId(),
@@ -257,7 +310,10 @@ export async function processNextBatch(
   };
 
   const categories = await categoryHints(input.profileId);
-  const rows = await extractRows({ text: batch.text, categories, log });
+  // O cabeçalho vai junto só quando não é o próprio começo do documento, para
+  // não repetir o trecho dentro do lote que já o contém.
+  const header = job.nextIndex === 0 ? "" : job.header;
+  const rows = await extractRows({ text: batch.text, categories, log, header });
 
   // Confere o que ficou de fora e pede de novo, só as linhas faltantes.
   const { extra, missing } = await recoverMissingRows({
@@ -275,7 +331,12 @@ export async function processNextBatch(
   if (done) dropJob(userId, job.id);
 
   const today = new Date().toISOString().slice(0, 10);
-  const clean = rows.map((row) => sanitize(row, batch.text, today));
+  // Conferência inversa: o que voltou existe mesmo como lançamento no documento?
+  const matched = matchRowsToEntries(entryLines(batch.text), rows);
+  const clean = matched.map((row) => ({
+    ...sanitize(row, batch.text, today),
+    looksLikeSummary: !row.matchesEntry,
+  }));
 
   // Marca o que o perfil já tem lançado, para a tela mostrar sem deixar repetir.
   const existing = await existingByKey(input.profileId, [...new Set(clean.map((r) => r.date))]);
@@ -296,8 +357,18 @@ export async function processNextBatch(
     `[ia ${log.requestId}] conferência: lançamentos=${checked.length} ` +
       `recuperados=${extra.length} linhas_sem_lançamento=${missing.length} ` +
       `valor_não_encontrado=${checked.filter((row) => !row.amountFound).length} ` +
+      `parecem_resumo=${checked.filter((row) => row.looksLikeSummary).length} ` +
       `duplicados=${checked.filter((row) => row.duplicateOf).length}`,
   );
+
+  const summaryRows = checked.filter((row) => row.looksLikeSummary);
+  if (summaryRows.length > 0) {
+    console.warn(
+      `[ia ${log.requestId}] ${summaryRows.length} linha(s) devolvidas não casam com ` +
+        `nenhum lançamento do documento (provável total ou resumo):\n` +
+        summaryRows.map((row) => `  · ${row.description} — ${row.amount}`).join("\n"),
+    );
+  }
 
   return {
     rows: checked,
@@ -306,5 +377,7 @@ export async function processNextBatch(
     done,
     recovered: extra.length,
     missing: missing.length,
+    summaryRows: summaryRows.length,
+    skippedBatches: skipped,
   };
 }
