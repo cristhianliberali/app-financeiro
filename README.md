@@ -44,6 +44,22 @@ do documento (onde está o vencimento) segue junto em todo lote, como referênci
 Lista de transações recentes e filtro por categoria, paginada com seletor de
 10 / 50 / 100 registros por página.
 
+Compras parceladas, nos dois caminhos:
+
+- **No formulário**, o botão "Lançamento parcelado" abre a quantidade de
+  parcelas, divide o valor total sem perder centavo (R$ 100 em 3x vira 33,34 +
+  33,33 + 33,33) e mostra antes de salvar o que será lançado — valor e
+  vencimento de cada parcela, uma por mês.
+- **Na importação por IA**, uma linha "01/03" na fatura significa que faltam
+  duas cobranças: elas entram na relação para aprovação junto da atual, com
+  vencimento avançando um mês, e são lançadas com o mesmo grupo.
+
+As parcelas são gravadas no padrão `DESCRIÇÃO k/n`. Por causa disso, e porque o
+nome muda conforme a origem, o que identifica um lançamento repetido passou a
+ser a **data do lançamento, o vencimento e o valor** — sem o nome. É o que faz a
+parcela projetada aqui reencontrar a linha que virá na fatura do mês seguinte, em
+vez de lançar tudo de novo.
+
 #Centro de categorias
 Categorias de entrada e saída
 Com teto de gastos de cada categoria de sáida (para definir um orçamento)

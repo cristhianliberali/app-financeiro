@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { DateField } from "@/components/ui/date-field";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import { useAppState } from "@/lib/app-state";
 import { activeCategories, useCategories, useUpsert, type Transaction } from "@/lib/data";
-import { toISODate } from "@/lib/format";
+import { brl, toISODate, formatDateBR } from "@/lib/format";
+import { MAX_INSTALLMENTS, buildInstallments, installmentLabel } from "@/lib/installments";
 
 type Props = {
   open: boolean;
@@ -36,7 +38,9 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
     due_date: today,
     category_id: "",
     status: "pending" as "paid" | "pending",
-    installments: "1",
+    /** Liga os campos de parcelamento. */
+    installmentMode: false,
+    installments: "2",
     notes: "",
   });
 
@@ -49,11 +53,20 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
         due_date: editing.due_date,
         category_id: editing.category_id ?? "",
         status: editing.status,
-        installments: String(editing.installment_total ?? 1),
+        // Editar mexe numa parcela específica, não no parcelamento inteiro.
+        installmentMode: false,
+        installments: String(editing.installment_total ?? 2),
         notes: editing.notes ?? "",
       });
     } else {
-      setForm((f) => ({ ...f, description: "", amount: "", notes: "", installments: "1" }));
+      setForm((f) => ({
+        ...f,
+        description: "",
+        amount: "",
+        notes: "",
+        installmentMode: false,
+        installments: "2",
+      }));
     }
   }, [editing, open]);
 
@@ -61,13 +74,27 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
   // recebem lançamento novo.
   const options = activeCategories(categories ?? []).filter((c) => c.kind === kind);
 
+  const installmentCount = Math.min(
+    MAX_INSTALLMENTS,
+    Math.max(2, Math.trunc(Number(form.installments) || 0)),
+  );
+  const parsedAmount = Number(form.amount.replace(",", ".")) || 0;
+  /** O que será gravado, mostrado no formulário antes de salvar. */
+  const preview =
+    form.installmentMode && parsedAmount > 0
+      ? buildInstallments({
+          total: parsedAmount,
+          count: installmentCount,
+          firstDueDate: form.due_date,
+        })
+      : [];
+
   async function save() {
     const amount = Number(form.amount.replace(",", "."));
     if (!form.description || !amount) {
       toast.error("Informe descrição e valor");
       return;
     }
-    const installments = Math.max(1, Number(form.installments) || 1);
     const base = {
       profile_id: profileId,
       category_id: form.category_id || null,
@@ -89,24 +116,27 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
           installment_total: editing.installment_total,
           installment_group: editing.installment_group,
         });
-      } else if (installments > 1) {
+      } else if (form.installmentMode) {
+        // O valor informado é o da compra inteira: a divisão fecha na soma, e o
+        // nome de cada parcela sai no padrão "DESCRIÇÃO k/n".
         const group = crypto.randomUUID();
-        const per = Number((amount / installments).toFixed(2));
-        const rows = Array.from({ length: installments }, (_, i) => {
-          const due = new Date(form.due_date);
-          due.setMonth(due.getMonth() + i);
-          return {
-            ...base,
-            description: form.description,
-            amount: per,
-            transaction_date: form.transaction_date,
-            due_date: toISODate(due),
-            installment_no: i + 1,
-            installment_total: installments,
-            installment_group: group,
-          };
+        const parts = buildInstallments({
+          total: amount,
+          count: installmentCount,
+          firstDueDate: form.due_date,
         });
-        await upsert.mutateAsync(rows);
+        await upsert.mutateAsync(
+          parts.map((part) => ({
+            ...base,
+            description: installmentLabel(form.description, part.no, part.total),
+            amount: part.amount,
+            transaction_date: form.transaction_date,
+            due_date: part.due_date,
+            installment_no: part.no,
+            installment_total: part.total,
+            installment_group: group,
+          })),
+        );
       } else {
         await upsert.mutateAsync({
           ...base,
@@ -116,7 +146,13 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
           due_date: form.due_date,
         });
       }
-      toast.success(editing ? "Lançamento atualizado" : "Lançamento registrado");
+      toast.success(
+        editing
+          ? "Lançamento atualizado"
+          : form.installmentMode
+            ? `${installmentCount} parcelas registradas`
+            : "Lançamento registrado",
+      );
       onOpenChange(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao salvar");
@@ -133,23 +169,26 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
-            <Label>Descrição</Label>
+            <Label htmlFor="tx-descricao">Descrição</Label>
             <Input
+              id="tx-descricao"
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Valor total (R$)</Label>
+            <Label htmlFor="tx-valor">Valor total (R$)</Label>
             <Input
+              id="tx-valor"
               inputMode="decimal"
               value={form.amount}
               onChange={(e) => setForm({ ...form, amount: e.target.value })}
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Categoria</Label>
+            <Label htmlFor="tx-categoria">Categoria</Label>
             <select
+              id="tx-categoria"
               value={form.category_id}
               onChange={(e) => setForm({ ...form, category_id: e.target.value })}
               className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
@@ -163,36 +202,104 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label>Data da transação</Label>
+            <Label htmlFor="tx-data">Data da transação</Label>
             <DateField
+              id="tx-data"
               type="date"
               value={form.transaction_date}
               onChange={(e) => setForm({ ...form, transaction_date: e.target.value })}
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Vencimento / pagamento</Label>
+            <Label>
+              {form.installmentMode ? "Vencimento da 1ª parcela" : "Vencimento / pagamento"}
+            </Label>
             <DateField
+              id="tx-vencimento"
               type="date"
               value={form.due_date}
               onChange={(e) => setForm({ ...form, due_date: e.target.value })}
             />
           </div>
           {!editing && (
-            <div className="space-y-1.5">
-              <Label>Parcelas</Label>
-              <Input
-                type="number"
-                min={1}
-                max={48}
-                value={form.installments}
-                onChange={(e) => setForm({ ...form, installments: e.target.value })}
-              />
+            <div className="space-y-1.5 sm:col-span-2">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
+                <Label htmlFor="parcelado" className="cursor-pointer">
+                  Lançamento parcelado
+                  <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">
+                    Divide o valor total da compra e agenda uma parcela por mês.
+                  </span>
+                </Label>
+                <Switch
+                  id="parcelado"
+                  checked={form.installmentMode}
+                  onCheckedChange={(checked) => setForm({ ...form, installmentMode: checked })}
+                />
+              </div>
+
+              {form.installmentMode && (
+                <div className="space-y-3 rounded-xl border border-border p-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="quantidade-parcelas">Quantidade de parcelas</Label>
+                    <Input
+                      id="quantidade-parcelas"
+                      type="number"
+                      min={2}
+                      max={MAX_INSTALLMENTS}
+                      value={form.installments}
+                      onChange={(e) => setForm({ ...form, installments: e.target.value })}
+                      className="w-32"
+                    />
+                  </div>
+
+                  {preview.length > 0 ? (
+                    <div className="space-y-1">
+                      <p className="label-caps">O que será lançado</p>
+                      <div className="max-h-40 space-y-1 overflow-y-auto pr-1 thin-scrollbar">
+                        {preview.map((part) => (
+                          <div
+                            key={part.no}
+                            className="flex items-center justify-between gap-2 rounded-lg bg-secondary/40 px-2.5 py-1.5 text-xs"
+                          >
+                            <span className="font-mono text-[11px] text-muted-foreground">
+                              {part.no}/{part.total}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate">
+                              {installmentLabel(
+                                form.description || "Lançamento",
+                                part.no,
+                                part.total,
+                              )}
+                            </span>
+                            <span className="font-mono font-semibold tabular-nums">
+                              {brl(part.amount)}
+                            </span>
+                            <span className="text-muted-foreground">
+                              {formatDateBR(part.due_date)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Total:{" "}
+                        <span className="font-medium text-foreground">{brl(parsedAmount)}</span> em{" "}
+                        {preview.length}x · primeira em {formatDateBR(preview[0]!.due_date)}, última
+                        em {formatDateBR(preview[preview.length - 1]!.due_date)}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">
+                      Informe o valor total da compra para ver as parcelas.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <div className="space-y-1.5">
-            <Label>Status</Label>
+            <Label htmlFor="tx-status">Status</Label>
             <select
+              id="tx-status"
               value={form.status}
               onChange={(e) => setForm({ ...form, status: e.target.value as "paid" | "pending" })}
               className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
@@ -202,8 +309,9 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
             </select>
           </div>
           <div className="space-y-1.5 sm:col-span-2">
-            <Label>Observações</Label>
+            <Label htmlFor="tx-observacoes">Observações</Label>
             <Textarea
+              id="tx-observacoes"
               rows={2}
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}

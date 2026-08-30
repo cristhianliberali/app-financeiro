@@ -17,6 +17,10 @@ export type ParsedRow = {
   duplicateOf: { id: string; description: string; date: string } | null;
   /** Não casa com nenhuma linha datada do documento: provável total ou resumo. */
   looksLikeSummary: boolean;
+  /** Liga as parcelas de uma mesma compra. */
+  installment_group: string | null;
+  /** Parcela que ainda não está nesta fatura, projetada a partir de "03/10". */
+  projected: boolean;
 };
 
 export type ImportSummary = {
@@ -40,6 +44,8 @@ export type BatchResult = {
   summaryRows: number;
   /** Lotes de cabeçalho/resumo que não chegaram a ir para a IA. */
   skippedBatches: number;
+  /** Parcelas futuras projetadas a partir das linhas parceladas. */
+  projectedRows: number;
 };
 
 /** Extensões que o servidor sabe converter em texto. */

@@ -182,7 +182,10 @@ function TransactionsPage() {
                 >
                   <p className="truncate text-sm font-medium">
                     {t.description}
-                    {t.installment_total ? (
+                    {/* O selo só aparece quando o nome não traz a parcela: o padrão
+                        "DESCRIÇÃO k/n" já diz isso, e repetir polui a linha. */}
+                    {t.installment_total &&
+                    !t.description.trim().endsWith(`${t.installment_no}/${t.installment_total}`) ? (
                       <span className="ml-2 rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px]">
                         {t.installment_no}/{t.installment_total}
                       </span>

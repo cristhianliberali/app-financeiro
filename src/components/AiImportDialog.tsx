@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Ban, FileUp, Sparkles, Trash2, X } from "lucide-react";
+import { AlertTriangle, Ban, CalendarPlus, FileUp, Sparkles, Trash2, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -73,7 +73,12 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
   const [batchesDone, setBatchesDone] = useState(0);
   const [rows, setRows] = useState<Draft[]>([]);
   /** Conferência do servidor: o que foi recuperado e o que ficou sem lançamento. */
-  const [coverage, setCoverage] = useState({ recovered: 0, missing: 0, summaryRows: 0 });
+  const [coverage, setCoverage] = useState({
+    recovered: 0,
+    missing: 0,
+    summaryRows: 0,
+    projectedRows: 0,
+  });
   /** As linhas que parecem total/resumo ficam recolhidas até se pedir para ver. */
   const [showSummaryRows, setShowSummaryRows] = useState(false);
   /** Última data mexida à mão, que abre a opção de repetir nas demais linhas. */
@@ -92,7 +97,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
     setSummary(null);
     setBatchesDone(0);
     setRows([]);
-    setCoverage({ recovered: 0, missing: 0, summaryRows: 0 });
+    setCoverage({ recovered: 0, missing: 0, summaryRows: 0, projectedRows: 0 });
     setShowSummaryRows(false);
     setLastDate(null);
     setRepeatDate({ date: false, due_date: false });
@@ -150,6 +155,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
         recovered: prev.recovered + result.recovered,
         missing: prev.missing + result.missing,
         summaryRows: prev.summaryRows + result.summaryRows,
+        projectedRows: prev.projectedRows + result.projectedRows,
       }));
       if (result.rows.length === 0) {
         toast.warning(`Lote ${result.batchNumber} não trouxe lançamentos.`);
@@ -207,6 +213,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
         category_id: r.category_id || null,
         installment_no: r.installment_no,
         installment_total: r.installment_total,
+        installment_group: r.installment_group,
       })),
     );
     toast.success(`${selected.length} lançamentos importados`);
@@ -336,6 +343,8 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                   {rows.length} linha{rows.length === 1 ? "" : "s"} lida
                   {rows.length === 1 ? "" : "s"} · {selected.length} selecionada
                   {selected.length === 1 ? "" : "s"} para lançar
+                  {coverage.projectedRows > 0 &&
+                    ` · ${coverage.projectedRows} parcela${coverage.projectedRows === 1 ? "" : "s"} futura${coverage.projectedRows === 1 ? "" : "s"}`}
                   {coverage.summaryRows > 0 && ` · ${coverage.summaryRows} fora (total/resumo)`}
                 </p>
               </div>
@@ -418,6 +427,17 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
               </div>
             )}
 
+            {coverage.projectedRows > 0 && (
+              <p className="flex items-center gap-2 rounded-lg border border-border bg-secondary/40 p-2.5 text-xs text-muted-foreground">
+                <CalendarPlus className="size-4 shrink-0" />
+                {coverage.projectedRows === 1
+                  ? "1 parcela ainda não cobrada foi projetada a partir das compras parceladas da fatura, com vencimento no mês seguinte."
+                  : `${coverage.projectedRows} parcelas ainda não cobradas foram projetadas a partir das compras parceladas da fatura, uma por mês.`}{" "}
+                Elas entram como lançamento normal e não serão repetidas quando a próxima fatura for
+                importada.
+              </p>
+            )}
+
             {coverage.recovered > 0 && (
               <p className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 p-2.5 text-xs text-muted-foreground">
                 <Sparkles className="size-4 shrink-0" />
@@ -464,7 +484,9 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                       ? "border-dashed border-border bg-muted/40 opacity-70"
                       : r.looksLikeSummary || !r.amountFound
                         ? "border-negative/50 bg-negative/5"
-                        : "border-border"
+                        : r.projected
+                          ? "border-dashed border-border bg-secondary/20"
+                          : "border-border"
                   }`}
                 >
                   <input
@@ -490,6 +512,18 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                         <Ban className="size-3 shrink-0" /> Já lançado no sistema
                       </span>
                     )}
+                    {r.installment_total ? (
+                      <span className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                        <span className="rounded bg-secondary px-1.5 py-0.5 font-mono">
+                          {r.installment_no}/{r.installment_total}
+                        </span>
+                        {r.projected && (
+                          <span className="flex items-center gap-1">
+                            <CalendarPlus className="size-3 shrink-0" /> parcela futura
+                          </span>
+                        )}
+                      </span>
+                    ) : null}
                     {!blocked && r.looksLikeSummary && (
                       <span
                         className="flex items-center gap-1 text-[11px] text-negative"
@@ -555,7 +589,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                 setRows([]);
                 setSummary(null);
                 setBatchesDone(0);
-                setCoverage({ recovered: 0, missing: 0, summaryRows: 0 });
+                setCoverage({ recovered: 0, missing: 0, summaryRows: 0, projectedRows: 0 });
               }}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
             >

@@ -2,6 +2,8 @@
  * Importação de faturas: prepara o documento, processa lote a lote e confere
  * o que a IA devolveu antes de mostrar ao usuário.
  */
+import { randomUUID } from "node:crypto";
+
 import { query } from "../postgres/client.server";
 import { getAiSettings } from "../postgres/config.server";
 import { requireProfileAccess } from "../postgres/access.server";
@@ -11,6 +13,12 @@ import { countTokens, splitIntoBatches } from "./tokens.server";
 import { extractRows, type CategoryHint, type ExtractedRow } from "./openai.server";
 import { newRequestId, type AiLogContext } from "./logs.server";
 import { amountAppearsIn } from "./amounts.server";
+import {
+  addMonths,
+  hasInstallments,
+  installmentLabel,
+  stripInstallmentSuffix,
+} from "@/lib/installments";
 import {
   capacityByAmount,
   documentHeader,
@@ -47,6 +55,13 @@ export type ImportedRow = ExtractedRow & {
    * está lançado. Chega desmarcada na tela, para conferência.
    */
   looksLikeSummary: boolean;
+  /** Liga as parcelas de uma mesma compra. */
+  installment_group: string | null;
+  /**
+   * Parcela que ainda não está nesta fatura: veio projetada a partir de uma
+   * linha "03/10". Aparece na relação para aprovação como as demais.
+   */
+  projected: boolean;
 };
 
 export type BatchResult = {
@@ -62,6 +77,8 @@ export type BatchResult = {
   summaryRows: number;
   /** Lotes pulados por não terem lançamento nenhum — cabeçalho, resumo, totais. */
   skippedBatches: number;
+  /** Parcelas futuras projetadas a partir das linhas parceladas da fatura. */
+  projectedRows: number;
 };
 
 /**
@@ -80,38 +97,52 @@ async function categoryHints(profileId: string): Promise<CategoryHint[]> {
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Chave de comparação de um lançamento: data, valor e descrição.
+ * Chave de comparação de um lançamento: as duas datas e o valor.
  *
- * A descrição é normalizada só no que não muda o significado — espaços
- * repetidos e maiúsculas —, para "MERCADOLIVRE*4PRODUT" e
- * "Mercadolivre*4produt" contarem como o mesmo lançamento.
+ * A descrição ficou de fora de propósito. Com o parcelamento, o mesmo
+ * lançamento tem nomes diferentes conforme a origem — a fatura escreve
+ * "C E A 01/03", o app grava "C E A 2/3", e uma parcela projetada aqui precisa
+ * reencontrar a linha que virá na fatura do mês seguinte. Data do lançamento,
+ * vencimento e valor identificam isso; o nome, não.
  */
-function duplicateKey(date: string, amount: number, description: string): string {
-  const normalized = description.trim().replace(/\s+/g, " ").toLowerCase();
-  return `${date}|${amount.toFixed(2)}|${normalized}`;
+function duplicateKey(date: string, dueDate: string, amount: number): string {
+  return `${date}|${dueDate}|${amount.toFixed(2)}`;
 }
 
-type ExistingRow = { id: string; description: string; amount: number; transaction_date: string };
+type ExistingRow = {
+  id: string;
+  description: string;
+  amount: number;
+  transaction_date: string;
+  due_date: string;
+};
 
 /**
  * Indexa os lançamentos que o perfil já tem nas datas em questão. A janela é
  * limitada às datas que a IA devolveu, então não varre o histórico inteiro.
+ *
+ * Guarda uma fila por chave, e não um registro só: duas compras de R$ 15 no
+ * mesmo dia são duas linhas legítimas, e a segunda não pode ser marcada como
+ * repetida por causa da primeira.
  */
 async function existingByKey(
   profileId: string,
   dates: string[],
-): Promise<Map<string, ExistingRow>> {
-  const index = new Map<string, ExistingRow>();
+): Promise<Map<string, ExistingRow[]>> {
+  const index = new Map<string, ExistingRow[]>();
   if (dates.length === 0) return index;
 
   const rows = await query<ExistingRow>(
-    `SELECT id, description, amount, transaction_date::text AS transaction_date
+    `SELECT id, description, amount, transaction_date::text AS transaction_date,
+            due_date::text AS due_date
        FROM transactions
-      WHERE profile_id = $1 AND transaction_date = ANY($2::date[])`,
+      WHERE profile_id = $1
+        AND (transaction_date = ANY($2::date[]) OR due_date = ANY($2::date[]))`,
     [profileId, dates],
   );
   for (const row of rows) {
-    index.set(duplicateKey(row.transaction_date, Number(row.amount), row.description), row);
+    const key = duplicateKey(row.transaction_date, row.due_date, Number(row.amount));
+    index.set(key, [...(index.get(key) ?? []), row]);
   }
   return index;
 }
@@ -120,7 +151,7 @@ function sanitize(
   row: ExtractedRow,
   text: string,
   today: string,
-): Omit<ImportedRow, "duplicateOf" | "looksLikeSummary"> {
+): Omit<ImportedRow, "duplicateOf" | "looksLikeSummary" | "installment_group" | "projected"> {
   const amount = Math.abs(Number(row.amount)) || 0;
   const date = ISO_DATE.test(row.date) ? row.date : today;
   return {
@@ -180,6 +211,59 @@ export async function prepareImport(
     totalTokens,
     expiresInMinutes: CACHE_TTL_MINUTES,
   };
+}
+
+/**
+ * Projeta as parcelas que ainda não estão nesta fatura.
+ *
+ * Uma linha "10 DEZ C E A 01/03 R$ 146,65" diz que existem mais duas cobranças
+ * a caminho, uma por mês. Elas entram na relação para aprovação junto da atual,
+ * com o mesmo grupo e o nome no padrão `C E A 2/3`, e passam pela mesma
+ * checagem de repetido — quando a fatura do mês seguinte for importada, a linha
+ * dela vai reencontrar a parcela já lançada pelas duas datas e pelo valor.
+ *
+ * O valor não é dividido: a fatura já mostra o valor da parcela, não o da
+ * compra inteira.
+ */
+function expandInstallments(
+  rows: Array<Omit<ImportedRow, "duplicateOf">>,
+): Array<Omit<ImportedRow, "duplicateOf">> {
+  const expanded: Array<Omit<ImportedRow, "duplicateOf">> = [];
+
+  for (const row of rows) {
+    if (row.looksLikeSummary || !hasInstallments(row.installment_no, row.installment_total)) {
+      expanded.push(row);
+      continue;
+    }
+
+    const no = row.installment_no!;
+    const total = row.installment_total!;
+    const group = randomUUID();
+    // A marca da fatura sai uma vez, com os números da própria linha — nas
+    // projetadas ela não bateria mais ("01/03" numa parcela 2/3).
+    const base = stripInstallmentSuffix(row.description, no, total);
+
+    expanded.push({
+      ...row,
+      description: installmentLabel(base, no, total),
+      installment_group: group,
+    });
+
+    for (let next = no + 1; next <= total; next += 1) {
+      expanded.push({
+        ...row,
+        description: installmentLabel(base, next, total),
+        // A compra aconteceu uma vez; o que anda de mês em mês é a cobrança.
+        due_date: addMonths(row.due_date, next - no),
+        installment_no: next,
+        installment_total: total,
+        installment_group: group,
+        projected: true,
+      });
+    }
+  }
+
+  return expanded;
 }
 
 /** Quantas vezes o servidor insiste nas linhas que ficaram sem lançamento. */
@@ -297,6 +381,7 @@ export async function processNextBatch(
       missing: 0,
       summaryRows: 0,
       skippedBatches: skipped,
+      projectedRows: 0,
     };
   }
 
@@ -333,16 +418,25 @@ export async function processNextBatch(
   const today = new Date().toISOString().slice(0, 10);
   // Conferência inversa: o que voltou existe mesmo como lançamento no documento?
   const matched = matchRowsToEntries(entryLines(batch.text), rows);
-  const clean = matched.map((row) => ({
-    ...sanitize(row, batch.text, today),
-    looksLikeSummary: !row.matchesEntry,
-  }));
+  const clean = expandInstallments(
+    matched.map((row) => ({
+      ...sanitize(row, batch.text, today),
+      looksLikeSummary: !row.matchesEntry,
+      installment_group: null,
+      projected: false,
+    })),
+  );
 
   // Marca o que o perfil já tem lançado, para a tela mostrar sem deixar repetir.
-  const existing = await existingByKey(input.profileId, [...new Set(clean.map((r) => r.date))]);
+  const existing = await existingByKey(input.profileId, [
+    ...new Set(clean.flatMap((r) => [r.date, r.due_date])),
+  ]);
 
   const checked: ImportedRow[] = clean.map((row) => {
-    const found = existing.get(duplicateKey(row.date, row.amount, row.description));
+    // Consome da fila: duas linhas iguais na fatura só são repetidas se o perfil
+    // também tiver duas.
+    const queue = existing.get(duplicateKey(row.date, row.due_date, row.amount));
+    const found = queue?.shift();
     return {
       ...row,
       duplicateOf: found
@@ -358,6 +452,7 @@ export async function processNextBatch(
       `recuperados=${extra.length} linhas_sem_lançamento=${missing.length} ` +
       `valor_não_encontrado=${checked.filter((row) => !row.amountFound).length} ` +
       `parecem_resumo=${checked.filter((row) => row.looksLikeSummary).length} ` +
+      `parcelas_projetadas=${checked.filter((row) => row.projected).length} ` +
       `duplicados=${checked.filter((row) => row.duplicateOf).length}`,
   );
 
@@ -379,5 +474,6 @@ export async function processNextBatch(
     missing: missing.length,
     summaryRows: summaryRows.length,
     skippedBatches: skipped,
+    projectedRows: checked.filter((row) => row.projected).length,
   };
 }
