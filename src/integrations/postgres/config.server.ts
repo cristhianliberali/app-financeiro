@@ -161,6 +161,91 @@ export function isAiConfigured(): boolean {
   }
 }
 
+/**
+ * Logs das requisições de IA.
+ *
+ * Ficam ligados por padrão: sem eles não há como conferir o que foi enviado ao
+ * modelo nem o que ele devolveu quando uma importação sai errada. O conteúdo é
+ * truncado em `LOG_IA_LIMITE_CARACTERES` para uma fatura grande não encher o
+ * log do container.
+ */
+export type AiLogSettings = {
+  enabled: boolean;
+  /** Inclui o texto enviado e a resposta crua, não só os números. */
+  includeBody: boolean;
+  /** Teto de caracteres de cada trecho registrado. */
+  maxChars: number;
+};
+
+export function getAiLogSettings(): AiLogSettings {
+  return {
+    enabled: readBool("LOG_IA", true),
+    includeBody: readBool("LOG_IA_CORPO", true),
+    maxChars: readInt("LOG_IA_LIMITE_CARACTERES", 2_000),
+  };
+}
+
+/**
+ * Servidor SMTP usado na redefinição de senha e na troca de e-mail.
+ *
+ * Tudo é lido em runtime: trocar de provedor de e-mail é editar as variáveis do
+ * serviço e reiniciar. Sem `SMTP_HOST` o app continua funcionando — só os
+ * recursos que dependem de e-mail é que ficam indisponíveis, com mensagem
+ * explicando o que falta.
+ */
+export type SmtpSettings = {
+  host: string;
+  port: number;
+  /** TLS direto na conexão (porta 465). Em 587 o TLS sobe via STARTTLS. */
+  secure: boolean;
+  user: string | undefined;
+  password: string | undefined;
+  /** Endereço no campo De:. */
+  from: string;
+  /** Nome exibido junto do endereço. */
+  fromName: string;
+  /** `false` aceita certificado autoassinado — útil em SMTP interno. */
+  rejectUnauthorized: boolean;
+};
+
+export function getSmtpSettings(): SmtpSettings {
+  const host = readEnv("SMTP_HOST");
+  if (!host) {
+    throw new Error(
+      "Envio de e-mail não configurado. Defina SMTP_HOST (e as demais variáveis SMTP_*) " +
+        "no serviço — veja .env.example.",
+    );
+  }
+
+  const port = readInt("SMTP_PORT", 587);
+  const user = readEnv("SMTP_USER");
+  const from = readEnv("SMTP_FROM") ?? user;
+  if (!from) {
+    throw new Error("Defina SMTP_FROM (ou SMTP_USER) com o endereço remetente dos e-mails.");
+  }
+
+  return {
+    host,
+    port,
+    secure: readBool("SMTP_SECURE", port === 465),
+    user,
+    password: readEnv("SMTP_PASSWORD"),
+    from,
+    fromName: readEnv("SMTP_FROM_NAME") ?? "Aura Finanças",
+    rejectUnauthorized: readBool("SMTP_TLS_REJECT_UNAUTHORIZED", true),
+  };
+}
+
+/** A tela usa isto para avisar quando a redefinição por e-mail não está de pé. */
+export function isSmtpConfigured(): boolean {
+  try {
+    getSmtpSettings();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Nome do cookie que carrega o token de sessão. */
 export function getSessionCookieName(): string {
   return readEnv("SESSION_COOKIE_NAME") ?? "aura_session";

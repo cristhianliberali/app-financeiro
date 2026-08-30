@@ -9,7 +9,7 @@ import {
 export type { AuthedUser };
 
 /** Regras de senha aplicadas no servidor (o front só espelha na UI). */
-const MIN_PASSWORD = 8;
+export const MIN_PASSWORD = 8;
 
 function validateCredentials(input: { email?: string; password?: string }) {
   const email = (input?.email ?? "").trim().toLowerCase();

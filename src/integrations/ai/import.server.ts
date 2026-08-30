@@ -9,6 +9,7 @@ import { createJob, dropJob, getJob, CACHE_TTL_MINUTES } from "./cache.server";
 import { extractText, type UploadInput } from "./extract.server";
 import { countTokens, splitIntoBatches } from "./tokens.server";
 import { extractRows, type CategoryHint, type ExtractedRow } from "./openai.server";
+import { newRequestId, type AiLogContext } from "./logs.server";
 
 export type ImportSummary = {
   importId: string;
@@ -40,9 +41,15 @@ export type BatchResult = {
   done: boolean;
 };
 
+/**
+ * Categorias oferecidas ao modelo. As arquivadas ficam de fora: elas continuam
+ * nos relatórios do que já foi lançado, mas não recebem lançamento novo.
+ */
 async function categoryHints(profileId: string): Promise<CategoryHint[]> {
   return query<CategoryHint>(
-    `SELECT name, description FROM categories WHERE profile_id = $1 ORDER BY name`,
+    `SELECT name, description FROM categories
+      WHERE profile_id = $1 AND archived_at IS NULL
+      ORDER BY name`,
     [profileId],
   );
 }
@@ -157,6 +164,12 @@ export async function prepareImport(
   const batches = await splitIntoBatches(text, settings.tokenLimit);
   const job = createJob({ userId, source, batches, totalTokens });
 
+  console.info(
+    `[ia] importação ${job.id} preparada: usuário=${userId} perfil=${input.profileId} ` +
+      `origem="${source}" caracteres=${text.length} tokens=${totalTokens} ` +
+      `lotes=${batches.length} (limite ${settings.tokenLimit})`,
+  );
+
   return {
     importId: job.id,
     source,
@@ -177,9 +190,19 @@ export async function processNextBatch(
   const batch = job.batches[job.nextIndex];
   if (!batch) throw new Error("Todos os lotes desta importação já foram processados.");
 
+  const log: AiLogContext = {
+    requestId: newRequestId(),
+    userId,
+    profileId: input.profileId,
+    importId: job.id,
+    batch: job.nextIndex + 1,
+    totalBatches: job.batches.length,
+  };
+
   const rows = await extractRows({
     text: batch.text,
     categories: await categoryHints(input.profileId),
+    log,
   });
 
   // Só avança depois do sucesso: se a requisição falhar, o mesmo lote é
@@ -194,16 +217,26 @@ export async function processNextBatch(
   // Marca o que o perfil já tem lançado, para a tela mostrar sem deixar repetir.
   const existing = await existingByKey(input.profileId, [...new Set(clean.map((r) => r.date))]);
 
+  const checked: ImportedRow[] = clean.map((row) => {
+    const found = existing.get(duplicateKey(row.date, row.amount, row.description));
+    return {
+      ...row,
+      duplicateOf: found
+        ? { id: found.id, description: found.description, date: found.transaction_date }
+        : null,
+    };
+  });
+
+  // O que a conferência do servidor fez com a resposta do modelo — é o que
+  // explica, no log, por que uma linha chegou marcada na tela.
+  console.info(
+    `[ia ${log.requestId}] conferência: lançamentos=${checked.length} ` +
+      `valor_não_encontrado=${checked.filter((row) => !row.amountFound).length} ` +
+      `duplicados=${checked.filter((row) => row.duplicateOf).length}`,
+  );
+
   return {
-    rows: clean.map((row) => {
-      const found = existing.get(duplicateKey(row.date, row.amount, row.description));
-      return {
-        ...row,
-        duplicateOf: found
-          ? { id: found.id, description: found.description, date: found.transaction_date }
-          : null,
-      };
-    }),
+    rows: checked,
     batchNumber: job.nextIndex,
     totalBatches: job.batches.length,
     done,

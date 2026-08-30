@@ -6,6 +6,7 @@
  * texto solto para tentar interpretar depois.
  */
 import { getAiSettings } from "../postgres/config.server";
+import { logAiError, logAiRequest, logAiResponse, type AiLogContext } from "./logs.server";
 
 export type ExtractedRow = {
   description: string;
@@ -105,29 +106,65 @@ function buildSystemPrompt(categories: CategoryHint[], today: string): string {
 export async function extractRows(input: {
   text: string;
   categories: CategoryHint[];
+  /** Quem pediu; vai para o log das duas pontas da requisição. */
+  log: AiLogContext;
 }): Promise<ExtractedRow[]> {
   const settings = getAiSettings();
   const { default: OpenAI } = await import("openai");
   const client = new OpenAI({ apiKey: settings.apiKey });
 
-  const response = await client.chat.completions.create({
+  const systemPrompt = buildSystemPrompt(input.categories, new Date().toISOString().slice(0, 10));
+
+  logAiRequest(input.log, {
+    provider: settings.provider,
     model: settings.model,
-    messages: [
-      {
-        role: "system",
-        content: buildSystemPrompt(input.categories, new Date().toISOString().slice(0, 10)),
-      },
-      { role: "user", content: input.text },
-    ],
-    response_format: {
-      type: "json_schema",
-      json_schema: { name: "lancamentos", strict: true, schema: ROW_SCHEMA as never },
-    },
+    systemPrompt,
+    userText: input.text,
+    categories: input.categories.length,
   });
 
+  const startedAt = Date.now();
+  let response;
+  try {
+    response = await client.chat.completions.create({
+      model: settings.model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: input.text },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "lancamentos", strict: true, schema: ROW_SCHEMA as never },
+      },
+    });
+  } catch (error) {
+    logAiError(input.log, error, Date.now() - startedAt);
+    throw error;
+  }
+  const durationMs = Date.now() - startedAt;
+
   const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error("A IA não devolveu nenhum lançamento.");
+  if (!content) {
+    logAiResponse(input.log, {
+      model: response.model ?? settings.model,
+      durationMs,
+      rows: 0,
+      content: JSON.stringify(response.choices[0] ?? null),
+      usage: response.usage ?? null,
+    });
+    throw new Error("A IA não devolveu nenhum lançamento.");
+  }
 
   const parsed = JSON.parse(content) as { rows?: ExtractedRow[] };
-  return parsed.rows ?? [];
+  const rows = parsed.rows ?? [];
+
+  logAiResponse(input.log, {
+    model: response.model ?? settings.model,
+    durationMs,
+    rows: rows.length,
+    content,
+    usage: response.usage ?? null,
+  });
+
+  return rows;
 }

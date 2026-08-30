@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { BellPlus, BellRing, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/date-field";
 import { Label } from "@/components/ui/label";
 import { useDeleteReminder, useSaveReminder, type AccountUser, type Reminder } from "@/lib/tasks";
 import { formatDateTimeBR, fromLocalInput, toLocalInput } from "@/lib/tasks-analytics";
@@ -137,7 +138,7 @@ export function TaskReminders({
         <div className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label className="text-xs">Quando avisar</Label>
-            <Input
+            <DateField
               type="datetime-local"
               autoFocus
               value={draft.remind_at}

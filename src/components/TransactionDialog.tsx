@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/date-field";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -12,7 +13,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useAppState } from "@/lib/app-state";
-import { useCategories, useUpsert, type Transaction } from "@/lib/data";
+import { activeCategories, useCategories, useUpsert, type Transaction } from "@/lib/data";
 import { toISODate } from "@/lib/format";
 
 type Props = {
@@ -56,7 +57,9 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
     }
   }, [editing, open]);
 
-  const options = (categories ?? []).filter((c) => c.kind === kind);
+  // Arquivadas ficam de fora: elas seguem nos lançamentos antigos, mas não
+  // recebem lançamento novo.
+  const options = activeCategories(categories ?? []).filter((c) => c.kind === kind);
 
   async function save() {
     const amount = Number(form.amount.replace(",", "."));
@@ -161,7 +164,7 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
           </div>
           <div className="space-y-1.5">
             <Label>Data da transação</Label>
-            <Input
+            <DateField
               type="date"
               value={form.transaction_date}
               onChange={(e) => setForm({ ...form, transaction_date: e.target.value })}
@@ -169,7 +172,7 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
           </div>
           <div className="space-y-1.5">
             <Label>Vencimento / pagamento</Label>
-            <Input
+            <DateField
               type="date"
               value={form.due_date}
               onChange={(e) => setForm({ ...form, due_date: e.target.value })}

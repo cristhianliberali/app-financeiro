@@ -14,6 +14,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/date-field";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -183,7 +184,7 @@ function SubtaskRow({
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Início</Label>
-            <Input
+            <DateField
               type="datetime-local"
               value={toLocalInput(subtask.start_date)}
               onChange={(e) => onSave({ start_date: fromLocalInput(e.target.value) })}
@@ -191,7 +192,7 @@ function SubtaskRow({
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Prazo</Label>
-            <Input
+            <DateField
               type="datetime-local"
               value={toLocalInput(subtask.due_date)}
               onChange={(e) => onSave({ due_date: fromLocalInput(e.target.value) })}
@@ -412,7 +413,7 @@ export function TaskDialog({
           </div>
           <div className="space-y-1.5">
             <Label>Data de início</Label>
-            <Input
+            <DateField
               type="datetime-local"
               value={draft.start_date}
               onChange={(e) => {
@@ -430,7 +431,7 @@ export function TaskDialog({
                 </span>
               )}
             </Label>
-            <Input
+            <DateField
               type="datetime-local"
               value={draft.due_date}
               onChange={(e) => {

@@ -53,6 +53,10 @@ export function balanceEvolution(txs: Transaction[], basis: DateBasis) {
 /**
  * Teto por categoria proporcional ao período selecionado:
  * o teto mensal é convertido em teto diário e multiplicado pelos dias do intervalo.
+ *
+ * Categoria arquivada fica de fora: o teto é planejamento do que ainda vai ser
+ * gasto, e ela não recebe lançamento novo. O que já foi gasto nela continua
+ * aparecendo nos gráficos por categoria.
  */
 export function categoryBudgets(
   txs: Transaction[],
@@ -65,7 +69,9 @@ export function categoryBudgets(
   const daysInMonth = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
 
   return categories
-    .filter((c) => c.kind === "expense" && c.monthly_cap != null && c.monthly_cap > 0)
+    .filter(
+      (c) => !c.archived_at && c.kind === "expense" && c.monthly_cap != null && c.monthly_cap > 0,
+    )
     .map((c) => {
       const spent = txs
         .filter((t) => t.kind === "expense" && t.category_id === c.id)

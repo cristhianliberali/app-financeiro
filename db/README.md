@@ -52,11 +52,13 @@ sem prefixo.
 | --- | --- |
 | `app_users` | Usuários e hash da senha (scrypt) |
 | `user_sessions` | Um registro por login ativo; guarda só o SHA-256 do token do cookie |
+| `password_resets` | Links de redefinição de senha; guarda só o SHA-256 do token, com prazo e marca de uso |
+| `email_change_requests` | Trocas de e-mail pendentes; código de 6 dígitos hasheado, enviado ao endereço novo |
 | `accounts` | Espaço de trabalho compartilhável |
 | `account_members` | Quem participa de cada conta e com qual papel (`owner`/`editor`/`viewer`) |
 | `account_invites` | Convites pendentes, por e-mail, com token e prazo |
 | `budget_profiles` | Perfis (Pessoal, Empresa…) que isolam os dados dentro de uma conta |
-| `categories` | Categorias de entrada e saída, com teto mensal e palavras-chave usadas pela importação por IA |
+| `categories` | Categorias de entrada e saída, com teto mensal e palavras-chave usadas pela importação por IA. `archived_at` preenchido = arquivada: continua nos relatórios, mas não recebe lançamento novo |
 | `transactions` | Lançamentos, inclusive parcelas |
 | `recurring_rules` | Receitas e despesas recorrentes |
 | `investments` | Investimentos e rendimento esperado |
@@ -105,7 +107,9 @@ compartilhe com outros serviços.
 
 ## Manutenção
 
-Sessões expiradas não atrapalham o login, mas acumulam. Para limpar:
+Sessões expiradas não atrapalham o login, mas acumulam. Para limpar (a mesma
+função também descarta tokens de redefinição e códigos de troca de e-mail
+vencidos há mais de 7 dias):
 
 ```sql
 SELECT purge_expired_sessions();

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Repeat, Search, Sparkles, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { PaginationBar, usePagination } from "@/components/PaginationBar";
 import { TransactionDialog } from "@/components/TransactionDialog";
 import { AiImportDialog } from "@/components/AiImportDialog";
 import { RecurringDialog } from "@/components/RecurringDialog";
@@ -48,10 +49,7 @@ function TransactionsPage() {
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
 
-  const catMap = useMemo(
-    () => Object.fromEntries(categories.map((c) => [c.id, c])),
-    [categories],
-  );
+  const catMap = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c])), [categories]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -60,10 +58,15 @@ function TransactionsPage() {
       if (categoryFilter && t.category_id !== categoryFilter) return false;
       if (!q) return true;
       if (t.description.toLowerCase().includes(q)) return true;
-      if (!Number.isNaN(numeric) && q.length > 0 && Math.abs(t.amount - numeric) < 0.01) return true;
+      if (!Number.isNaN(numeric) && q.length > 0 && Math.abs(t.amount - numeric) < 0.01)
+        return true;
       return false;
     });
   }, [transactions, query, categoryFilter]);
+
+  // A paginação é do que sobrou dos filtros: os totais acima continuam somando
+  // o período inteiro, não só a página exibida.
+  const pagination = usePagination(filtered, "aura.transacoes.pageSize");
 
   const totals = filtered.reduce(
     (acc, t) => {
@@ -124,9 +127,11 @@ function TransactionsPage() {
           className="h-9 rounded-md border border-input bg-card px-3 text-sm md:w-56"
         >
           <option value="">Todas as categorias</option>
+          {/* Arquivadas continuam aqui: elas ainda têm lançamentos para filtrar. */}
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
               {c.emoji} {c.name}
+              {c.archived_at ? " (arquivada)" : ""}
             </option>
           ))}
         </select>
@@ -153,11 +158,12 @@ function TransactionsPage() {
             {filtered.length} lançamento{filtered.length === 1 ? "" : "s"}
           </h2>
           <p className="text-xs text-muted-foreground">
-            Período filtrado por {dateBasis === "due_date" ? "data de vencimento" : "data da transação"}
+            Período filtrado por{" "}
+            {dateBasis === "due_date" ? "data de vencimento" : "data da transação"}
           </p>
         </div>
         <div className="divide-y divide-border">
-          {filtered.map((t) => {
+          {pagination.visible.map((t) => {
             const cat = t.category_id ? catMap[t.category_id] : undefined;
             return (
               <div key={t.id} className="flex items-center gap-4 px-6 py-3">
@@ -218,6 +224,7 @@ function TransactionsPage() {
             </p>
           )}
         </div>
+        <PaginationBar pagination={pagination} itemLabel="lançamentos" />
       </div>
 
       <TransactionDialog

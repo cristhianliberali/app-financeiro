@@ -81,6 +81,37 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 CREATE INDEX IF NOT EXISTS user_sessions_user_idx ON user_sessions(user_id);
 CREATE INDEX IF NOT EXISTS user_sessions_expires_idx ON user_sessions(expires_at);
 
+-- Redefinição de senha por e-mail. Como nas sessões, guardamos só o SHA-256 do
+-- token que vai no link: quem lê a tabela não consegue redefinir a senha de
+-- ninguém. `consumed_at` marca o link já usado, que não vale uma segunda vez.
+CREATE TABLE IF NOT EXISTS password_resets (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  token_hash  text NOT NULL UNIQUE,
+  expires_at  timestamptz NOT NULL,
+  consumed_at timestamptz,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS password_resets_user_idx ON password_resets(user_id, created_at DESC);
+
+-- Troca de e-mail em duas etapas: o código de confirmação é enviado para o
+-- endereço NOVO, então só conclui quem realmente recebe lá. `attempts` limita a
+-- tentativa de adivinhar o código de 6 dígitos.
+CREATE TABLE IF NOT EXISTS email_change_requests (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  new_email   text NOT NULL CHECK (new_email = lower(new_email) AND new_email LIKE '%@%'),
+  code_hash   text NOT NULL,
+  attempts    int NOT NULL DEFAULT 0,
+  expires_at  timestamptz NOT NULL,
+  consumed_at timestamptz,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS email_change_requests_user_idx
+  ON email_change_requests(user_id, created_at DESC);
+
 
 -- ──────────────────────── contas e compartilhamento ─────────────────────────
 
@@ -163,6 +194,13 @@ CREATE INDEX IF NOT EXISTS categories_profile_idx ON categories(profile_id);
 -- por IA: termos como "IFOOD, RESTAURANTE, PADARIA" ajudam o modelo a
 -- classificar as linhas da fatura sem depender só do nome da categoria.
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS description text;
+
+-- Categoria arquivada em vez de apagada. Apagar de verdade deixaria os
+-- lançamentos antigos sem categoria (`ON DELETE SET NULL`) e a categoria
+-- sumiria dos relatórios do passado. Arquivar preserva o histórico: o nome
+-- continua aparecendo no que já foi lançado, e a categoria só some das listas
+-- de escolha de lançamento novo.
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS archived_at timestamptz;
 
 CREATE TABLE IF NOT EXISTS transactions (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -578,6 +616,10 @@ DECLARE
 BEGIN
   DELETE FROM user_sessions WHERE expires_at < now();
   GET DIAGNOSTICS removed = ROW_COUNT;
+  -- Tokens de redefinição e códigos de troca de e-mail vencem sozinhos (a
+  -- consulta filtra por `expires_at`), mas também não precisam ficar guardados.
+  DELETE FROM password_resets WHERE expires_at < now() - interval '7 days';
+  DELETE FROM email_change_requests WHERE expires_at < now() - interval '7 days';
   RETURN removed;
 END;
 $fn$;

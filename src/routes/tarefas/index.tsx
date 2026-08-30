@@ -32,6 +32,7 @@ import {
   todayKey,
   dayKey,
 } from "@/lib/tasks-analytics";
+import { datePickerProps } from "@/components/ui/date-field";
 
 export const Route = createFileRoute("/tarefas/")({
   head: () => ({
@@ -349,12 +350,14 @@ function TasksDashboard() {
           <>
             <input
               type="date"
+              {...datePickerProps()}
               className={SELECT_CLASS}
               value={custom.from}
               onChange={(e) => setCustom({ ...custom, from: e.target.value })}
             />
             <input
               type="date"
+              {...datePickerProps()}
               className={SELECT_CLASS}
               value={custom.to}
               onChange={(e) => setCustom({ ...custom, to: e.target.value })}
