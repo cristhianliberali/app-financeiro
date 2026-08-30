@@ -31,6 +31,14 @@ type Props = { open: boolean; onOpenChange: (v: boolean) => void };
 
 type Draft = ParsedRow & { category_id: string; include: boolean };
 
+/** As duas datas de um lançamento, que a edição em massa alcança. */
+type DateField = "date" | "due_date";
+
+const DATE_LABEL: Record<DateField, string> = {
+  date: "data do lançamento",
+  due_date: "data de vencimento",
+};
+
 /** Lê o arquivo escolhido como base64, sem o prefixo `data:`. */
 function readAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -66,6 +74,13 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
   const [rows, setRows] = useState<Draft[]>([]);
   /** Conferência do servidor: o que foi recuperado e o que ficou sem lançamento. */
   const [coverage, setCoverage] = useState({ recovered: 0, missing: 0 });
+  /** Última data mexida à mão, que abre a opção de repetir nas demais linhas. */
+  const [lastDate, setLastDate] = useState<{ field: DateField; value: string } | null>(null);
+  /** Campos em que "aplicar a todos" ficou marcado: seguem se repetindo sozinhos. */
+  const [repeatDate, setRepeatDate] = useState<Record<DateField, boolean>>({
+    date: false,
+    due_date: false,
+  });
 
   useEffect(() => {
     if (open) return;
@@ -76,6 +91,8 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
     setBatchesDone(0);
     setRows([]);
     setCoverage({ recovered: 0, missing: 0 });
+    setLastDate(null);
+    setRepeatDate({ date: false, due_date: false });
   }, [open]);
 
   function toDraft(row: ParsedRow): Draft {
@@ -151,6 +168,23 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...values } : r)));
   }
 
+  /** Repete a data em todas as linhas — menos nas já lançadas, que não vão. */
+  function applyDateToAll(field: DateField, value: string) {
+    if (!value) return;
+    setRows((prev) => prev.map((r) => (r.duplicateOf ? r : { ...r, [field]: value })));
+  }
+
+  /**
+   * Mexer numa data oferece repetir nas demais: numa fatura de cartão o
+   * vencimento é o mesmo para todas as linhas, e corrigi-lo uma a uma em cem
+   * lançamentos não é trabalho para ninguém.
+   */
+  function patchDate(i: number, field: DateField, value: string) {
+    patch(i, { [field]: value } as Partial<Draft>);
+    if (repeatDate[field]) applyDateToAll(field, value);
+    else if (value) setLastDate({ field, value });
+  }
+
   async function commit() {
     const selected = rows.filter((r) => r.include && !r.duplicateOf);
     if (!selected.length) {
@@ -178,6 +212,18 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
   const pendingBatches = summary && summary.importId ? summary.totalBatches - batchesDone : 0;
   const unverified = rows.filter((r) => !r.amountFound && !r.duplicateOf).length;
   const duplicates = rows.filter((r) => r.duplicateOf).length;
+
+  // Somado aqui, no código, e não pedido à IA: conferir a extração com um número
+  // que a própria IA produziu não conferiria nada.
+  const selected = rows.filter((r) => r.include && !r.duplicateOf);
+  const totals = selected.reduce(
+    (acc, row) => {
+      if (row.kind === "income") acc.income += row.amount;
+      else acc.expense += row.amount;
+      return acc;
+    },
+    { income: 0, expense: 0 },
+  );
   const started = rows.length > 0 || batchesDone > 0;
   const canStart = !!file || text.trim().length >= 10;
 
@@ -272,6 +318,69 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
               </p>
             )}
 
+            {/* Resumo somado pelo código a partir do que a IA devolveu. */}
+            <div className="rounded-xl border border-border bg-secondary/30 p-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-xs font-semibold">Resumo da extração</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {rows.length} lançamento{rows.length === 1 ? "" : "s"} lido
+                  {rows.length === 1 ? "" : "s"} · {selected.length} selecionado
+                  {selected.length === 1 ? "" : "s"} para lançar
+                </p>
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg bg-card p-2">
+                  <p className="label-caps text-[10px]">Entradas</p>
+                  <p className="font-mono text-sm font-bold text-positive">{brl(totals.income)}</p>
+                </div>
+                <div className="rounded-lg bg-card p-2">
+                  <p className="label-caps text-[10px]">Saídas</p>
+                  <p className="font-mono text-sm font-bold text-negative">{brl(totals.expense)}</p>
+                </div>
+                <div className="rounded-lg bg-card p-2">
+                  <p className="label-caps text-[10px]">Resultado</p>
+                  <p className="font-mono text-sm font-bold">
+                    {brl(totals.income - totals.expense)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {lastDate && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card p-2.5 text-xs">
+                <span>
+                  {DATE_LABEL[lastDate.field].charAt(0).toUpperCase() +
+                    DATE_LABEL[lastDate.field].slice(1)}{" "}
+                  alterada para{" "}
+                  <span className="font-semibold">{formatDateBR(lastDate.value)}</span>.
+                </span>
+                <span className="flex items-center gap-3">
+                  <label className="flex cursor-pointer items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      className="size-3.5 accent-[var(--color-primary)]"
+                      checked={repeatDate[lastDate.field]}
+                      onChange={(e) => {
+                        setRepeatDate((prev) => ({
+                          ...prev,
+                          [lastDate.field]: e.target.checked,
+                        }));
+                        if (e.target.checked) applyDateToAll(lastDate.field, lastDate.value);
+                      }}
+                    />
+                    Aplicar a todos os {rows.length} lançamentos
+                  </label>
+                  <button
+                    onClick={() => setLastDate(null)}
+                    className="text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label="Dispensar"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </span>
+              </div>
+            )}
+
             {duplicates > 0 && (
               <p className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 p-2.5 text-xs text-muted-foreground">
                 <Ban className="size-4 shrink-0" />
@@ -359,7 +468,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                     className="col-span-2 h-8 text-xs"
                     value={r.date}
                     disabled={blocked}
-                    onChange={(e) => patch(i, { date: e.target.value })}
+                    onChange={(e) => patchDate(i, "date", e.target.value)}
                     aria-label="Data do lançamento"
                   />
                   <DateField
@@ -367,7 +476,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                     className="col-span-2 h-8 text-xs"
                     value={r.due_date}
                     disabled={blocked}
-                    onChange={(e) => patch(i, { due_date: e.target.value })}
+                    onChange={(e) => patchDate(i, "due_date", e.target.value)}
                     aria-label="Data de vencimento"
                   />
                   <select
