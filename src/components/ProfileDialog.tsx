@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, KeyRound, Mail, MailCheck, User } from "lucide-react";
+import { AlertTriangle, CalendarDays, KeyRound, Mail, MailCheck, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AUTH_QUERY_KEY, useAuth } from "@/hooks/useAuth";
 import { MIN_PASSWORD, changePassword } from "@/lib/auth.functions";
+import { useConnectGoogle, useDisconnectGoogle, useGoogleStatus } from "@/lib/google";
 import {
   cancelEmailChange,
   confirmEmailChange,
@@ -48,6 +49,10 @@ export function ProfileDialog({
     enabled: open,
     queryFn: () => getPendingEmailChange(),
   });
+
+  const { data: google } = useGoogleStatus();
+  const connectGoogle = useConnectGoogle();
+  const disconnectGoogle = useDisconnectGoogle();
 
   const [name, setName] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -218,6 +223,67 @@ export function ProfileDialog({
                   Enviar código de confirmação
                 </Button>
               </div>
+            )}
+          </section>
+
+          {/* Google Agenda */}
+          <section className="space-y-3 rounded-xl border border-border p-4">
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
+              <CalendarDays className="size-4" /> Google Agenda
+            </h3>
+
+            {google && !google.configured ? (
+              <p className="flex items-start gap-2 rounded-lg border border-border bg-secondary/40 p-3 text-xs text-muted-foreground">
+                <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />A integração não está
+                configurada neste servidor (variáveis GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET).
+              </p>
+            ) : google?.connected ? (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Conectado como <span className="font-medium text-foreground">{google.email}</span>
+                  {google.lastSyncAt && (
+                    <>
+                      {" "}
+                      · última sincronização {new Date(google.lastSyncAt).toLocaleString("pt-BR")}
+                    </>
+                  )}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  As tarefas em que você é responsável viram compromissos na sua agenda. Apagar o
+                  compromisso lá limpa as datas da tarefa aqui — a tarefa em si não é excluída.
+                </p>
+                {google.lastError && (
+                  <p className="flex items-start gap-2 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-xs">
+                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-negative" />
+                    Última sincronização falhou: {google.lastError}
+                  </p>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={disconnectGoogle.isPending}
+                  onClick={async () => {
+                    await disconnectGoogle.mutateAsync();
+                    toast.success("Google Agenda desconectado");
+                  }}
+                >
+                  Desconectar
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Conecte para que as tarefas em que você é responsável apareçam na sua agenda, com
+                  as datas sempre iguais nos dois lados.
+                </p>
+                <Button
+                  size="sm"
+                  disabled={connectGoogle.isPending}
+                  onClick={() => connectGoogle.mutate()}
+                >
+                  Conectar Google Agenda
+                </Button>
+              </>
             )}
           </section>
 

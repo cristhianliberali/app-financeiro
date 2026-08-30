@@ -622,7 +622,22 @@ export async function saveTask(userId: string, input: SaveTaskInput): Promise<st
       await syncLabels(client, taskId!, input.labelIds);
     }
     return taskId!;
+  }).then(async (taskId) => {
+    // A agenda acompanha a tarefa, mas não manda nela: uma falha no Google não
+    // pode derrubar o salvamento que já foi confirmado no banco.
+    await syncCalendarQuietly(taskId);
+    return taskId;
   });
+}
+
+/** Repassa a mudança para o Google Agenda sem deixar o erro subir. */
+async function syncCalendarQuietly(taskId: string): Promise<void> {
+  try {
+    const { syncTaskToCalendar } = await import("./google.server");
+    await syncTaskToCalendar(taskId);
+  } catch (error) {
+    console.error("[agenda] sincronização da tarefa falhou:", error);
+  }
 }
 
 /** Substitui as etiquetas da tarefa pelo conjunto informado. */
@@ -789,7 +804,19 @@ export async function moveTaskByPolarity(
 
 export async function deleteTask(userId: string, taskId: string): Promise<void> {
   await requireTaskAccess(userId, taskId, "editor");
+
+  // Os vínculos com a agenda caem em cascata junto da tarefa, então precisam
+  // ser lidos antes — é com eles que o evento é apagado no Google.
+  const { linksOfTask, removeTaskFromCalendar } = await import("./google.server");
+  const links = await linksOfTask(taskId).catch(() => []);
+
   await query(`DELETE FROM tasks WHERE id = $1`, [taskId]);
+
+  if (links.length > 0) {
+    await removeTaskFromCalendar(links, taskId).catch((error) =>
+      console.error("[agenda] não foi possível apagar o evento da tarefa excluída:", error),
+    );
+  }
 }
 
 // ─────────────────────────────── etiquetas ──────────────────────────────

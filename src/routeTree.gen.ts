@@ -22,6 +22,7 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as TarefasIndexRouteImport } from './routes/tarefas/index'
 import { Route as TarefasCalendarioRouteImport } from './routes/tarefas/calendario'
 import { Route as TarefasMinhasRouteImport } from './routes/tarefas/minhas'
+import { Route as ApiGoogleCallbackRouteImport } from './routes/api/google/callback'
 import { Route as TarefasEspacosIndexRouteImport } from './routes/tarefas/espacos/index'
 import { Route as TarefasEspacosSpaceIdRouteImport } from './routes/tarefas/espacos/$spaceId'
 import { Route as TarefasQuadrosBoardIdRouteImport } from './routes/tarefas/quadros/$boardId'
@@ -91,6 +92,11 @@ const TarefasMinhasRoute = TarefasMinhasRouteImport.update({
   path: '/tarefas/minhas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGoogleCallbackRoute = ApiGoogleCallbackRouteImport.update({
+  id: '/api/google/callback',
+  path: '/api/google/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TarefasEspacosIndexRoute = TarefasEspacosIndexRouteImport.update({
   id: '/tarefas/espacos/',
   path: '/tarefas/espacos/',
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/tarefas/calendario': typeof TarefasCalendarioRoute
   '/tarefas/minhas': typeof TarefasMinhasRoute
   '/tarefas/': typeof TarefasIndexRoute
+  '/api/google/callback': typeof ApiGoogleCallbackRoute
   '/tarefas/espacos/$spaceId': typeof TarefasEspacosSpaceIdRoute
   '/tarefas/quadros/$boardId': typeof TarefasQuadrosBoardIdRoute
   '/tarefas/espacos/': typeof TarefasEspacosIndexRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/tarefas/calendario': typeof TarefasCalendarioRoute
   '/tarefas/minhas': typeof TarefasMinhasRoute
   '/tarefas': typeof TarefasIndexRoute
+  '/api/google/callback': typeof ApiGoogleCallbackRoute
   '/tarefas/espacos/$spaceId': typeof TarefasEspacosSpaceIdRoute
   '/tarefas/quadros/$boardId': typeof TarefasQuadrosBoardIdRoute
   '/tarefas/espacos': typeof TarefasEspacosIndexRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/tarefas/calendario': typeof TarefasCalendarioRoute
   '/tarefas/minhas': typeof TarefasMinhasRoute
   '/tarefas/': typeof TarefasIndexRoute
+  '/api/google/callback': typeof ApiGoogleCallbackRoute
   '/tarefas/espacos/$spaceId': typeof TarefasEspacosSpaceIdRoute
   '/tarefas/quadros/$boardId': typeof TarefasQuadrosBoardIdRoute
   '/tarefas/espacos/': typeof TarefasEspacosIndexRoute
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/tarefas/calendario'
     | '/tarefas/minhas'
     | '/tarefas/'
+    | '/api/google/callback'
     | '/tarefas/espacos/$spaceId'
     | '/tarefas/quadros/$boardId'
     | '/tarefas/espacos/'
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
     | '/tarefas/calendario'
     | '/tarefas/minhas'
     | '/tarefas'
+    | '/api/google/callback'
     | '/tarefas/espacos/$spaceId'
     | '/tarefas/quadros/$boardId'
     | '/tarefas/espacos'
@@ -214,6 +225,7 @@ export interface FileRouteTypes {
     | '/tarefas/calendario'
     | '/tarefas/minhas'
     | '/tarefas/'
+    | '/api/google/callback'
     | '/tarefas/espacos/$spaceId'
     | '/tarefas/quadros/$boardId'
     | '/tarefas/espacos/'
@@ -233,6 +245,7 @@ export interface RootRouteChildren {
   TarefasCalendarioRoute: typeof TarefasCalendarioRoute
   TarefasMinhasRoute: typeof TarefasMinhasRoute
   TarefasIndexRoute: typeof TarefasIndexRoute
+  ApiGoogleCallbackRoute: typeof ApiGoogleCallbackRoute
   TarefasEspacosSpaceIdRoute: typeof TarefasEspacosSpaceIdRoute
   TarefasQuadrosBoardIdRoute: typeof TarefasQuadrosBoardIdRoute
   TarefasEspacosIndexRoute: typeof TarefasEspacosIndexRoute
@@ -331,6 +344,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TarefasMinhasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/google/callback': {
+      id: '/api/google/callback'
+      path: '/api/google/callback'
+      fullPath: '/api/google/callback'
+      preLoaderRoute: typeof ApiGoogleCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tarefas/espacos/': {
       id: '/tarefas/espacos/'
       path: '/tarefas/espacos'
@@ -369,6 +389,7 @@ const rootRouteChildren: RootRouteChildren = {
   TarefasCalendarioRoute: TarefasCalendarioRoute,
   TarefasMinhasRoute: TarefasMinhasRoute,
   TarefasIndexRoute: TarefasIndexRoute,
+  ApiGoogleCallbackRoute: ApiGoogleCallbackRoute,
   TarefasEspacosSpaceIdRoute: TarefasEspacosSpaceIdRoute,
   TarefasQuadrosBoardIdRoute: TarefasQuadrosBoardIdRoute,
   TarefasEspacosIndexRoute: TarefasEspacosIndexRoute,

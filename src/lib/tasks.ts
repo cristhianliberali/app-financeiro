@@ -190,7 +190,8 @@ export type AccountTimeEntry = {
 };
 
 /** Prefixo único das queries do módulo — toda escrita invalida por ele. */
-const KEY = "tp";
+export const TASKS_QUERY_KEY = "tp";
+const KEY = TASKS_QUERY_KEY;
 
 /** O servidor devolve a tarefa já agregada; aqui só derivamos o tempo. */
 function normalizeTask(row: unknown): Task {
