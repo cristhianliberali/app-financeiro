@@ -21,6 +21,14 @@ Toda requisição de IA fica registrada no log do servidor — o prompt enviado 
 resposta crua —, para conferir depois o que o modelo recebeu e o que devolveu.
 Ligado por padrão, ajustável em `LOG_IA*` (veja `.env.example`).
 
+Numa fatura com muitos lançamentos o modelo pula linhas sem avisar, então o
+servidor confere: toda linha do documento com data e valor precisa ter um
+lançamento correspondente. As que faltarem voltam para o modelo numa segunda
+passada, só elas; o que ainda assim não voltar é mostrado na tela como aviso, em
+vez de sumir. O documento também é dividido em lotes por número de lançamentos
+(`LIMITE_LANCAMENTOS_LOTE`), que é o que mantém a resposta curta o bastante para
+o modelo transcrever tudo.
+
 Lista de transações recentes e filtro por categoria, paginada com seletor de
 10 / 50 / 100 registros por página.
 
@@ -62,6 +70,10 @@ ou quadro.
   dashboard (estimado x realizado, saldo de horas, o que estourou);
 - **Lembretes** por tarefa, entregues como notificação do navegador e no sininho
   do cabeçalho;
+- **Anexos** por tarefa, guardados num bucket S3 (ou compatível: MinIO, R2, B2).
+  Imagem, vídeo e PDF abrem na própria tela; o resto baixa. O arquivo vai do
+  navegador direto para o bucket, que fica privado — o que circula são URLs
+  assinadas com prazo;
 - Exclusão protegida: espaço e quadro pedem o nome digitado, tarefa pede
   confirmação, e uma etapa com tarefas não pode ser excluída — mova ou exclua as
   tarefas dela antes.

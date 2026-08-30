@@ -114,6 +114,12 @@ export type AiSettings = {
   model: string;
   /** Teto de tokens do documento por requisição; acima disso, vira lote. */
   tokenLimit: number;
+  /**
+   * Teto de lançamentos por requisição. É o limite que importa numa fatura
+   * grande: pedir uma centena de lançamentos de uma vez faz o modelo pular
+   * linhas — e ele não avisa quando pula.
+   */
+  entryLimit: number;
   apiKey: string;
 };
 
@@ -148,6 +154,7 @@ export function getAiSettings(): AiSettings {
     // O teto é do texto do documento, não da resposta: o que passar disso é
     // dividido em lotes processados um por vez.
     tokenLimit: readInt("LIMITE_TOKENS", 12_000),
+    entryLimit: readInt("LIMITE_LANCAMENTOS_LOTE", 40),
   };
 }
 
@@ -240,6 +247,76 @@ export function getSmtpSettings(): SmtpSettings {
 export function isSmtpConfigured(): boolean {
   try {
     getSmtpSettings();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Armazenamento S3 dos anexos de tarefa.
+ *
+ * Vale para a AWS e para qualquer serviço compatível (MinIO, Backblaze B2,
+ * Cloudflare R2, Wasabi…): quem decide é `S3_ENDPOINT`. Sem `S3_BUCKET` o app
+ * inteiro continua de pé — só os anexos ficam indisponíveis, com a tela
+ * dizendo o que falta configurar.
+ *
+ * O bucket é privado: o navegador nunca recebe as chaves, e sim URLs assinadas
+ * com prazo curto, geradas aqui no servidor.
+ */
+export type S3Settings = {
+  bucket: string;
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  /** Endpoint próprio (MinIO, R2, B2…). Vazio usa o da AWS. */
+  endpoint: string | undefined;
+  /**
+   * Caminho em vez de subdomínio (`host/bucket/chave`). MinIO e a maioria dos
+   * compatíveis precisam disto; a AWS trabalha com o padrão de subdomínio.
+   */
+  forcePathStyle: boolean;
+  /** Teto de tamanho por arquivo, em bytes. */
+  maxUploadBytes: number;
+  /** Validade das URLs assinadas de leitura e de envio, em segundos. */
+  signedUrlTtlSeconds: number;
+};
+
+export function getS3Settings(): S3Settings {
+  const bucket = readEnv("S3_BUCKET");
+  const accessKeyId = readEnv("S3_ACCESS_KEY_ID");
+  const secretAccessKey = readEnv("S3_SECRET_ACCESS_KEY");
+
+  const missing = [
+    ...(bucket ? [] : ["S3_BUCKET"]),
+    ...(accessKeyId ? [] : ["S3_ACCESS_KEY_ID"]),
+    ...(secretAccessKey ? [] : ["S3_SECRET_ACCESS_KEY"]),
+  ];
+  if (missing.length) {
+    throw new Error(
+      `Armazenamento de anexos não configurado. Faltam as variáveis: ${missing.join(", ")}.`,
+    );
+  }
+
+  const endpoint = readEnv("S3_ENDPOINT");
+
+  return {
+    bucket: bucket!,
+    accessKeyId: accessKeyId!,
+    secretAccessKey: secretAccessKey!,
+    region: readEnv("S3_REGION") ?? "us-east-1",
+    endpoint,
+    // Endpoint próprio quase sempre quer caminho; a AWS, não.
+    forcePathStyle: readBool("S3_FORCE_PATH_STYLE", !!endpoint),
+    maxUploadBytes: readInt("S3_MAX_UPLOAD_MB", 50) * 1024 * 1024,
+    signedUrlTtlSeconds: readInt("S3_URL_TTL_SEGUNDOS", 900),
+  };
+}
+
+/** A tela de tarefas usa isto para explicar por que os anexos estão fora. */
+export function isS3Configured(): boolean {
+  try {
+    getS3Settings();
     return true;
   } catch {
     return false;

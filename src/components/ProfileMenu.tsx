@@ -42,8 +42,10 @@ export function ProfileMenu({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          className={`flex items-center gap-2 rounded-lg text-left transition-colors hover:bg-secondary ${
-            collapsed ? "justify-center p-1" : "w-full p-1.5"
+          // `min-w-0` é o que deixa o botão encolher: sem ele, um e-mail longo
+          // empurra o seletor de tema para fora da lateral, por cima do conteúdo.
+          className={`flex min-w-0 items-center gap-2 rounded-lg text-left transition-colors hover:bg-secondary ${
+            collapsed ? "shrink-0 justify-center p-1" : "w-full p-1.5"
           }`}
           aria-label="Meu perfil"
           title={user.name ?? user.email}

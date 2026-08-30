@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -8,6 +8,7 @@ import {
   Target,
   Users,
   ChevronDown,
+  Menu,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppState } from "@/lib/app-state";
@@ -25,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 /**
  * Casca do módulo Finanças. O módulo Projetos e Tarefas tem a sua própria
@@ -46,6 +48,10 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
   const { accountId, setAccountId, profileId, setProfileId } = useAppState();
   const { data: accounts } = useAccounts();
   const { data: profiles } = useProfiles(accountId);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Trocar de tela fecha o menu do celular — ele cobre a tela inteira.
+  useEffect(() => setMenuOpen(false), [pathname]);
 
   useEffect(() => {
     if (accounts?.length && !accounts.some((a) => a.id === accountId)) {
@@ -74,61 +80,89 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
     );
   }
 
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <aside className="fixed left-0 top-0 z-10 hidden h-full w-64 flex-col border-r border-border bg-card p-6 lg:flex">
-        <div className="mb-6 flex items-center gap-2">
-          <div className="size-8 rounded-lg bg-primary" />
-          <span className="text-xl font-bold tracking-tight">AURA</span>
+  /**
+   * Conteúdo da lateral. Vai para a coluna fixa no desktop e para a gaveta do
+   * celular — a mesma navegação nos dois, sem duplicar o menu em dois lugares.
+   */
+  const sidebar = (
+    <>
+      <div className="mb-6 flex items-center gap-2">
+        <div className="size-8 rounded-lg bg-primary" />
+        <span className="text-xl font-bold tracking-tight">AURA</span>
+      </div>
+      <div className="mb-6">
+        <ModuleSwitcher />
+      </div>
+      <nav className="space-y-1">
+        {nav.map((item) => {
+          const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                active
+                  ? "bg-secondary font-medium text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <item.icon className="size-4" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="mt-auto space-y-4 pt-6">
+        <div className="rounded-xl border border-border bg-secondary/50 p-4">
+          <p className="label-caps mb-2">Perfil ativo</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Os lançamentos, categorias e metas exibidos pertencem ao perfil{" "}
+            <span className="font-semibold text-foreground">{current?.name ?? "—"}</span>.
+          </p>
         </div>
-        <div className="mb-6">
-          <ModuleSwitcher />
-        </div>
-        <nav className="space-y-1">
-          {nav.map((item) => {
-            const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-                  active
-                    ? "bg-secondary font-medium text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <item.icon className="size-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="mt-auto space-y-4">
-          <div className="rounded-xl border border-border bg-secondary/50 p-4">
-            <p className="label-caps mb-2">Perfil ativo</p>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Os lançamentos, categorias e metas exibidos pertencem ao perfil{" "}
-              <span className="font-semibold text-foreground">{current?.name ?? "—"}</span>.
-            </p>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <ProfileMenu />
+        <div className="flex min-w-0 items-center gap-2">
+          <ProfileMenu />
+          <div className="shrink-0">
             <ThemeToggle />
           </div>
         </div>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <aside className="fixed left-0 top-0 z-10 hidden h-full w-64 flex-col border-r border-border bg-card p-6 lg:flex">
+        {sidebar}
       </aside>
+
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+        <SheetContent side="left" className="flex w-72 flex-col overflow-y-auto p-6 lg:hidden">
+          <SheetTitle className="sr-only">Menu</SheetTitle>
+          {sidebar}
+        </SheetContent>
+      </Sheet>
 
       <main className="lg:pl-64">
         <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-card/80 px-4 py-3 backdrop-blur-md lg:px-8">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:hidden"
+              aria-label="Abrir menu"
+            >
+              <Menu className="size-4" />
+            </button>
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-border bg-secondary/60 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary">
                 <span
                   className="size-2 rounded-full"
                   style={{ backgroundColor: currentAccount?.color ?? "var(--foreground)" }}
                 />
-                {currentAccount?.name ?? "Conta"}
-                <ChevronDown className="size-3 opacity-50" />
+                <span className="max-w-28 truncate sm:max-w-none">
+                  {currentAccount?.name ?? "Conta"}
+                </span>
+                <ChevronDown className="size-3 shrink-0 opacity-50" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 {accounts?.map((a) => (
@@ -155,8 +189,11 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
                   className="size-2 rounded-full"
                   style={{ backgroundColor: current?.color ?? "var(--foreground)" }}
                 />
-                Perfil: {current?.name ?? "—"}
-                <ChevronDown className="size-3 opacity-50" />
+                <span className="max-w-28 truncate sm:max-w-none">
+                  <span className="hidden sm:inline">Perfil: </span>
+                  {current?.name ?? "—"}
+                </span>
+                <ChevronDown className="size-3 shrink-0 opacity-50" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 {profiles?.map((p) => (

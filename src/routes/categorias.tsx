@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Archive, RotateCcw } from "lucide-react";
+import { Archive, Pencil, RotateCcw } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,8 @@ function CategoriesPage() {
   const [form, setForm] = useState(empty);
   const [open, setOpen] = useState(false);
   const [archiving, setArchiving] = useState<Category | null>(null);
+  /** O que está sendo editado é uma categoria arquivada? */
+  const editingArchived = categories.some((c) => c.id === form.id && c.archived_at);
 
   const active = useMemo(() => categories.filter((c) => !c.archived_at), [categories]);
   const archived = useMemo(() => categories.filter((c) => c.archived_at), [categories]);
@@ -126,28 +128,42 @@ function CategoriesPage() {
                   key={c.id}
                   className="flex items-center justify-between rounded-xl border border-border p-4"
                 >
-                  <button onClick={() => edit(c)} className="flex items-center gap-3 text-left">
+                  <button
+                    onClick={() => edit(c)}
+                    className="flex min-w-0 items-center gap-3 text-left"
+                    aria-label={`Editar ${c.name}`}
+                  >
                     <span
-                      className="flex size-9 items-center justify-center rounded-lg text-sm"
+                      className="flex size-9 shrink-0 items-center justify-center rounded-lg text-sm"
                       style={{ backgroundColor: `${c.color}20` }}
                     >
                       {c.emoji}
                     </span>
-                    <span>
-                      <span className="block text-sm font-medium">{c.name}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium">{c.name}</span>
                       <span className="block text-[11px] text-muted-foreground">
                         {c.monthly_cap ? `Teto ${brl(Number(c.monthly_cap))}/mês` : "Sem teto"}
                       </span>
                     </span>
                   </button>
-                  <button
-                    onClick={() => setArchiving(c)}
-                    className="text-muted-foreground transition-colors hover:text-destructive"
-                    aria-label={`Arquivar ${c.name}`}
-                    title="Arquivar categoria"
-                  >
-                    <Archive className="size-4" />
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      onClick={() => edit(c)}
+                      className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                      aria-label={`Editar ${c.name}`}
+                      title="Editar categoria"
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                    <button
+                      onClick={() => setArchiving(c)}
+                      className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive"
+                      aria-label={`Arquivar ${c.name}`}
+                      title="Arquivar categoria"
+                    >
+                      <Archive className="size-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             {active.filter((c) => c.kind === g.kind).length === 0 && (
@@ -185,16 +201,28 @@ function CategoriesPage() {
                     </span>
                   </span>
                 </span>
-                <button
-                  onClick={async () => {
-                    await upsert.mutateAsync({ id: c.id, archived_at: null });
-                    toast.success(`Categoria “${c.name}” reativada`);
-                  }}
-                  className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                  aria-label={`Reativar ${c.name}`}
-                >
-                  <RotateCcw className="size-3.5" /> Reativar
-                </button>
+                <div className="flex shrink-0 items-center gap-1">
+                  {/* Arquivada continua editável: corrigir o nome de uma categoria
+                      antiga conserta também o que ela mostra nos relatórios. */}
+                  <button
+                    onClick={() => edit(c)}
+                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    aria-label={`Editar ${c.name}`}
+                    title="Editar categoria"
+                  >
+                    <Pencil className="size-4" />
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await upsert.mutateAsync({ id: c.id, archived_at: null });
+                      toast.success(`Categoria “${c.name}” reativada`);
+                    }}
+                    className="flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    aria-label={`Reativar ${c.name}`}
+                  >
+                    <RotateCcw className="size-3.5" /> Reativar
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -232,17 +260,26 @@ function CategoriesPage() {
           <DialogHeader>
             <DialogTitle>{form.id ? "Editar categoria" : "Nova categoria"}</DialogTitle>
           </DialogHeader>
+          {editingArchived && (
+            <p className="rounded-lg border border-border bg-secondary/40 p-2.5 text-xs text-muted-foreground">
+              Esta categoria está arquivada. As alterações valem também para os lançamentos antigos,
+              que continuam ligados a ela; para voltar a usá-la em lançamentos novos, reative-a na
+              lista.
+            </p>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
-              <Label>Nome</Label>
+              <Label htmlFor="categoria-nome">Nome</Label>
               <Input
+                id="categoria-nome"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Tipo</Label>
+              <Label htmlFor="categoria-tipo">Tipo</Label>
               <select
+                id="categoria-tipo"
                 value={form.kind}
                 onChange={(e) => setForm({ ...form, kind: e.target.value as "income" | "expense" })}
                 className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
@@ -252,16 +289,18 @@ function CategoriesPage() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>Emoji</Label>
+              <Label htmlFor="categoria-emoji">Emoji</Label>
               <Input
+                id="categoria-emoji"
                 value={form.emoji}
                 maxLength={2}
                 onChange={(e) => setForm({ ...form, emoji: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Cor</Label>
+              <Label htmlFor="categoria-cor">Cor</Label>
               <Input
+                id="categoria-cor"
                 type="color"
                 value={form.color}
                 onChange={(e) => setForm({ ...form, color: e.target.value })}
@@ -270,8 +309,9 @@ function CategoriesPage() {
             </div>
             {form.kind === "expense" && (
               <div className="space-y-1.5">
-                <Label>Teto mensal (R$)</Label>
+                <Label htmlFor="categoria-teto">Teto mensal (R$)</Label>
                 <Input
+                  id="categoria-teto"
                   inputMode="decimal"
                   value={form.monthly_cap}
                   onChange={(e) => setForm({ ...form, monthly_cap: e.target.value })}
@@ -279,8 +319,9 @@ function CategoriesPage() {
               </div>
             )}
             <div className="space-y-1.5 sm:col-span-2">
-              <Label>Palavras-chave da fatura</Label>
+              <Label htmlFor="categoria-palavras">Palavras-chave da fatura</Label>
               <textarea
+                id="categoria-palavras"
                 rows={2}
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}

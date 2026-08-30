@@ -10,6 +10,8 @@ import { extractText, type UploadInput } from "./extract.server";
 import { countTokens, splitIntoBatches } from "./tokens.server";
 import { extractRows, type CategoryHint, type ExtractedRow } from "./openai.server";
 import { newRequestId, type AiLogContext } from "./logs.server";
+import { amountAppearsIn } from "./amounts.server";
+import { capacityByAmount, entryLines, uncoveredEntries } from "./coverage.server";
 
 export type ImportSummary = {
   importId: string;
@@ -39,6 +41,10 @@ export type BatchResult = {
   batchNumber: number;
   totalBatches: number;
   done: boolean;
+  /** Lançamentos que só apareceram na segunda passada sobre as linhas faltantes. */
+  recovered: number;
+  /** Linhas com data e valor que continuaram sem lançamento depois das passadas. */
+  missing: number;
 };
 
 /**
@@ -52,27 +58,6 @@ async function categoryHints(profileId: string): Promise<CategoryHint[]> {
       ORDER BY name`,
     [profileId],
   );
-}
-
-/**
- * Formas em que um mesmo valor pode aparecer na fatura: 1234.56 pode estar
- * escrito como "1.234,56", "1234,56", "1,234.56" ou "1234.56".
- */
-function amountVariants(amount: number): string[] {
-  const fixed = Math.abs(amount).toFixed(2);
-  const [whole, cents] = fixed.split(".") as [string, string];
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-  return [
-    `${whole},${cents}`,
-    `${whole}.${cents}`,
-    `${grouped.replace(/ /g, ".")},${cents}`,
-    `${grouped.replace(/ /g, ",")}.${cents}`,
-  ];
-}
-
-/** O valor extraído aparece mesmo no documento? */
-function amountAppearsIn(text: string, amount: number): boolean {
-  return amountVariants(amount).some((variant) => text.includes(variant));
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -161,13 +146,14 @@ export async function prepareImport(
   if (text.length < 10) throw new Error("Não há texto suficiente para analisar.");
 
   const totalTokens = await countTokens(text);
-  const batches = await splitIntoBatches(text, settings.tokenLimit);
+  const batches = await splitIntoBatches(text, settings.tokenLimit, settings.entryLimit);
   const job = createJob({ userId, source, batches, totalTokens });
 
   console.info(
     `[ia] importação ${job.id} preparada: usuário=${userId} perfil=${input.profileId} ` +
       `origem="${source}" caracteres=${text.length} tokens=${totalTokens} ` +
-      `lotes=${batches.length} (limite ${settings.tokenLimit})`,
+      `lotes=${batches.length} (limite ${settings.tokenLimit} tokens / ` +
+      `${settings.entryLimit} lançamentos por lote)`,
   );
 
   return {
@@ -177,6 +163,77 @@ export async function prepareImport(
     totalTokens,
     expiresInMinutes: CACHE_TTL_MINUTES,
   };
+}
+
+/** Quantas vezes o servidor insiste nas linhas que ficaram sem lançamento. */
+const MAX_RECOVERY_PASSES = 2;
+
+/**
+ * Segunda (e terceira) passada sobre o que o modelo deixou passar.
+ *
+ * A conferência é por valor: toda linha com data e valor precisa ter um
+ * lançamento correspondente. As que não têm voltam para o modelo sozinhas — um
+ * punhado de linhas em vez da fatura inteira, que é justamente a situação em
+ * que ele acerta. O teto por valor impede que a repescagem devolva de novo o
+ * que já veio: só entram tantos lançamentos de um valor quantas linhas do
+ * documento têm aquele valor.
+ */
+async function recoverMissingRows(input: {
+  text: string;
+  rows: ExtractedRow[];
+  categories: CategoryHint[];
+  log: AiLogContext;
+}): Promise<{ extra: ExtractedRow[]; missing: string[] }> {
+  const entries = entryLines(input.text);
+  if (entries.length === 0) return { extra: [], missing: [] };
+
+  const capacity = capacityByAmount(entries);
+  const extra: ExtractedRow[] = [];
+  let pending = uncoveredEntries(entries, input.rows);
+
+  for (let pass = 1; pass <= MAX_RECOVERY_PASSES && pending.length > 0; pass += 1) {
+    console.info(
+      `[ia ${input.log.requestId}] ${pending.length} linha(s) sem lançamento; ` +
+        `passada de recuperação ${pass}/${MAX_RECOVERY_PASSES}`,
+    );
+
+    const recovered = await extractRows({
+      text: pending.map((entry) => entry.text).join("\n"),
+      categories: input.categories,
+      log: { ...input.log, attempt: pass },
+      recovery: true,
+    });
+    if (recovered.length === 0) break;
+
+    // Aceita só até o que o documento comporta daquele valor.
+    const used = new Map<string, number>();
+    for (const row of [...input.rows, ...extra]) {
+      const key = Math.abs(Number(row.amount) || 0).toFixed(2);
+      used.set(key, (used.get(key) ?? 0) + 1);
+    }
+
+    const accepted = recovered.filter((row) => {
+      const key = Math.abs(Number(row.amount) || 0).toFixed(2);
+      const room = (capacity.get(key) ?? 0) - (used.get(key) ?? 0);
+      if (room <= 0) return false;
+      used.set(key, (used.get(key) ?? 0) + 1);
+      return true;
+    });
+    if (accepted.length === 0) break;
+
+    extra.push(...accepted);
+    pending = uncoveredEntries(entries, [...input.rows, ...extra]);
+  }
+
+  if (pending.length > 0) {
+    console.warn(
+      `[ia ${input.log.requestId}] ${pending.length} linha(s) seguiram sem lançamento ` +
+        `depois das passadas de recuperação:\n` +
+        pending.map((entry) => `  · ${entry.text}`).join("\n"),
+    );
+  }
+
+  return { extra, missing: pending.map((entry) => entry.text) };
 }
 
 /** Processa o próximo lote pendente da importação. Uma requisição por chamada. */
@@ -199,11 +256,17 @@ export async function processNextBatch(
     totalBatches: job.batches.length,
   };
 
-  const rows = await extractRows({
+  const categories = await categoryHints(input.profileId);
+  const rows = await extractRows({ text: batch.text, categories, log });
+
+  // Confere o que ficou de fora e pede de novo, só as linhas faltantes.
+  const { extra, missing } = await recoverMissingRows({
     text: batch.text,
-    categories: await categoryHints(input.profileId),
+    rows,
+    categories,
     log,
   });
+  rows.push(...extra);
 
   // Só avança depois do sucesso: se a requisição falhar, o mesmo lote é
   // reprocessado no próximo clique em vez de ser pulado.
@@ -231,6 +294,7 @@ export async function processNextBatch(
   // explica, no log, por que uma linha chegou marcada na tela.
   console.info(
     `[ia ${log.requestId}] conferência: lançamentos=${checked.length} ` +
+      `recuperados=${extra.length} linhas_sem_lançamento=${missing.length} ` +
       `valor_não_encontrado=${checked.filter((row) => !row.amountFound).length} ` +
       `duplicados=${checked.filter((row) => row.duplicateOf).length}`,
   );
@@ -240,5 +304,7 @@ export async function processNextBatch(
     batchNumber: job.nextIndex,
     totalBatches: job.batches.length,
     done,
+    recovered: extra.length,
+    missing: missing.length,
   };
 }

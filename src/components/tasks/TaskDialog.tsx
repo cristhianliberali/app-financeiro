@@ -61,6 +61,7 @@ import {
 import { LabelPicker } from "./LabelPicker";
 import { PrioritySelect } from "./PriorityPicker";
 import { RichTextEditor, RichTextView } from "./RichText";
+import { TaskAttachments } from "./TaskAttachments";
 import { TaskReminders } from "./TaskReminders";
 import { UserAvatar, UserMultiSelect, UserSelect } from "./UserPicker";
 
@@ -683,6 +684,8 @@ export function TaskDialog({
                 })}
               </div>
             </div>
+
+            <TaskAttachments taskId={task.id} canEdit={canEdit} />
 
             <TaskReminders
               taskId={task.id}

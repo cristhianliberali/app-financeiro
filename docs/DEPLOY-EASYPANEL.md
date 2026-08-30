@@ -87,6 +87,7 @@ PROVEDOR_IA=openai
 MODELO_IA=gpt-4o-mini
 OPENAI_API_KEY=<opcional, segredo>
 LIMITE_TOKENS=12000
+LIMITE_LANCAMENTOS_LOTE=40
 LOG_IA=true
 SMTP_HOST=<opcional>
 SMTP_PORT=587
@@ -94,6 +95,12 @@ SMTP_USER=<opcional>
 SMTP_PASSWORD=<opcional, segredo>
 SMTP_FROM=nao-responda@seudominio.com
 SMTP_FROM_NAME=Aura Finanças
+S3_BUCKET=<opcional>
+S3_ACCESS_KEY_ID=<opcional, segredo>
+S3_SECRET_ACCESS_KEY=<opcional, segredo>
+S3_ENDPOINT=<opcional, para MinIO/R2/B2>
+S3_REGION=us-east-1
+S3_MAX_UPLOAD_MB=50
 PORT=3000
 HOST=0.0.0.0
 NODE_ENV=production
@@ -124,6 +131,7 @@ interna `5432` — assim o tráfego não sai para a internet.
 | `MODELO_IA` | runtime | não | Modelo usado nas requisições de importação (ex.: `gpt-4o-mini`) |
 | `OPENAI_API_KEY` | runtime | não | Chave do provedor. Sem ela a importação por IA fica indisponível. **Segredo** |
 | `LIMITE_TOKENS` | runtime | não | Tokens do documento por requisição (padrão `12000`); acima disso vira lote |
+| `LIMITE_LANCAMENTOS_LOTE` | runtime | não | Lançamentos por requisição (padrão `40`). Lote grande faz o modelo pular linhas; baixe para `20`–`25` se ainda faltar lançamento |
 | `LOG_IA` | runtime | não | Registra no log do container o que foi enviado à IA e o que ela devolveu (padrão `true`) |
 | `LOG_IA_CORPO` | runtime | não | `false` registra só modelo, tokens e duração, sem prompt nem resposta (padrão `true`) |
 | `LOG_IA_LIMITE_CARACTERES` | runtime | não | Teto de caracteres de cada trecho registrado (padrão `2000`) |
@@ -135,6 +143,14 @@ interna `5432` — assim o tráfego não sai para a internet.
 | `SMTP_FROM` | runtime | não | Endereço remetente (padrão: o valor de `SMTP_USER`) |
 | `SMTP_FROM_NAME` | runtime | não | Nome exibido no remetente (padrão `Aura Finanças`) |
 | `SMTP_TLS_REJECT_UNAUTHORIZED` | runtime | não | `false` aceita certificado autoassinado (padrão `true`) |
+| `S3_BUCKET` | runtime | não | Bucket dos anexos de tarefa. Sem ele, os anexos ficam indisponíveis |
+| `S3_ACCESS_KEY_ID` | runtime | não | Chave de acesso do bucket. **Segredo** |
+| `S3_SECRET_ACCESS_KEY` | runtime | não | Segredo da chave de acesso. **Segredo** |
+| `S3_ENDPOINT` | runtime | não | Endpoint do serviço compatível (MinIO, R2, B2…). Vazio usa a AWS |
+| `S3_REGION` | runtime | não | Região do bucket (padrão `us-east-1`) |
+| `S3_FORCE_PATH_STYLE` | runtime | não | `true` para `host/bucket/chave`. Em branco, segue o endpoint |
+| `S3_MAX_UPLOAD_MB` | runtime | não | Teto por arquivo em MB (padrão `50`) |
+| `S3_URL_TTL_SEGUNDOS` | runtime | não | Validade das URLs assinadas (padrão `900`) |
 | `PORT` | runtime | não | Porta do servidor (padrão `3000`) |
 | `HOST` | runtime | sim | Precisa ser `0.0.0.0` para o proxy alcançar |
 
@@ -273,10 +289,47 @@ docker run --rm -p 3000:3000 \
 | `502 Bad Gateway` no EasyPanel | `HOST` diferente de `0.0.0.0`, ou porta do domínio diferente de `PORT` |
 | `403 Forbidden` ao salvar transações | `APP_URL` não bate com o domínio de onde a página foi aberta |
 | Importação por IA aparece desabilitada na tela | Falta `MODELO_IA` ou `OPENAI_API_KEY` |
+| A tela avisa "N linhas do documento não viraram lançamento" | O modelo não devolveu essas linhas nem quando o servidor cobrou. Baixe `LIMITE_LANCAMENTOS_LOTE` ou use um modelo melhor em `MODELO_IA`; o log do container lista as linhas |
+| "A resposta da IA foi cortada por tamanho" | O lote pede mais lançamentos do que cabem na resposta: baixe `LIMITE_LANCAMENTOS_LOTE` |
 | `PROVEDOR_IA "x" não é suportado` | Só `openai` é aceito hoje |
 | "Envio de e-mail não configurado" na troca de e-mail ou na redefinição de senha | Falta `SMTP_HOST` (e as demais `SMTP_*`) |
 | E-mail não chega e o log mostra erro de certificado | SMTP interno com certificado autoassinado: use `SMTP_TLS_REJECT_UNAUTHORIZED=false` |
 | Link de redefinição de senha aponta para `localhost` | Falta `APP_URL` com o domínio público |
+| "O armazenamento de arquivos não está configurado" na tarefa | Faltam `S3_BUCKET`, `S3_ACCESS_KEY_ID` ou `S3_SECRET_ACCESS_KEY` |
+| "O navegador não conseguiu enviar o arquivo ao armazenamento" | CORS do bucket não libera o domínio do app — veja a seção CORS acima |
+| Anexo envia mas não aparece a miniatura | Endpoint acessível pelo servidor mas não pelo navegador, ou `S3_FORCE_PATH_STYLE` errado |
+
+---
+
+## CORS do bucket de anexos
+
+O arquivo vai do navegador **direto** para o bucket, com uma URL que este
+servidor assina — nada trafega pelo container, então um vídeo grande não ocupa
+memória nem estoura tempo de requisição. Em troca, o bucket precisa aceitar o
+domínio do app:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://financas.seudominio.com"],
+    "AllowedMethods": ["PUT", "GET", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }
+]
+```
+
+- **AWS S3**: bucket → Permissions → Cross-origin resource sharing (CORS).
+- **MinIO**: `mc admin config set` ou a variável de CORS do serviço.
+- **Cloudflare R2**: bucket → Settings → CORS policy.
+
+Mantenha o bucket **privado**. A leitura também é por URL assinada com prazo
+(`S3_URL_TTL_SEGUNDOS`), e é assim que imagem, vídeo e PDF aparecem na tarefa —
+essas cargas não passam por CORS, só o envio.
+
+Se o envio falhar com "o navegador não conseguiu enviar o arquivo", é CORS: a
+resposta do bucket ao *preflight* não liberou o domínio.
 
 ---
 

@@ -29,6 +29,8 @@ export type AiLogContext = {
   /** Lote atual e total, quando o documento foi dividido. */
   batch: number;
   totalBatches: number;
+  /** 0 (ou ausente) é a extração; acima disso, a passada de recuperação. */
+  attempt?: number;
 };
 
 export function newRequestId(): string {
@@ -44,7 +46,8 @@ function clip(text: string, maxChars: number): string {
 function tag(context: AiLogContext): string {
   return (
     `[ia ${context.requestId}] usuário=${context.userId} perfil=${context.profileId} ` +
-    `importação=${context.importId} lote=${context.batch}/${context.totalBatches}`
+    `importação=${context.importId} lote=${context.batch}/${context.totalBatches}` +
+    (context.attempt ? ` recuperação=${context.attempt}` : "")
   );
 }
 
