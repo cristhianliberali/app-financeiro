@@ -65,7 +65,12 @@ const ROW_SCHEMA = {
   },
 } as const;
 
-function buildSystemPrompt(categories: CategoryHint[], today: string): string {
+function buildSystemPrompt(
+  categories: CategoryHint[],
+  today: string,
+  /** Segunda passada: só as linhas que ficaram de fora da primeira. */
+  recovery: boolean,
+): string {
   const list = categories.length
     ? categories
         .map((c) =>
@@ -74,13 +79,28 @@ function buildSystemPrompt(categories: CategoryHint[], today: string): string {
         .join("\n")
     : "- Outros";
 
+  const recoveryRules = recovery
+    ? [
+        "",
+        "Estas linhas ficaram de fora da extração anterior deste mesmo documento.",
+        "Devolva um lançamento para cada linha que for de fato um lançamento.",
+        "Se alguma linha for total, saldo, limite, resumo ou cabeçalho, simplesmente não a devolva.",
+        "Cada linha vem completa: quando a descrição estava quebrada em duas, as duas já foram juntadas.",
+      ]
+    : [];
+
   return [
     "Você extrai lançamentos financeiros de faturas de cartão e extratos bancários brasileiros.",
     `Hoje é ${today}.`,
+    ...recoveryRules,
     "",
     "Regras:",
     "- Uma linha de saída para cada lançamento do documento. Não invente lançamentos.",
-    "- Copie os valores exatamente como aparecem, convertidos para número (1.234,56 vira 1234.56).",
+    "- Devolva TODOS os lançamentos, do primeiro ao último. Não resuma, não agrupe e não pare no meio:",
+    "  uma linha do documento que ficar sem lançamento é um erro.",
+    "- Copie os valores exatamente como aparecem, convertidos para número.",
+    "- O documento pode usar vírgula ou ponto como separador decimal: o separador dos centavos é",
+    '  sempre o último. "1.234,56" e "1,234.56" são o mesmo valor, 1234.56.',
     "- Valores sempre positivos: use kind=expense para gastos e kind=income para créditos, estornos e recebimentos.",
     "- Datas em YYYY-MM-DD. Quando o documento traz só dia e mês, use o ano mais provável em relação a hoje.",
     "",
@@ -108,12 +128,18 @@ export async function extractRows(input: {
   categories: CategoryHint[];
   /** Quem pediu; vai para o log das duas pontas da requisição. */
   log: AiLogContext;
+  /** Segunda passada, com as linhas que a primeira deixou passar. */
+  recovery?: boolean;
 }): Promise<ExtractedRow[]> {
   const settings = getAiSettings();
   const { default: OpenAI } = await import("openai");
   const client = new OpenAI({ apiKey: settings.apiKey });
 
-  const systemPrompt = buildSystemPrompt(input.categories, new Date().toISOString().slice(0, 10));
+  const systemPrompt = buildSystemPrompt(
+    input.categories,
+    new Date().toISOString().slice(0, 10),
+    input.recovery ?? false,
+  );
 
   logAiRequest(input.log, {
     provider: settings.provider,
@@ -143,13 +169,36 @@ export async function extractRows(input: {
   }
   const durationMs = Date.now() - startedAt;
 
-  const content = response.choices[0]?.message?.content;
+  const choice = response.choices[0];
+
+  // Resposta cortada no meio: o JSON chega inválido e, pior, faltando
+  // lançamentos. Vale mais dizer isso do que estourar um erro de parse.
+  if (choice?.finish_reason === "length") {
+    logAiResponse(input.log, {
+      model: response.model ?? settings.model,
+      durationMs,
+      rows: 0,
+      content: choice.message?.content ?? "",
+      usage: response.usage ?? null,
+    });
+    throw new Error(
+      "A resposta da IA foi cortada por tamanho — o lote tem lançamentos demais. " +
+        "Reduza LIMITE_LANCAMENTOS_LOTE no servidor e envie o documento de novo.",
+    );
+  }
+
+  if (choice?.message?.refusal) {
+    logAiError(input.log, new Error(choice.message.refusal), durationMs);
+    throw new Error(`A IA recusou a extração: ${choice.message.refusal}`);
+  }
+
+  const content = choice?.message?.content;
   if (!content) {
     logAiResponse(input.log, {
       model: response.model ?? settings.model,
       durationMs,
       rows: 0,
-      content: JSON.stringify(response.choices[0] ?? null),
+      content: JSON.stringify(choice ?? null),
       usage: response.usage ?? null,
     });
     throw new Error("A IA não devolveu nenhum lançamento.");

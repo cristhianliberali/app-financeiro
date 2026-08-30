@@ -64,6 +64,8 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [batchesDone, setBatchesDone] = useState(0);
   const [rows, setRows] = useState<Draft[]>([]);
+  /** Conferência do servidor: o que foi recuperado e o que ficou sem lançamento. */
+  const [coverage, setCoverage] = useState({ recovered: 0, missing: 0 });
 
   useEffect(() => {
     if (open) return;
@@ -73,6 +75,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
     setSummary(null);
     setBatchesDone(0);
     setRows([]);
+    setCoverage({ recovered: 0, missing: 0 });
   }, [open]);
 
   function toDraft(row: ParsedRow): Draft {
@@ -123,6 +126,10 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
       const result = await processBatch({ data: { importId, profileId } });
       setRows((prev) => [...prev, ...result.rows.map(toDraft)]);
       setBatchesDone(result.batchNumber);
+      setCoverage((prev) => ({
+        recovered: prev.recovered + result.recovered,
+        missing: prev.missing + result.missing,
+      }));
       if (result.rows.length === 0) {
         toast.warning(`Lote ${result.batchNumber} não trouxe lançamentos.`);
       } else {
@@ -274,6 +281,24 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
               </p>
             )}
 
+            {coverage.recovered > 0 && (
+              <p className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 p-2.5 text-xs text-muted-foreground">
+                <Sparkles className="size-4 shrink-0" />
+                {coverage.recovered === 1
+                  ? "1 lançamento tinha ficado de fora da resposta da IA e foi recuperado numa segunda passada."
+                  : `${coverage.recovered} lançamentos tinham ficado de fora da resposta da IA e foram recuperados numa segunda passada.`}
+              </p>
+            )}
+
+            {coverage.missing > 0 && (
+              <p className="flex items-center gap-2 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-xs">
+                <AlertTriangle className="size-4 shrink-0 text-negative" />
+                {coverage.missing === 1
+                  ? "1 linha do documento tem data e valor mas não virou lançamento. Confira a fatura antes de lançar."
+                  : `${coverage.missing} linhas do documento têm data e valor mas não viraram lançamento. Confira a fatura antes de lançar.`}
+              </p>
+            )}
+
             {unverified > 0 && (
               <p className="flex items-center gap-2 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-xs">
                 <AlertTriangle className="size-4 shrink-0 text-negative" />
@@ -385,6 +410,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                 setRows([]);
                 setSummary(null);
                 setBatchesDone(0);
+                setCoverage({ recovered: 0, missing: 0 });
               }}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
             >

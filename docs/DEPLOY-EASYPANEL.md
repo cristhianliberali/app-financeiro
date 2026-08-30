@@ -87,6 +87,7 @@ PROVEDOR_IA=openai
 MODELO_IA=gpt-4o-mini
 OPENAI_API_KEY=<opcional, segredo>
 LIMITE_TOKENS=12000
+LIMITE_LANCAMENTOS_LOTE=40
 LOG_IA=true
 SMTP_HOST=<opcional>
 SMTP_PORT=587
@@ -124,6 +125,7 @@ interna `5432` — assim o tráfego não sai para a internet.
 | `MODELO_IA` | runtime | não | Modelo usado nas requisições de importação (ex.: `gpt-4o-mini`) |
 | `OPENAI_API_KEY` | runtime | não | Chave do provedor. Sem ela a importação por IA fica indisponível. **Segredo** |
 | `LIMITE_TOKENS` | runtime | não | Tokens do documento por requisição (padrão `12000`); acima disso vira lote |
+| `LIMITE_LANCAMENTOS_LOTE` | runtime | não | Lançamentos por requisição (padrão `40`). Lote grande faz o modelo pular linhas; baixe para `20`–`25` se ainda faltar lançamento |
 | `LOG_IA` | runtime | não | Registra no log do container o que foi enviado à IA e o que ela devolveu (padrão `true`) |
 | `LOG_IA_CORPO` | runtime | não | `false` registra só modelo, tokens e duração, sem prompt nem resposta (padrão `true`) |
 | `LOG_IA_LIMITE_CARACTERES` | runtime | não | Teto de caracteres de cada trecho registrado (padrão `2000`) |
@@ -273,6 +275,8 @@ docker run --rm -p 3000:3000 \
 | `502 Bad Gateway` no EasyPanel | `HOST` diferente de `0.0.0.0`, ou porta do domínio diferente de `PORT` |
 | `403 Forbidden` ao salvar transações | `APP_URL` não bate com o domínio de onde a página foi aberta |
 | Importação por IA aparece desabilitada na tela | Falta `MODELO_IA` ou `OPENAI_API_KEY` |
+| A tela avisa "N linhas do documento não viraram lançamento" | O modelo não devolveu essas linhas nem quando o servidor cobrou. Baixe `LIMITE_LANCAMENTOS_LOTE` ou use um modelo melhor em `MODELO_IA`; o log do container lista as linhas |
+| "A resposta da IA foi cortada por tamanho" | O lote pede mais lançamentos do que cabem na resposta: baixe `LIMITE_LANCAMENTOS_LOTE` |
 | `PROVEDOR_IA "x" não é suportado` | Só `openai` é aceito hoje |
 | "Envio de e-mail não configurado" na troca de e-mail ou na redefinição de senha | Falta `SMTP_HOST` (e as demais `SMTP_*`) |
 | E-mail não chega e o log mostra erro de certificado | SMTP interno com certificado autoassinado: use `SMTP_TLS_REJECT_UNAUTHORIZED=false` |

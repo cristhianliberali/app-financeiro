@@ -30,6 +30,10 @@ export type BatchResult = {
   batchNumber: number;
   totalBatches: number;
   done: boolean;
+  /** Lançamentos que a IA só devolveu quando o servidor cobrou o que faltava. */
+  recovered: number;
+  /** Linhas com data e valor que continuaram sem lançamento. */
+  missing: number;
 };
 
 /** Extensões que o servidor sabe converter em texto. */

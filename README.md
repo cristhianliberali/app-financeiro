@@ -21,6 +21,14 @@ Toda requisição de IA fica registrada no log do servidor — o prompt enviado 
 resposta crua —, para conferir depois o que o modelo recebeu e o que devolveu.
 Ligado por padrão, ajustável em `LOG_IA*` (veja `.env.example`).
 
+Numa fatura com muitos lançamentos o modelo pula linhas sem avisar, então o
+servidor confere: toda linha do documento com data e valor precisa ter um
+lançamento correspondente. As que faltarem voltam para o modelo numa segunda
+passada, só elas; o que ainda assim não voltar é mostrado na tela como aviso, em
+vez de sumir. O documento também é dividido em lotes por número de lançamentos
+(`LIMITE_LANCAMENTOS_LOTE`), que é o que mantém a resposta curta o bastante para
+o modelo transcrever tudo.
+
 Lista de transações recentes e filtro por categoria, paginada com seletor de
 10 / 50 / 100 registros por página.
 

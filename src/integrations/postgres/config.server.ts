@@ -114,6 +114,12 @@ export type AiSettings = {
   model: string;
   /** Teto de tokens do documento por requisição; acima disso, vira lote. */
   tokenLimit: number;
+  /**
+   * Teto de lançamentos por requisição. É o limite que importa numa fatura
+   * grande: pedir uma centena de lançamentos de uma vez faz o modelo pular
+   * linhas — e ele não avisa quando pula.
+   */
+  entryLimit: number;
   apiKey: string;
 };
 
@@ -148,6 +154,7 @@ export function getAiSettings(): AiSettings {
     // O teto é do texto do documento, não da resposta: o que passar disso é
     // dividido em lotes processados um por vez.
     tokenLimit: readInt("LIMITE_TOKENS", 12_000),
+    entryLimit: readInt("LIMITE_LANCAMENTOS_LOTE", 40),
   };
 }
 
