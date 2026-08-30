@@ -30,7 +30,18 @@ export type Category = {
   monthly_cap: number | null;
   /** Palavras-chave da fatura; vão junto na importação por IA. */
   description: string | null;
+  /**
+   * Categoria arquivada: continua aparecendo nos relatórios do que já foi
+   * lançado, mas não é oferecida para lançamento novo. Substitui a exclusão,
+   * que deixaria os lançamentos antigos sem categoria.
+   */
+  archived_at: string | null;
 };
+
+/** As que ainda recebem lançamento — o filtro de todo seletor de categoria. */
+export function activeCategories(categories: Category[]): Category[] {
+  return categories.filter((category) => !category.archived_at);
+}
 
 export type Transaction = {
   id: string;

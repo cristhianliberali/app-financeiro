@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Clock, Pause, Play, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { PaginationBar, usePagination } from "@/components/PaginationBar";
 import { useNow } from "@/hooks/use-now";
 import { useTone } from "@/hooks/use-tone";
 import { useAppState } from "@/lib/app-state";
@@ -125,10 +126,15 @@ export function TaskListView({
     );
   }, [filtered, sort, now]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Pagina a lista já ordenada e só então agrupa: o agrupamento é da página
+  // exibida, e a contagem do rodapé bate com o total filtrado.
+  const pagination = usePagination(sorted, "aura.tarefas.lista.pageSize");
+
   const groups = useMemo(() => {
-    if (group === "none") return [{ key: "", label: "", items: sorted }];
+    const page = pagination.visible;
+    if (group === "none") return [{ key: "", label: "", items: page }];
     const map = new Map<string, Task[]>();
-    for (const task of sorted) {
+    for (const task of page) {
       const label =
         group === "status"
           ? (task.status?.name ?? "Sem status")
@@ -144,7 +150,7 @@ export function TaskListView({
     return [...map.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([label, items]) => ({ key: label, label, items }));
-  }, [sorted, group]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pagination.visible, group]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const header = (key: SortKey, label: string, className = "") => (
     <th className={`px-3 py-2 text-left font-medium ${className}`}>
@@ -234,145 +240,152 @@ export function TaskListView({
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-        <table className="w-full min-w-[62rem] text-sm">
-          <thead className="border-b border-border text-xs text-muted-foreground">
-            <tr>
-              {header("title", "Tarefa")}
-              {header("status", "Status")}
-              {header("priority", "Prioridade")}
-              {header("responsible", "Responsável")}
-              {header("start", "Início")}
-              {header("due", "Prazo")}
-              {header("tracked", "Tempo / estimativa")}
-              <th className="px-3 py-2 text-left font-medium">Participantes</th>
-              <th className="w-10 px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {groups.map((g) => (
-              <Fragment key={`grp-${g.key}`}>
-                {g.label && (
-                  <tr className="bg-secondary/40">
-                    <td colSpan={9} className="px-3 py-1.5 text-xs font-semibold">
-                      {g.label} · {g.items.length}
-                    </td>
-                  </tr>
-                )}
-                {g.items.map((task) => {
-                  const state = deadlineState({
-                    due_date: task.due_date,
-                    polarity: task.status?.polarity ?? null,
-                  });
-                  const seconds = secondsOf(task);
-                  const isMine = task.running?.user_id === currentUserId;
-                  return (
-                    <tr
-                      key={task.id}
-                      className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-secondary/40"
-                      onClick={() => onOpen(task)}
-                    >
-                      <td className="px-3 py-2">
-                        <p className="font-medium">{task.title}</p>
-                        {showBoard && (
-                          <p className="text-[11px] text-muted-foreground">
-                            {task.space.icon} {task.space.name} › {task.board.name}
-                          </p>
-                        )}
-                        {task.labels.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {task.labels.map((label) => (
-                              <LabelChip key={label.id} label={label} />
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border px-2 py-0.5 text-xs">
-                          <span
-                            className="size-1.5 rounded-full ring-1 ring-border"
-                            style={{ backgroundColor: tone(task.status?.color ?? "#8A8A8A") }}
-                          />
-                          {task.status?.name ?? "—"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2">
-                        {task.priority === "none" ? (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        ) : (
-                          <PriorityBadge priority={task.priority} />
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className="flex items-center gap-1.5">
-                          <UserAvatar
-                            user={users.find((u) => u.user_id === task.responsible_user_id) ?? null}
-                            size={20}
-                          />
-                          <span className="hidden truncate text-xs lg:inline">
-                            {nameOf(task.responsible_user_id)}
-                          </span>
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
-                        {formatDateTimeBR(task.start_date, false)}
-                      </td>
-                      <td className={`whitespace-nowrap px-3 py-2 text-xs ${deadlineClass(state)}`}>
-                        {formatDateTimeBR(task.due_date, false)}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 font-mono text-xs tabular-nums">
-                        {task.running ? formatClock(seconds) : formatDuration(seconds)}
-                        {task.estimate_hours ? (
-                          <span
-                            className={estimateClass(estimateState(task.estimate_hours, seconds))}
-                          >
-                            {" / "}
-                            {formatHours(task.estimate_hours)}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="px-3 py-2">
-                        {task.participants.length > 0 ? (
-                          <UserStack ids={task.participants} users={users} max={3} size={20} />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleTimer(task);
-                          }}
-                          className={`rounded-full p-1 transition-colors hover:bg-secondary ${
-                            task.running && isMine ? "text-foreground" : "text-muted-foreground"
-                          }`}
-                          aria-label={
-                            task.running && isMine ? "Pausar cronômetro" : "Iniciar cronômetro"
-                          }
-                        >
-                          {task.running && isMine ? (
-                            <Pause className="size-3.5" />
-                          ) : (
-                            <Play className="size-3.5" />
-                          )}
-                        </button>
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[62rem] text-sm">
+            <thead className="border-b border-border text-xs text-muted-foreground">
+              <tr>
+                {header("title", "Tarefa")}
+                {header("status", "Status")}
+                {header("priority", "Prioridade")}
+                {header("responsible", "Responsável")}
+                {header("start", "Início")}
+                {header("due", "Prazo")}
+                {header("tracked", "Tempo / estimativa")}
+                <th className="px-3 py-2 text-left font-medium">Participantes</th>
+                <th className="w-10 px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {groups.map((g) => (
+                <Fragment key={`grp-${g.key}`}>
+                  {g.label && (
+                    <tr className="bg-secondary/40">
+                      <td colSpan={9} className="px-3 py-1.5 text-xs font-semibold">
+                        {g.label} · {g.items.length}
                       </td>
                     </tr>
-                  );
-                })}
-              </Fragment>
-            ))}
-            {sorted.length === 0 && (
-              <tr>
-                <td colSpan={9} className="px-3 py-10 text-center text-sm text-muted-foreground">
-                  <Clock className="mx-auto mb-2 size-5 opacity-40" />
-                  Nenhuma tarefa encontrada com os filtros atuais.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                  )}
+                  {g.items.map((task) => {
+                    const state = deadlineState({
+                      due_date: task.due_date,
+                      polarity: task.status?.polarity ?? null,
+                    });
+                    const seconds = secondsOf(task);
+                    const isMine = task.running?.user_id === currentUserId;
+                    return (
+                      <tr
+                        key={task.id}
+                        className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-secondary/40"
+                        onClick={() => onOpen(task)}
+                      >
+                        <td className="px-3 py-2">
+                          <p className="font-medium">{task.title}</p>
+                          {showBoard && (
+                            <p className="text-[11px] text-muted-foreground">
+                              {task.space.icon} {task.space.name} › {task.board.name}
+                            </p>
+                          )}
+                          {task.labels.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {task.labels.map((label) => (
+                                <LabelChip key={label.id} label={label} />
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border px-2 py-0.5 text-xs">
+                            <span
+                              className="size-1.5 rounded-full ring-1 ring-border"
+                              style={{ backgroundColor: tone(task.status?.color ?? "#8A8A8A") }}
+                            />
+                            {task.status?.name ?? "—"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          {task.priority === "none" ? (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          ) : (
+                            <PriorityBadge priority={task.priority} />
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className="flex items-center gap-1.5">
+                            <UserAvatar
+                              user={
+                                users.find((u) => u.user_id === task.responsible_user_id) ?? null
+                              }
+                              size={20}
+                            />
+                            <span className="hidden truncate text-xs lg:inline">
+                              {nameOf(task.responsible_user_id)}
+                            </span>
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
+                          {formatDateTimeBR(task.start_date, false)}
+                        </td>
+                        <td
+                          className={`whitespace-nowrap px-3 py-2 text-xs ${deadlineClass(state)}`}
+                        >
+                          {formatDateTimeBR(task.due_date, false)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 font-mono text-xs tabular-nums">
+                          {task.running ? formatClock(seconds) : formatDuration(seconds)}
+                          {task.estimate_hours ? (
+                            <span
+                              className={estimateClass(estimateState(task.estimate_hours, seconds))}
+                            >
+                              {" / "}
+                              {formatHours(task.estimate_hours)}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2">
+                          {task.participants.length > 0 ? (
+                            <UserStack ids={task.participants} users={users} max={3} size={20} />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onToggleTimer(task);
+                            }}
+                            className={`rounded-full p-1 transition-colors hover:bg-secondary ${
+                              task.running && isMine ? "text-foreground" : "text-muted-foreground"
+                            }`}
+                            aria-label={
+                              task.running && isMine ? "Pausar cronômetro" : "Iniciar cronômetro"
+                            }
+                          >
+                            {task.running && isMine ? (
+                              <Pause className="size-3.5" />
+                            ) : (
+                              <Play className="size-3.5" />
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </Fragment>
+              ))}
+              {sorted.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-3 py-10 text-center text-sm text-muted-foreground">
+                    <Clock className="mx-auto mb-2 size-5 opacity-40" />
+                    Nenhuma tarefa encontrada com os filtros atuais.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <PaginationBar pagination={pagination} itemLabel="tarefas" />
       </div>
     </div>
   );

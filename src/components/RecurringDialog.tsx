@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/date-field";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -12,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAppState } from "@/lib/app-state";
-import { useCategories, useRecurring, useRemove, useUpsert } from "@/lib/data";
+import { activeCategories, useCategories, useRecurring, useRemove, useUpsert } from "@/lib/data";
 import { brl, toISODate } from "@/lib/format";
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void };
@@ -120,7 +121,7 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
               className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
             >
               <option value="">Sem categoria</option>
-              {categories
+              {activeCategories(categories)
                 .filter((c) => c.kind === form.kind)
                 .map((c) => (
                   <option key={c.id} value={c.id}>
@@ -131,7 +132,7 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
           </div>
           <div className="space-y-1.5">
             <Label>Início</Label>
-            <Input
+            <DateField
               type="date"
               value={form.start_date}
               onChange={(e) => setForm({ ...form, start_date: e.target.value })}
@@ -151,7 +152,11 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
                   {r.description}
                   <span className="ml-2 text-xs text-muted-foreground">
                     dia {r.day_of_month} ·{" "}
-                    {r.frequency === "monthly" ? "mensal" : r.frequency === "weekly" ? "semanal" : "anual"}
+                    {r.frequency === "monthly"
+                      ? "mensal"
+                      : r.frequency === "weekly"
+                        ? "semanal"
+                        : "anual"}
                   </span>
                 </span>
                 <span className="flex items-center gap-3">

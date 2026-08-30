@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -13,15 +13,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 /**
- * Confirmação de exclusão para itens que levam conteúdo junto — espaços e
- * quadros. Apagar um espaço derruba em cascata seus quadros e tarefas, então
- * não basta um "tem certeza?": é preciso digitar o nome exato do item.
+ * Confirmação para ações que não têm volta e levam conteúdo junto — excluir um
+ * espaço derruba em cascata seus quadros e tarefas, arquivar uma categoria a
+ * tira de todos os lançamentos futuros. Nesses casos não basta um "tem
+ * certeza?": é preciso digitar o nome exato do item.
  */
 export function ConfirmDeleteDialog({
   open,
   onOpenChange,
   itemLabel,
   itemName,
+  title,
   description,
   consequences,
   confirmLabel = "Excluir definitivamente",
@@ -33,7 +35,9 @@ export function ConfirmDeleteDialog({
   itemLabel: string;
   /** Nome que o usuário precisa digitar para liberar o botão. */
   itemName: string;
-  description?: string;
+  /** Título do diálogo. O padrão é "Excluir {itemLabel}". */
+  title?: string;
+  description?: ReactNode;
   /** O que será perdido junto, listado item a item. */
   consequences?: string[];
   confirmLabel?: string;
@@ -73,7 +77,7 @@ export function ConfirmDeleteDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="size-4 text-negative" />
-            Excluir {itemLabel}
+            {title ?? `Excluir ${itemLabel}`}
           </DialogTitle>
         </DialogHeader>
 

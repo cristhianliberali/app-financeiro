@@ -16,6 +16,7 @@ import { Route as ContaRouteImport } from './routes/conta'
 import { Route as ConviteRouteImport } from './routes/convite'
 import { Route as InvestimentosRouteImport } from './routes/investimentos'
 import { Route as MetasRouteImport } from './routes/metas'
+import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
 import { Route as TransacoesRouteImport } from './routes/transacoes'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as TarefasIndexRouteImport } from './routes/tarefas/index'
@@ -58,6 +59,11 @@ const InvestimentosRoute = InvestimentosRouteImport.update({
 const MetasRoute = MetasRouteImport.update({
   id: '/metas',
   path: '/metas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RedefinirSenhaRoute = RedefinirSenhaRouteImport.update({
+  id: '/redefinir-senha',
+  path: '/redefinir-senha',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TransacoesRoute = TransacoesRouteImport.update({
@@ -109,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/convite': typeof ConviteRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/transacoes': typeof TransacoesRoute
   '/api/health': typeof ApiHealthRoute
   '/tarefas/calendario': typeof TarefasCalendarioRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/convite': typeof ConviteRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/transacoes': typeof TransacoesRoute
   '/api/health': typeof ApiHealthRoute
   '/tarefas/calendario': typeof TarefasCalendarioRoute
@@ -144,6 +152,7 @@ export interface FileRoutesById {
   '/convite': typeof ConviteRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/transacoes': typeof TransacoesRoute
   '/api/health': typeof ApiHealthRoute
   '/tarefas/calendario': typeof TarefasCalendarioRoute
@@ -163,6 +172,7 @@ export interface FileRouteTypes {
     | '/convite'
     | '/investimentos'
     | '/metas'
+    | '/redefinir-senha'
     | '/transacoes'
     | '/api/health'
     | '/tarefas/calendario'
@@ -180,6 +190,7 @@ export interface FileRouteTypes {
     | '/convite'
     | '/investimentos'
     | '/metas'
+    | '/redefinir-senha'
     | '/transacoes'
     | '/api/health'
     | '/tarefas/calendario'
@@ -197,6 +208,7 @@ export interface FileRouteTypes {
     | '/convite'
     | '/investimentos'
     | '/metas'
+    | '/redefinir-senha'
     | '/transacoes'
     | '/api/health'
     | '/tarefas/calendario'
@@ -215,6 +227,7 @@ export interface RootRouteChildren {
   ConviteRoute: typeof ConviteRoute
   InvestimentosRoute: typeof InvestimentosRoute
   MetasRoute: typeof MetasRoute
+  RedefinirSenhaRoute: typeof RedefinirSenhaRoute
   TransacoesRoute: typeof TransacoesRoute
   ApiHealthRoute: typeof ApiHealthRoute
   TarefasCalendarioRoute: typeof TarefasCalendarioRoute
@@ -274,6 +287,13 @@ declare module '@tanstack/react-router' {
       path: '/metas'
       fullPath: '/metas'
       preLoaderRoute: typeof MetasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/redefinir-senha': {
+      id: '/redefinir-senha'
+      path: '/redefinir-senha'
+      fullPath: '/redefinir-senha'
+      preLoaderRoute: typeof RedefinirSenhaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/transacoes': {
@@ -343,6 +363,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConviteRoute: ConviteRoute,
   InvestimentosRoute: InvestimentosRoute,
   MetasRoute: MetasRoute,
+  RedefinirSenhaRoute: RedefinirSenhaRoute,
   TransacoesRoute: TransacoesRoute,
   ApiHealthRoute: ApiHealthRoute,
   TarefasCalendarioRoute: TarefasCalendarioRoute,

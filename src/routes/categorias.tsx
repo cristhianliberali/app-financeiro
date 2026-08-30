@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Archive, RotateCcw } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,8 +15,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAppState } from "@/lib/app-state";
-import { useCategories, useRemove, useUpsert, type Category } from "@/lib/data";
-import { brl } from "@/lib/format";
+import { useCategories, useUpsert, type Category } from "@/lib/data";
+import { brl, formatDateBR } from "@/lib/format";
 
 export const Route = createFileRoute("/categorias")({
   head: () => ({
@@ -50,9 +51,12 @@ function CategoriesPage() {
   const { profileId } = useAppState();
   const { data: categories = [] } = useCategories(profileId);
   const upsert = useUpsert("categories");
-  const remove = useRemove("categories");
   const [form, setForm] = useState(empty);
   const [open, setOpen] = useState(false);
+  const [archiving, setArchiving] = useState<Category | null>(null);
+
+  const active = useMemo(() => categories.filter((c) => !c.archived_at), [categories]);
+  const archived = useMemo(() => categories.filter((c) => c.archived_at), [categories]);
 
   function edit(c: Category) {
     setForm({
@@ -115,7 +119,7 @@ function CategoriesPage() {
         <div key={g.kind} className="rounded-2xl border border-border bg-card p-6">
           <h2 className="mb-4 font-bold">{g.title}</h2>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {categories
+            {active
               .filter((c) => c.kind === g.kind)
               .map((c) => (
                 <div
@@ -137,20 +141,91 @@ function CategoriesPage() {
                     </span>
                   </button>
                   <button
-                    onClick={() => remove.mutate(c.id)}
+                    onClick={() => setArchiving(c)}
                     className="text-muted-foreground transition-colors hover:text-destructive"
-                    aria-label={`Excluir ${c.name}`}
+                    aria-label={`Arquivar ${c.name}`}
+                    title="Arquivar categoria"
                   >
-                    <Trash2 className="size-4" />
+                    <Archive className="size-4" />
                   </button>
                 </div>
               ))}
-            {categories.filter((c) => c.kind === g.kind).length === 0 && (
+            {active.filter((c) => c.kind === g.kind).length === 0 && (
               <p className="text-sm text-muted-foreground">Nenhuma categoria cadastrada.</p>
             )}
           </div>
         </div>
       ))}
+
+      {archived.length > 0 && (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-6">
+          <h2 className="mb-1 font-bold">Categorias arquivadas</h2>
+          <p className="mb-4 text-xs text-muted-foreground">
+            Continuam nos relatórios e nos lançamentos antigos, mas não são oferecidas em
+            lançamentos novos, recorrências ou importação por IA. Reative quando quiser voltar a
+            usá-las.
+          </p>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {archived.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between rounded-xl border border-border p-4 opacity-70"
+              >
+                <span className="flex items-center gap-3">
+                  <span
+                    className="flex size-9 items-center justify-center rounded-lg text-sm grayscale"
+                    style={{ backgroundColor: `${c.color}20` }}
+                  >
+                    {c.emoji}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-medium">{c.name}</span>
+                    <span className="block text-[11px] text-muted-foreground">
+                      Arquivada em {formatDateBR(c.archived_at!.slice(0, 10))}
+                    </span>
+                  </span>
+                </span>
+                <button
+                  onClick={async () => {
+                    await upsert.mutateAsync({ id: c.id, archived_at: null });
+                    toast.success(`Categoria “${c.name}” reativada`);
+                  }}
+                  className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label={`Reativar ${c.name}`}
+                >
+                  <RotateCcw className="size-3.5" /> Reativar
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <ConfirmDeleteDialog
+        open={archiving !== null}
+        onOpenChange={(value) => !value && setArchiving(null)}
+        itemLabel="categoria"
+        itemName={archiving?.name ?? ""}
+        title="Arquivar categoria"
+        confirmLabel="Arquivar categoria"
+        description={
+          <>
+            A categoria <span className="font-semibold text-foreground">{archiving?.name}</span>{" "}
+            deixa de ser oferecida em lançamentos novos. Nada do histórico é apagado.
+          </>
+        }
+        consequences={[
+          "Continua aparecendo nos relatórios e nos lançamentos já registrados",
+          "Some das listas de nova transação, de recorrência e da importação por IA",
+          "Pode ser reativada a qualquer momento nesta mesma tela",
+        ]}
+        onConfirm={async () => {
+          const category = archiving!;
+          await upsert.mutateAsync({ id: category.id, archived_at: new Date().toISOString() });
+          toast.success(`Categoria “${category.name}” arquivada`);
+          setArchiving(null);
+        }}
+      />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">

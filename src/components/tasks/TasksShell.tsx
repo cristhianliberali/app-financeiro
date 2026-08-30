@@ -7,7 +7,6 @@ import {
   ChevronRight,
   Layers,
   LayoutDashboard,
-  LogOut,
   MoreVertical,
   PanelLeft,
   Pencil,
@@ -36,10 +35,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ModuleSwitcher } from "@/components/ModuleSwitcher";
+import { ProfileMenu } from "@/components/ProfileMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ActiveTimerBar } from "./ActiveTimerBar";
 import { BoardDialog } from "./BoardDialog";
-import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { NotificationBell } from "./NotificationBell";
 import { SpaceDialog } from "./SpaceDialog";
 import { TasksBreadcrumb } from "./TasksBreadcrumb";
@@ -77,7 +77,7 @@ export function TasksShell({
   boardId?: string | null;
   breadcrumbCurrent?: string;
 }) {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { accountId, setAccountId } = useAppState();
@@ -413,28 +413,16 @@ export function TasksShell({
           className={`space-y-2 border-t border-sidebar-border p-2 ${collapsed ? "flex flex-col items-center" : ""}`}
         >
           {collapsed ? (
-            <ThemeToggle compact />
+            <>
+              <ProfileMenu collapsed />
+              <ThemeToggle compact />
+            </>
           ) : (
-            <div className="flex items-center justify-between gap-2 px-1">
-              <span className="min-w-0 truncate text-xs text-muted-foreground" title={user.email}>
-                {user.email}
-              </span>
+            <div className="flex items-center gap-2">
+              <ProfileMenu />
               <ThemeToggle />
             </div>
           )}
-          <button
-            onClick={async () => {
-              await signOut();
-              navigate({ to: "/auth" });
-            }}
-            className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground ${
-              collapsed ? "justify-center" : "w-full"
-            }`}
-            title="Sair"
-          >
-            <LogOut className="size-4 shrink-0" />
-            {!collapsed && "Sair"}
-          </button>
         </div>
       </aside>
 

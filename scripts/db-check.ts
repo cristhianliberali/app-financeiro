@@ -12,6 +12,8 @@ import { getPool, query } from "../src/integrations/postgres/client.server";
 const EXPECTED_TABLES = [
   "app_users",
   "user_sessions",
+  "password_resets",
+  "email_change_requests",
   "accounts",
   "account_members",
   "account_invites",

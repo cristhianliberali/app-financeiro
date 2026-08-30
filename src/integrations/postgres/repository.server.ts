@@ -22,7 +22,18 @@ export const DATA_TABLES: DataTable[] = ["budget_profiles", ...PROFILE_TABLES];
 /** Colunas que o cliente pode gravar, por tabela. */
 const WRITABLE_COLUMNS: Record<DataTable, readonly string[]> = {
   budget_profiles: ["account_id", "name", "color", "is_default"],
-  categories: ["profile_id", "name", "kind", "color", "emoji", "monthly_cap", "description"],
+  categories: [
+    "profile_id",
+    "name",
+    "kind",
+    "color",
+    "emoji",
+    "monthly_cap",
+    "description",
+    // Arquivar/reativar é um UPDATE desta coluna: a categoria some das listas
+    // de lançamento novo, mas continua nos relatórios do que já foi lançado.
+    "archived_at",
+  ],
   transactions: [
     "profile_id",
     "category_id",
@@ -62,7 +73,12 @@ const WRITABLE_COLUMNS: Record<DataTable, readonly string[]> = {
 };
 
 const PROFILE_COLUMNS = "id, name, color, is_default";
-const CATEGORY_COLUMNS = "id, profile_id, name, kind, color, emoji, monthly_cap, description";
+// `archived_at` sai como texto ISO em UTC, e não como o `Date` que o driver
+// devolveria: é a mesma convenção do módulo de tarefas, e o front só trabalha
+// com ISO (que o Safari aceita em `new Date(...)`).
+const CATEGORY_COLUMNS =
+  "id, profile_id, name, kind, color, emoji, monthly_cap, description, " +
+  `to_char(archived_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS archived_at`;
 const TRANSACTION_COLUMNS =
   "id, profile_id, category_id, description, amount, kind, transaction_date, due_date, status, " +
   "installment_no, installment_total, installment_group, notes";
@@ -131,11 +147,18 @@ export async function listProfiles(userId: string, accountId: string) {
   });
 }
 
+/**
+ * Todas as categorias do perfil, arquivadas inclusive: os relatórios precisam
+ * do nome e da cor das arquivadas para exibir os lançamentos antigos. Quem
+ * oferece categoria para lançamento novo é que filtra por `archived_at`.
+ */
 export async function listCategories(userId: string, profileId: string) {
   await requireProfileAccess(userId, profileId, "viewer");
-  return query(`SELECT ${CATEGORY_COLUMNS} FROM categories WHERE profile_id = $1 ORDER BY name`, [
-    profileId,
-  ]);
+  return query(
+    `SELECT ${CATEGORY_COLUMNS} FROM categories WHERE profile_id = $1
+      ORDER BY archived_at NULLS FIRST, name`,
+    [profileId],
+  );
 }
 
 export async function listTransactions(

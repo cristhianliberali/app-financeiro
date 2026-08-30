@@ -15,6 +15,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/date-field";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -121,7 +122,9 @@ function InvestmentsPage() {
       <div className="rounded-2xl border border-border bg-card p-6">
         <h2 className="mb-6 font-bold">Rendimento estimado x real</h2>
         {chart.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Cadastre um investimento para ver o gráfico.</p>
+          <p className="text-sm text-muted-foreground">
+            Cadastre um investimento para ver o gráfico.
+          </p>
         ) : (
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -208,10 +211,7 @@ function InvestmentsPage() {
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-secondary">
-                  <div
-                    className="h-full bg-primary"
-                    style={{ width: `${Math.min(100, pct)}%` }}
-                  />
+                  <div className="h-full bg-primary" style={{ width: `${Math.min(100, pct)}%` }} />
                 </div>
               </div>
             );
@@ -232,15 +232,21 @@ function InvestmentsPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
               <Label>Nome</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <Input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Tipo</Label>
-              <Input value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} />
+              <Input
+                value={form.type}
+                onChange={(e) => setForm({ ...form, type: e.target.value })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Início</Label>
-              <Input
+              <DateField
                 type="date"
                 value={form.started_at}
                 onChange={(e) => setForm({ ...form, started_at: e.target.value })}

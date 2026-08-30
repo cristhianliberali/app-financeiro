@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useAuth, useAuthConfig } from "@/hooks/useAuth";
@@ -116,6 +116,16 @@ function AuthPage() {
             {mode === "login" ? "Entrar" : "Criar conta"}
           </Button>
         </form>
+
+        {mode === "login" && (
+          <Link
+            to="/redefinir-senha"
+            search={{}}
+            className="mt-4 block w-full text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Esqueci minha senha
+          </Link>
+        )}
 
         {signupEnabled ? (
           <button

@@ -5,6 +5,7 @@ import { Check, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/date-field";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -23,7 +24,8 @@ export const Route = createFileRoute("/metas")({
       { title: "Objetivos e metas — Aura Finanças" },
       {
         name: "description",
-        content: "Defina metas pessoais, financeiras, de economia e de investimento e acompanhe o progresso.",
+        content:
+          "Defina metas pessoais, financeiras, de economia e de investimento e acompanhe o progresso.",
       },
       { property: "og:title", content: "Objetivos e metas — Aura Finanças" },
       {
@@ -194,7 +196,7 @@ function GoalsPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Prazo</Label>
-              <Input
+              <DateField
                 type="date"
                 value={form.target_date}
                 onChange={(e) => setForm({ ...form, target_date: e.target.value })}

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/date-field";
 import { Label } from "@/components/ui/label";
 import { useAppState } from "@/lib/app-state";
 import {
@@ -33,7 +34,7 @@ import {
   type Polarity,
   type StatusSeed,
 } from "@/lib/tasks-analytics";
-import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { UserMultiSelect, UserSelect } from "./UserPicker";
 
 const SELECT_CLASS =
@@ -238,7 +239,7 @@ export function BoardDialog({
 
           <div className="space-y-1.5">
             <Label>Data de início</Label>
-            <Input
+            <DateField
               type="date"
               value={form.start_date}
               onChange={(e) => setForm({ ...form, start_date: e.target.value })}
@@ -247,7 +248,7 @@ export function BoardDialog({
 
           <div className="space-y-1.5">
             <Label>Conclusão prevista</Label>
-            <Input
+            <DateField
               type="date"
               value={form.due_date}
               onChange={(e) => setForm({ ...form, due_date: e.target.value })}

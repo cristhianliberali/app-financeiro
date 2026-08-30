@@ -167,6 +167,50 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
+
+  /*
+   * Campos de data e hora.
+   *
+   * O ícone do calendário é desenhado pelo navegador em preto fixo: no tema
+   * escuro ele ficava preto sobre fundo preto — invisível, como se o campo não
+   * tivesse ícone nenhum. `invert` devolve o contraste no escuro, e o cursor de
+   * mão diz que dá para clicar. A abertura do calendário ao clicar em qualquer
+   * ponto do campo é do `DateField` (src/components/ui/date-field.tsx).
+   */
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+  input[type="month"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator,
+  input[type="week"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.65;
+    transition: opacity 0.15s ease;
+  }
+
+  input[type="date"]:hover::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator,
+  input[type="month"]:hover::-webkit-calendar-picker-indicator,
+  input[type="time"]:hover::-webkit-calendar-picker-indicator,
+  input[type="week"]:hover::-webkit-calendar-picker-indicator {
+    opacity: 1;
+  }
+
+  .dark input[type="date"]::-webkit-calendar-picker-indicator,
+  .dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+  .dark input[type="month"]::-webkit-calendar-picker-indicator,
+  .dark input[type="time"]::-webkit-calendar-picker-indicator,
+  .dark input[type="week"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+
+  /* O campo vazio mostra "dd/mm/aaaa"; sem isto ele briga com o placeholder. */
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="month"],
+  input[type="time"],
+  input[type="week"] {
+    cursor: pointer;
+  }
 }
 
 @utility panel {

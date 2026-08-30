@@ -24,7 +24,7 @@ import {
 } from "@/lib/tasks";
 import { PALETTE, SPACE_ICONS } from "@/lib/tasks-analytics";
 import { formatDateBR } from "@/lib/format";
-import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { UserMultiSelect } from "./UserPicker";
 
 export function SpaceDialog({

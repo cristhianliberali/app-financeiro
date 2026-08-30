@@ -87,6 +87,13 @@ PROVEDOR_IA=openai
 MODELO_IA=gpt-4o-mini
 OPENAI_API_KEY=<opcional, segredo>
 LIMITE_TOKENS=12000
+LOG_IA=true
+SMTP_HOST=<opcional>
+SMTP_PORT=587
+SMTP_USER=<opcional>
+SMTP_PASSWORD=<opcional, segredo>
+SMTP_FROM=nao-responda@seudominio.com
+SMTP_FROM_NAME=Aura Finanças
 PORT=3000
 HOST=0.0.0.0
 NODE_ENV=production
@@ -117,6 +124,17 @@ interna `5432` — assim o tráfego não sai para a internet.
 | `MODELO_IA` | runtime | não | Modelo usado nas requisições de importação (ex.: `gpt-4o-mini`) |
 | `OPENAI_API_KEY` | runtime | não | Chave do provedor. Sem ela a importação por IA fica indisponível. **Segredo** |
 | `LIMITE_TOKENS` | runtime | não | Tokens do documento por requisição (padrão `12000`); acima disso vira lote |
+| `LOG_IA` | runtime | não | Registra no log do container o que foi enviado à IA e o que ela devolveu (padrão `true`) |
+| `LOG_IA_CORPO` | runtime | não | `false` registra só modelo, tokens e duração, sem prompt nem resposta (padrão `true`) |
+| `LOG_IA_LIMITE_CARACTERES` | runtime | não | Teto de caracteres de cada trecho registrado (padrão `2000`) |
+| `SMTP_HOST` | runtime | não | Servidor de e-mail. Sem ele, redefinição de senha e troca de e-mail ficam indisponíveis |
+| `SMTP_PORT` | runtime | não | Porta do SMTP (padrão `587`) |
+| `SMTP_SECURE` | runtime | não | `true` para TLS direto; sem valor, é `true` só na porta `465` |
+| `SMTP_USER` | runtime | não | Usuário da autenticação SMTP |
+| `SMTP_PASSWORD` | runtime | não | Senha ou *app password* do SMTP. **Segredo** |
+| `SMTP_FROM` | runtime | não | Endereço remetente (padrão: o valor de `SMTP_USER`) |
+| `SMTP_FROM_NAME` | runtime | não | Nome exibido no remetente (padrão `Aura Finanças`) |
+| `SMTP_TLS_REJECT_UNAUTHORIZED` | runtime | não | `false` aceita certificado autoassinado (padrão `true`) |
 | `PORT` | runtime | não | Porta do servidor (padrão `3000`) |
 | `HOST` | runtime | sim | Precisa ser `0.0.0.0` para o proxy alcançar |
 
@@ -256,6 +274,9 @@ docker run --rm -p 3000:3000 \
 | `403 Forbidden` ao salvar transações | `APP_URL` não bate com o domínio de onde a página foi aberta |
 | Importação por IA aparece desabilitada na tela | Falta `MODELO_IA` ou `OPENAI_API_KEY` |
 | `PROVEDOR_IA "x" não é suportado` | Só `openai` é aceito hoje |
+| "Envio de e-mail não configurado" na troca de e-mail ou na redefinição de senha | Falta `SMTP_HOST` (e as demais `SMTP_*`) |
+| E-mail não chega e o log mostra erro de certificado | SMTP interno com certificado autoassinado: use `SMTP_TLS_REJECT_UNAUTHORIZED=false` |
+| Link de redefinição de senha aponta para `localhost` | Falta `APP_URL` com o domínio público |
 
 ---
 

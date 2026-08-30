@@ -7,7 +7,6 @@ import {
   TrendingUp,
   Target,
   Users,
-  LogOut,
   ChevronDown,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,6 +15,7 @@ import { useProfiles } from "@/lib/data";
 import { useAccounts } from "@/lib/accounts";
 import { PeriodControls } from "@/components/PeriodControls";
 import { ModuleSwitcher } from "@/components/ModuleSwitcher";
+import { ProfileMenu } from "@/components/ProfileMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ActiveTimerBar } from "@/components/tasks/ActiveTimerBar";
 import { NotificationBell } from "@/components/tasks/NotificationBell";
@@ -40,7 +40,7 @@ const nav = [
 ] as const;
 
 export function AppShell({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { accountId, setAccountId, profileId, setProfileId } = useAppState();
@@ -112,15 +112,7 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
             </p>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <button
-              onClick={async () => {
-                await signOut();
-                navigate({ to: "/auth" });
-              }}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <LogOut className="size-4" /> Sair
-            </button>
+            <ProfileMenu />
             <ThemeToggle />
           </div>
         </div>

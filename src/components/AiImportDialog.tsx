@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, Ban, FileUp, Sparkles, Trash2, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/date-field";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -15,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAppState } from "@/lib/app-state";
-import { useCategories, useUpsert } from "@/lib/data";
+import { activeCategories, useCategories, useUpsert } from "@/lib/data";
 import {
   ACCEPTED_UPLOAD,
   getImportConfig,
@@ -42,7 +43,10 @@ function readAsBase64(file: File): Promise<string> {
 
 export function AiImportDialog({ open, onOpenChange }: Props) {
   const { profileId } = useAppState();
-  const { data: categories = [] } = useCategories(profileId);
+  const { data: allCategories = [] } = useCategories(profileId);
+  // A IA classifica só entre as categorias ativas — é o que o servidor manda no
+  // prompt —, então o seletor da revisão oferece as mesmas.
+  const categories = useMemo(() => activeCategories(allCategories), [allCategories]);
   const upsert = useUpsert("transactions");
   const prepare = useServerFn(prepareImport);
   const processBatch = useServerFn(processNextBatch);
@@ -325,7 +329,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                       </span>
                     )}
                   </div>
-                  <Input
+                  <DateField
                     type="date"
                     className="col-span-2 h-8 text-xs"
                     value={r.date}
@@ -333,7 +337,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                     onChange={(e) => patch(i, { date: e.target.value })}
                     aria-label="Data do lançamento"
                   />
-                  <Input
+                  <DateField
                     type="date"
                     className="col-span-2 h-8 text-xs"
                     value={r.due_date}

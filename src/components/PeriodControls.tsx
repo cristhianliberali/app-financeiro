@@ -1,5 +1,6 @@
 import { useAppState } from "@/lib/app-state";
 import { toISODate } from "@/lib/format";
+import { datePickerProps } from "@/components/ui/date-field";
 
 const presets = [
   {
@@ -26,7 +27,10 @@ const presets = [
     label: "Ano",
     range: () => {
       const d = new Date();
-      return [toISODate(new Date(d.getFullYear(), 0, 1)), toISODate(new Date(d.getFullYear(), 11, 31))] as const;
+      return [
+        toISODate(new Date(d.getFullYear(), 0, 1)),
+        toISODate(new Date(d.getFullYear(), 11, 31)),
+      ] as const;
     },
   },
 ];
@@ -59,6 +63,7 @@ export function PeriodControls() {
       <div className="flex items-center gap-1">
         <input
           type="date"
+          {...datePickerProps()}
           value={from}
           onChange={(e) => setRange(e.target.value, to)}
           className="rounded-md border border-border bg-card px-2 py-1 font-mono text-xs outline-none focus:ring-1 focus:ring-ring"
@@ -66,6 +71,7 @@ export function PeriodControls() {
         <span className="text-xs text-muted-foreground">→</span>
         <input
           type="date"
+          {...datePickerProps()}
           value={to}
           onChange={(e) => setRange(from, e.target.value)}
           className="rounded-md border border-border bg-card px-2 py-1 font-mono text-xs outline-none focus:ring-1 focus:ring-ring"
