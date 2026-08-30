@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Layers,
   LayoutDashboard,
+  Menu,
   MoreVertical,
   PanelLeft,
   Pencil,
@@ -34,6 +35,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { ModuleSwitcher } from "@/components/ModuleSwitcher";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -90,6 +92,7 @@ export function TasksShell({
   const tone = useTone();
 
   const [collapsed, setCollapsed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [spaceDialog, setSpaceDialog] = useState<{ open: boolean; space: Space | null }>({
     open: false,
@@ -112,6 +115,9 @@ export function TasksShell({
       // Preferência corrompida não deve impedir a tela de abrir.
     }
   }, []);
+
+  // Trocar de tela fecha o menu do celular — ele cobre a tela inteira.
+  useEffect(() => setMenuOpen(false), [pathname]);
 
   // O espaço da tela atual abre sozinho, para o item ativo estar sempre à vista.
   useEffect(() => {
@@ -172,24 +178,25 @@ export function TasksShell({
     );
   }
 
-  return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      <aside
-        className={`hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 lg:flex ${
-          collapsed ? "w-16" : "w-72"
+  /**
+   * Conteúdo da lateral, usado nos dois lugares em que ele aparece: a coluna
+   * fixa do desktop e a gaveta do celular — onde ele vai sempre expandido, já
+   * que ali não existe lateral recolhida para alternar.
+   */
+  const renderSidebar = (collapsed: boolean, mobile = false) => (
+    <>
+      <div
+        className={`flex items-center gap-2 border-b border-sidebar-border p-3 ${
+          collapsed ? "justify-center" : ""
         }`}
       >
-        <div
-          className={`flex items-center gap-2 border-b border-sidebar-border p-3 ${
-            collapsed ? "justify-center" : ""
-          }`}
-        >
-          {!collapsed && (
-            <Link to="/tarefas" className="flex min-w-0 items-center gap-2">
-              <div className="size-7 shrink-0 rounded-lg bg-primary" />
-              <span className="truncate text-base font-bold tracking-tight">AURA</span>
-            </Link>
-          )}
+        {!collapsed && (
+          <Link to="/tarefas" className="flex min-w-0 items-center gap-2">
+            <div className="size-7 shrink-0 rounded-lg bg-primary" />
+            <span className="truncate text-base font-bold tracking-tight">AURA</span>
+          </Link>
+        )}
+        {!mobile && (
           <button
             onClick={toggleSidebar}
             className={`rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground ${
@@ -200,238 +207,261 @@ export function TasksShell({
           >
             <PanelLeft className="size-4" />
           </button>
-        </div>
+        )}
+      </div>
 
-        <div className="p-2">
-          <ModuleSwitcher collapsed={collapsed} />
-        </div>
+      <div className="p-2">
+        <ModuleSwitcher collapsed={collapsed} />
+      </div>
 
-        <nav className="space-y-0.5 border-b border-sidebar-border px-2 pb-3">
-          {NAV.map((item) => {
-            const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
-            return (
+      <nav className="space-y-0.5 border-b border-sidebar-border px-2 pb-3">
+        {NAV.map((item) => {
+          const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              title={item.label}
+              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
+                collapsed ? "justify-center" : ""
+              } ${
+                active
+                  ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                  : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
+              }`}
+            >
+              <item.icon className="size-4 shrink-0" />
+              {!collapsed && <span className="truncate">{item.label}</span>}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="flex-1 overflow-y-auto px-2 py-3 thin-scrollbar">
+        {collapsed ? (
+          <div className="space-y-1">
+            {activeSpaces.map((space) => (
               <Link
-                key={item.to}
-                to={item.to}
-                title={item.label}
-                className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
-                  collapsed ? "justify-center" : ""
-                } ${
-                  active
-                    ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-                    : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
+                key={space.id}
+                to="/tarefas/espacos/$spaceId"
+                params={{ spaceId: space.id }}
+                title={space.name}
+                className={`flex size-10 items-center justify-center rounded-lg text-base transition-colors ${
+                  space.id === spaceId ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/60"
                 }`}
               >
-                <item.icon className="size-4 shrink-0" />
-                {!collapsed && <span className="truncate">{item.label}</span>}
+                <span aria-hidden>{space.icon}</span>
+                <span className="sr-only">{space.name}</span>
               </Link>
-            );
-          })}
-        </nav>
-
-        <div className="flex-1 overflow-y-auto px-2 py-3 thin-scrollbar">
-          {collapsed ? (
-            <div className="space-y-1">
-              {activeSpaces.map((space) => (
-                <Link
-                  key={space.id}
-                  to="/tarefas/espacos/$spaceId"
-                  params={{ spaceId: space.id }}
-                  title={space.name}
-                  className={`flex size-10 items-center justify-center rounded-lg text-base transition-colors ${
-                    space.id === spaceId ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/60"
-                  }`}
-                >
-                  <span aria-hidden>{space.icon}</span>
-                  <span className="sr-only">{space.name}</span>
-                </Link>
-              ))}
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="mb-1 flex items-center justify-between px-2">
+              <span className="label-caps">Espaços e quadros</span>
+              <button
+                onClick={() => setSpaceDialog({ open: true, space: null })}
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                aria-label="Novo espaço"
+                title="Novo espaço"
+              >
+                <Plus className="size-3.5" />
+              </button>
             </div>
-          ) : (
-            <>
-              <div className="mb-1 flex items-center justify-between px-2">
-                <span className="label-caps">Espaços e quadros</span>
-                <button
-                  onClick={() => setSpaceDialog({ open: true, space: null })}
-                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                  aria-label="Novo espaço"
-                  title="Novo espaço"
-                >
-                  <Plus className="size-3.5" />
-                </button>
-              </div>
 
-              <div className="space-y-0.5">
-                {activeSpaces.map((space) => {
-                  const spaceBoards = boards.filter(
-                    (b) => b.space_id === space.id && !b.archived_at,
-                  );
-                  const isOpen = expanded.includes(space.id);
-                  const isActive = space.id === spaceId && !boardId;
-                  const pending = openTasksBySpace.get(space.id) ?? 0;
+            <div className="space-y-0.5">
+              {activeSpaces.map((space) => {
+                const spaceBoards = boards.filter((b) => b.space_id === space.id && !b.archived_at);
+                const isOpen = expanded.includes(space.id);
+                const isActive = space.id === spaceId && !boardId;
+                const pending = openTasksBySpace.get(space.id) ?? 0;
 
-                  return (
-                    <div key={space.id}>
-                      <div
-                        className={`group flex items-center gap-1 rounded-lg pr-1 transition-colors ${
-                          isActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                            : "hover:bg-sidebar-accent/60"
-                        }`}
+                return (
+                  <div key={space.id}>
+                    <div
+                      className={`group flex items-center gap-1 rounded-lg pr-1 transition-colors ${
+                        isActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "hover:bg-sidebar-accent/60"
+                      }`}
+                    >
+                      <button
+                        onClick={() => toggleSpace(space.id)}
+                        className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
+                        aria-label={isOpen ? `Recolher ${space.name}` : `Expandir ${space.name}`}
+                        aria-expanded={isOpen}
                       >
-                        <button
-                          onClick={() => toggleSpace(space.id)}
-                          className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
-                          aria-label={isOpen ? `Recolher ${space.name}` : `Expandir ${space.name}`}
-                          aria-expanded={isOpen}
-                        >
-                          {isOpen ? (
-                            <ChevronDown className="size-3.5" />
-                          ) : (
-                            <ChevronRight className="size-3.5" />
-                          )}
-                        </button>
-                        <Link
-                          to="/tarefas/espacos/$spaceId"
-                          params={{ spaceId: space.id }}
-                          className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-sm"
-                        >
-                          <span aria-hidden>{space.icon}</span>
-                          <span className={`truncate ${isActive ? "font-medium" : ""}`}>
-                            {space.name}
-                          </span>
-                        </Link>
-                        {pending > 0 && (
-                          <span className="shrink-0 font-mono text-[10px] text-muted-foreground group-hover:hidden">
-                            {pending}
-                          </span>
+                        {isOpen ? (
+                          <ChevronDown className="size-3.5" />
+                        ) : (
+                          <ChevronRight className="size-3.5" />
                         )}
-                        <div className="hidden shrink-0 items-center group-hover:flex">
+                      </button>
+                      <Link
+                        to="/tarefas/espacos/$spaceId"
+                        params={{ spaceId: space.id }}
+                        className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-sm"
+                      >
+                        <span aria-hidden>{space.icon}</span>
+                        <span className={`truncate ${isActive ? "font-medium" : ""}`}>
+                          {space.name}
+                        </span>
+                      </Link>
+                      {pending > 0 && (
+                        <span className="shrink-0 font-mono text-[10px] text-muted-foreground group-hover:hidden">
+                          {pending}
+                        </span>
+                      )}
+                      <div className="hidden shrink-0 items-center group-hover:flex">
+                        <button
+                          onClick={() =>
+                            setBoardDialog({ open: true, board: null, spaceId: space.id })
+                          }
+                          className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
+                          aria-label={`Novo quadro em ${space.name}`}
+                          title="Novo quadro"
+                        >
+                          <Plus className="size-3" />
+                        </button>
+                        <ItemMenu
+                          label={`Opções do espaço ${space.name}`}
+                          onEdit={() => setSpaceDialog({ open: true, space })}
+                          onDelete={() => setConfirmSpace(space)}
+                          editLabel="Editar espaço"
+                          deleteLabel="Excluir espaço"
+                        />
+                      </div>
+                    </div>
+
+                    {isOpen && (
+                      <div className="ml-4 space-y-0.5 border-l border-sidebar-border pl-2">
+                        {spaceBoards.map((board) => {
+                          const boardActive = board.id === boardId;
+                          const boardPending = openTasksByBoard.get(board.id) ?? 0;
+                          return (
+                            <div
+                              key={board.id}
+                              className={`group flex items-center gap-1 rounded-lg pr-1 transition-colors ${
+                                boardActive
+                                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                                  : "hover:bg-sidebar-accent/60"
+                              }`}
+                            >
+                              <Link
+                                to="/tarefas/quadros/$boardId"
+                                params={{ boardId: board.id }}
+                                search={{}}
+                                className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-xs"
+                              >
+                                <span
+                                  className="size-2 shrink-0 rounded-full ring-1 ring-border"
+                                  style={{ backgroundColor: tone(board.color) }}
+                                />
+                                <span
+                                  className={`truncate ${boardActive ? "font-medium" : "text-muted-foreground"}`}
+                                >
+                                  {board.name}
+                                </span>
+                              </Link>
+                              {boardPending > 0 && (
+                                <span className="shrink-0 font-mono text-[10px] text-muted-foreground group-hover:hidden">
+                                  {boardPending}
+                                </span>
+                              )}
+                              <div className="hidden shrink-0 group-hover:block">
+                                <ItemMenu
+                                  label={`Opções do quadro ${board.name}`}
+                                  onEdit={() =>
+                                    setBoardDialog({
+                                      open: true,
+                                      board,
+                                      spaceId: board.space_id,
+                                    })
+                                  }
+                                  onDelete={() => setConfirmBoard(board)}
+                                  editLabel="Editar quadro"
+                                  deleteLabel="Excluir quadro"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {spaceBoards.length === 0 && (
                           <button
                             onClick={() =>
                               setBoardDialog({ open: true, board: null, spaceId: space.id })
                             }
-                            className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
-                            aria-label={`Novo quadro em ${space.name}`}
-                            title="Novo quadro"
+                            className="flex w-full items-center gap-1.5 px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
                           >
-                            <Plus className="size-3" />
+                            <Plus className="size-3" /> Criar quadro
                           </button>
-                          <ItemMenu
-                            label={`Opções do espaço ${space.name}`}
-                            onEdit={() => setSpaceDialog({ open: true, space })}
-                            onDelete={() => setConfirmSpace(space)}
-                            editLabel="Editar espaço"
-                            deleteLabel="Excluir espaço"
-                          />
-                        </div>
+                        )}
                       </div>
+                    )}
+                  </div>
+                );
+              })}
 
-                      {isOpen && (
-                        <div className="ml-4 space-y-0.5 border-l border-sidebar-border pl-2">
-                          {spaceBoards.map((board) => {
-                            const boardActive = board.id === boardId;
-                            const boardPending = openTasksByBoard.get(board.id) ?? 0;
-                            return (
-                              <div
-                                key={board.id}
-                                className={`group flex items-center gap-1 rounded-lg pr-1 transition-colors ${
-                                  boardActive
-                                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                                    : "hover:bg-sidebar-accent/60"
-                                }`}
-                              >
-                                <Link
-                                  to="/tarefas/quadros/$boardId"
-                                  params={{ boardId: board.id }}
-                                  search={{}}
-                                  className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-xs"
-                                >
-                                  <span
-                                    className="size-2 shrink-0 rounded-full ring-1 ring-border"
-                                    style={{ backgroundColor: tone(board.color) }}
-                                  />
-                                  <span
-                                    className={`truncate ${boardActive ? "font-medium" : "text-muted-foreground"}`}
-                                  >
-                                    {board.name}
-                                  </span>
-                                </Link>
-                                {boardPending > 0 && (
-                                  <span className="shrink-0 font-mono text-[10px] text-muted-foreground group-hover:hidden">
-                                    {boardPending}
-                                  </span>
-                                )}
-                                <div className="hidden shrink-0 group-hover:block">
-                                  <ItemMenu
-                                    label={`Opções do quadro ${board.name}`}
-                                    onEdit={() =>
-                                      setBoardDialog({
-                                        open: true,
-                                        board,
-                                        spaceId: board.space_id,
-                                      })
-                                    }
-                                    onDelete={() => setConfirmBoard(board)}
-                                    editLabel="Editar quadro"
-                                    deleteLabel="Excluir quadro"
-                                  />
-                                </div>
-                              </div>
-                            );
-                          })}
-                          {spaceBoards.length === 0 && (
-                            <button
-                              onClick={() =>
-                                setBoardDialog({ open: true, board: null, spaceId: space.id })
-                              }
-                              className="flex w-full items-center gap-1.5 px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                            >
-                              <Plus className="size-3" /> Criar quadro
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              {activeSpaces.length === 0 && (
+                <button
+                  onClick={() => setSpaceDialog({ open: true, space: null })}
+                  className="flex w-full items-center gap-1.5 rounded-lg border border-dashed border-border px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <Plus className="size-3.5" /> Criar primeiro espaço
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
 
-                {activeSpaces.length === 0 && (
-                  <button
-                    onClick={() => setSpaceDialog({ open: true, space: null })}
-                    className="flex w-full items-center gap-1.5 rounded-lg border border-dashed border-border px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    <Plus className="size-3.5" /> Criar primeiro espaço
-                  </button>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div
-          className={`space-y-2 border-t border-sidebar-border p-2 ${collapsed ? "flex flex-col items-center" : ""}`}
-        >
-          {collapsed ? (
-            <>
-              <ProfileMenu collapsed />
-              <ThemeToggle compact />
-            </>
-          ) : (
-            <div className="flex items-center gap-2">
-              <ProfileMenu />
+      <div
+        className={`space-y-2 border-t border-sidebar-border p-2 ${collapsed ? "flex flex-col items-center" : ""}`}
+      >
+        {collapsed ? (
+          <>
+            <ProfileMenu collapsed />
+            <ThemeToggle compact />
+          </>
+        ) : (
+          <div className="flex min-w-0 items-center gap-2">
+            <ProfileMenu />
+            <div className="shrink-0">
               <ThemeToggle />
             </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+      <aside
+        className={`hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 lg:flex ${
+          collapsed ? "w-16" : "w-72"
+        }`}
+      >
+        {renderSidebar(collapsed)}
       </aside>
+
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+        <SheetContent side="left" className="flex w-80 flex-col gap-0 bg-sidebar p-0 lg:hidden">
+          <SheetTitle className="sr-only">Menu</SheetTitle>
+          {renderSidebar(false, true)}
+        </SheetContent>
+      </Sheet>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-border bg-card/80 px-4 py-2 backdrop-blur-md lg:px-6">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <div className="lg:hidden">
-              <ModuleSwitcher orientation="horizontal" />
-            </div>
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:hidden"
+              aria-label="Abrir menu"
+            >
+              <Menu className="size-4" />
+            </button>
             <TasksBreadcrumb
               spaceId={spaceId}
               boardId={boardId}
