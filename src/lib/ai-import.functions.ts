@@ -15,6 +15,8 @@ export type ParsedRow = {
   amountFound: boolean;
   /** Lançamento igual que o perfil já tem: mesma descrição, valor e data. */
   duplicateOf: { id: string; description: string; date: string } | null;
+  /** Não casa com nenhuma linha datada do documento: provável total ou resumo. */
+  looksLikeSummary: boolean;
 };
 
 export type ImportSummary = {
@@ -34,6 +36,10 @@ export type BatchResult = {
   recovered: number;
   /** Linhas com data e valor que continuaram sem lançamento. */
   missing: number;
+  /** Linhas devolvidas que parecem total ou resumo, e não lançamento. */
+  summaryRows: number;
+  /** Lotes de cabeçalho/resumo que não chegaram a ir para a IA. */
+  skippedBatches: number;
 };
 
 /** Extensões que o servidor sabe converter em texto. */

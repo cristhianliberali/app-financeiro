@@ -27,6 +27,11 @@ export type ImportJob = {
   batches: Batch[];
   /** Índice do próximo lote a processar. */
   nextIndex: number;
+  /**
+   * Começo do documento (vencimento, período, titular). Vai junto em cada lote
+   * como referência: sem isso, só o primeiro lote enxerga essas datas.
+   */
+  header: string;
   totalTokens: number;
   expiresAt: number;
 };
@@ -43,6 +48,7 @@ export function createJob(input: {
   source: string;
   batches: Batch[];
   totalTokens: number;
+  header: string;
 }): ImportJob {
   purgeExpired();
 
@@ -58,6 +64,7 @@ export function createJob(input: {
     source: input.source,
     batches: input.batches,
     nextIndex: 0,
+    header: input.header,
     totalTokens: input.totalTokens,
     expiresAt: Date.now() + TTL_MS,
   };
