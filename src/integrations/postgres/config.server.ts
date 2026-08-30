@@ -253,6 +253,76 @@ export function isSmtpConfigured(): boolean {
   }
 }
 
+/**
+ * Armazenamento S3 dos anexos de tarefa.
+ *
+ * Vale para a AWS e para qualquer serviço compatível (MinIO, Backblaze B2,
+ * Cloudflare R2, Wasabi…): quem decide é `S3_ENDPOINT`. Sem `S3_BUCKET` o app
+ * inteiro continua de pé — só os anexos ficam indisponíveis, com a tela
+ * dizendo o que falta configurar.
+ *
+ * O bucket é privado: o navegador nunca recebe as chaves, e sim URLs assinadas
+ * com prazo curto, geradas aqui no servidor.
+ */
+export type S3Settings = {
+  bucket: string;
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  /** Endpoint próprio (MinIO, R2, B2…). Vazio usa o da AWS. */
+  endpoint: string | undefined;
+  /**
+   * Caminho em vez de subdomínio (`host/bucket/chave`). MinIO e a maioria dos
+   * compatíveis precisam disto; a AWS trabalha com o padrão de subdomínio.
+   */
+  forcePathStyle: boolean;
+  /** Teto de tamanho por arquivo, em bytes. */
+  maxUploadBytes: number;
+  /** Validade das URLs assinadas de leitura e de envio, em segundos. */
+  signedUrlTtlSeconds: number;
+};
+
+export function getS3Settings(): S3Settings {
+  const bucket = readEnv("S3_BUCKET");
+  const accessKeyId = readEnv("S3_ACCESS_KEY_ID");
+  const secretAccessKey = readEnv("S3_SECRET_ACCESS_KEY");
+
+  const missing = [
+    ...(bucket ? [] : ["S3_BUCKET"]),
+    ...(accessKeyId ? [] : ["S3_ACCESS_KEY_ID"]),
+    ...(secretAccessKey ? [] : ["S3_SECRET_ACCESS_KEY"]),
+  ];
+  if (missing.length) {
+    throw new Error(
+      `Armazenamento de anexos não configurado. Faltam as variáveis: ${missing.join(", ")}.`,
+    );
+  }
+
+  const endpoint = readEnv("S3_ENDPOINT");
+
+  return {
+    bucket: bucket!,
+    accessKeyId: accessKeyId!,
+    secretAccessKey: secretAccessKey!,
+    region: readEnv("S3_REGION") ?? "us-east-1",
+    endpoint,
+    // Endpoint próprio quase sempre quer caminho; a AWS, não.
+    forcePathStyle: readBool("S3_FORCE_PATH_STYLE", !!endpoint),
+    maxUploadBytes: readInt("S3_MAX_UPLOAD_MB", 50) * 1024 * 1024,
+    signedUrlTtlSeconds: readInt("S3_URL_TTL_SEGUNDOS", 900),
+  };
+}
+
+/** A tela de tarefas usa isto para explicar por que os anexos estão fora. */
+export function isS3Configured(): boolean {
+  try {
+    getS3Settings();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Nome do cookie que carrega o token de sessão. */
 export function getSessionCookieName(): string {
   return readEnv("SESSION_COOKIE_NAME") ?? "aura_session";

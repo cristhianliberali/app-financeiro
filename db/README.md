@@ -76,6 +76,7 @@ sem prefixo.
 | `task_reminders` | Lembretes agendados por tarefa; `delivered_at` marca o que já foi notificado |
 | `time_entries` | Registros do cronômetro; `stopped_at` nulo = em execução |
 | `task_activity` | Trilha de auditoria da tarefa |
+| `task_attachments` | Metadados dos anexos; o arquivo em si fica no bucket S3, referenciado por `object_key` |
 
 ## Autorização
 

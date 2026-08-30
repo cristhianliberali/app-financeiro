@@ -70,6 +70,10 @@ ou quadro.
   dashboard (estimado x realizado, saldo de horas, o que estourou);
 - **Lembretes** por tarefa, entregues como notificação do navegador e no sininho
   do cabeçalho;
+- **Anexos** por tarefa, guardados num bucket S3 (ou compatível: MinIO, R2, B2).
+  Imagem, vídeo e PDF abrem na própria tela; o resto baixa. O arquivo vai do
+  navegador direto para o bucket, que fica privado — o que circula são URLs
+  assinadas com prazo;
 - Exclusão protegida: espaço e quadro pedem o nome digitado, tarefa pede
   confirmação, e uma etapa com tarefas não pode ser excluída — mova ou exclua as
   tarefas dela antes.

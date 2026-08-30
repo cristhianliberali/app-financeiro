@@ -474,6 +474,23 @@ CREATE TABLE IF NOT EXISTS subtasks (
 CREATE INDEX IF NOT EXISTS subtasks_task_idx ON subtasks(task_id, sort_order);
 CREATE INDEX IF NOT EXISTS subtasks_due_idx ON subtasks(due_date);
 
+-- Anexos da tarefa. O arquivo vive no bucket S3 (ou compatível); aqui ficam só
+-- os metadados e a chave do objeto. O navegador nunca recebe credencial: lê e
+-- escreve por URL assinada com prazo, gerada em
+-- `src/integrations/storage/s3.server.ts`.
+CREATE TABLE IF NOT EXISTS task_attachments (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id      uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  -- Chave do objeto no bucket. Única: dois envios nunca se sobrepõem.
+  object_key   text NOT NULL UNIQUE,
+  file_name    text NOT NULL,
+  content_type text NOT NULL DEFAULT 'application/octet-stream',
+  size_bytes   bigint NOT NULL DEFAULT 0 CHECK (size_bytes >= 0),
+  uploaded_by  uuid REFERENCES app_users(id) ON DELETE SET NULL,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS task_attachments_task_idx ON task_attachments(task_id, created_at DESC);
+
 -- `stopped_at IS NULL` significa cronômetro em execução.
 CREATE TABLE IF NOT EXISTS time_entries (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
