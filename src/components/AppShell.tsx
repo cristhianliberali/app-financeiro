@@ -8,6 +8,7 @@ import {
   Target,
   Users,
   ChevronDown,
+  Clock3,
   Menu,
   Plus,
   Sparkles,
@@ -37,13 +38,27 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/transacoes", label: "Transações", icon: ArrowLeftRight },
+  { to: "/pendentes", label: "Transações pendentes", icon: Clock3 },
   { to: "/categorias", label: "Categorias", icon: Tags },
   { to: "/investimentos", label: "Investimentos", icon: TrendingUp },
   { to: "/metas", label: "Metas", icon: Target },
   { to: "/conta", label: "Conta & equipe", icon: Users },
 ] as const;
 
-export function AppShell({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
+export function AppShell({
+  children,
+  actions,
+  /**
+   * A barra de período comanda quase todas as telas do módulo, mas não todas:
+   * a de pendências fala de vencimento, não de recorte de tempo, e mostrar um
+   * controle que não muda nada seria pior do que não mostrá-lo.
+   */
+  showPeriodBar = true,
+}: {
+  children: ReactNode;
+  actions?: ReactNode;
+  showPeriodBar?: boolean;
+}) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -247,7 +262,7 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
             mostram, então ele abre o conteúdo em largura total, em vez de
             disputar espaço com os seletores de conta e perfil no cabeçalho.
           */}
-          <PeriodBar />
+          {showPeriodBar && <PeriodBar />}
           {children}
         </div>
       </main>
