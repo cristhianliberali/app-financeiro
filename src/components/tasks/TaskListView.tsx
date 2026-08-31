@@ -19,6 +19,7 @@ import {
   formatHours,
   priorityOf,
 } from "@/lib/tasks-analytics";
+import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
 import { LabelChip, LabelFilter } from "./LabelPicker";
 import { PriorityBadge } from "./PriorityPicker";
 import { UserAvatar, UserStack } from "./UserPicker";
@@ -27,7 +28,7 @@ type SortKey = "title" | "status" | "priority" | "responsible" | "start" | "due"
 type GroupKey = "none" | "status" | "priority" | "responsible" | "board" | "space";
 
 const SELECT_CLASS =
-  "h-9 rounded-md border border-input bg-card px-2 text-sm outline-none focus:ring-1 focus:ring-ring";
+  "h-10 rounded-xl border border-input bg-card px-2.5 text-sm font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25";
 
 export function TaskListView({
   tasks,
@@ -153,9 +154,9 @@ export function TaskListView({
   }, [pagination.visible, group]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const header = (key: SortKey, label: string, className = "") => (
-    <th className={`px-3 py-2 text-left font-medium ${className}`}>
+    <th className={`label-caps px-3 py-3 text-left ${className}`}>
       <button
-        className="inline-flex items-center gap-1 hover:text-foreground"
+        className="inline-flex items-center gap-1 transition-colors hover:text-primary"
         onClick={() => setSort((s) => ({ key, asc: s.key === key ? !s.asc : true }))}
       >
         {label}
@@ -240,10 +241,10 @@ export function TaskListView({
         </select>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="panel overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[62rem] text-sm">
-            <thead className="border-b border-border text-xs text-muted-foreground">
+            <thead className="border-b border-border bg-surface text-xs text-muted-foreground">
               <tr>
                 {header("title", "Tarefa")}
                 {header("status", "Status")}
@@ -260,8 +261,8 @@ export function TaskListView({
               {groups.map((g) => (
                 <Fragment key={`grp-${g.key}`}>
                   {g.label && (
-                    <tr className="bg-secondary/40">
-                      <td colSpan={9} className="px-3 py-1.5 text-xs font-semibold">
+                    <tr className="bg-surface-2">
+                      <td colSpan={9} className="label-caps px-3 py-2">
                         {g.label} · {g.items.length}
                       </td>
                     </tr>
@@ -276,14 +277,36 @@ export function TaskListView({
                     return (
                       <tr
                         key={task.id}
-                        className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-secondary/40"
+                        className="cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-accent/40"
                         onClick={() => onOpen(task)}
                       >
-                        <td className="px-3 py-2">
-                          <p className="font-medium">{task.title}</p>
+                        {/* A borda esquerda repete o estado do prazo, como no
+                            cartão do Kanban e nas linhas de Finanças. */}
+                        <td
+                          className={`border-l-[3px] px-3 py-2.5 ${
+                            state === "done"
+                              ? "border-l-positive"
+                              : state === "late"
+                                ? "border-l-negative"
+                                : state === "due_today"
+                                  ? "border-l-warning"
+                                  : state === "archived"
+                                    ? "border-l-transparent"
+                                    : "border-l-info"
+                          }`}
+                        >
+                          <p className={`font-semibold ${state === "done" ? "done-text" : ""}`}>
+                            {task.title}
+                          </p>
                           {showBoard && (
-                            <p className="text-[11px] text-muted-foreground">
-                              {task.space.icon} {task.space.name} › {task.board.name}
+                            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                              <IconBadge
+                                name={task.space.icon}
+                                color={task.space.color}
+                                size="sm"
+                                fallback={DEFAULT_SPACE_ICON}
+                              />
+                              {task.space.name} › {task.board.name}
                             </p>
                           )}
                           {task.labels.length > 0 && (
@@ -295,10 +318,17 @@ export function TaskListView({
                           )}
                         </td>
                         <td className="px-3 py-2">
-                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border px-2 py-0.5 text-xs">
+                          <span
+                            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold"
+                            style={{
+                              color: tone(task.status?.color ?? "#94A3B8"),
+                              borderColor: `color-mix(in oklab, ${tone(task.status?.color ?? "#94A3B8")} 35%, transparent)`,
+                              backgroundColor: `color-mix(in oklab, ${tone(task.status?.color ?? "#94A3B8")} 12%, transparent)`,
+                            }}
+                          >
                             <span
-                              className="size-1.5 rounded-full ring-1 ring-border"
-                              style={{ backgroundColor: tone(task.status?.color ?? "#8A8A8A") }}
+                              className="size-1.5 rounded-full"
+                              style={{ backgroundColor: tone(task.status?.color ?? "#94A3B8") }}
                             />
                             {task.status?.name ?? "—"}
                           </span>
@@ -355,8 +385,10 @@ export function TaskListView({
                               e.stopPropagation();
                               onToggleTimer(task);
                             }}
-                            className={`rounded-full p-1 transition-colors hover:bg-secondary ${
-                              task.running && isMine ? "text-foreground" : "text-muted-foreground"
+                            className={`rounded-full p-1.5 transition-colors ${
+                              task.running && isMine
+                                ? "bg-primary-soft text-primary"
+                                : "text-muted-foreground hover:bg-accent hover:text-foreground"
                             }`}
                             aria-label={
                               task.running && isMine ? "Pausar cronômetro" : "Iniciar cronômetro"

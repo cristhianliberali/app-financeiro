@@ -16,6 +16,7 @@ import {
   type Task,
 } from "@/lib/tasks";
 import { todayKey } from "@/lib/tasks-analytics";
+import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
 
 /**
  * "Meu dia": o que precisa acontecer hoje, num lugar só.
@@ -143,7 +144,7 @@ export function MyDay({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-lg font-bold">Meu dia</h2>
+          <h2 className="text-lg font-bold tracking-tight">Meu dia</h2>
           <p className="text-xs text-muted-foreground">
             {items.length === 0
               ? "Nada marcado para hoje."
@@ -156,11 +157,15 @@ export function MyDay({
       {PERIODS.map((period) => {
         const ofPeriod = items.filter((item) => periodOf(item.at) === period.key);
         return (
-          <div key={period.key} className="rounded-2xl border border-border bg-card p-4">
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-              <period.icon className="size-4 text-muted-foreground" />
+          <div key={period.key} className="panel p-4">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold tracking-tight">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-primary-soft text-primary">
+                <period.icon className="size-3.5" />
+              </span>
               {period.label}
-              <span className="text-xs font-normal text-muted-foreground">({ofPeriod.length})</span>
+              <span className="rounded-full bg-secondary px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground">
+                {ofPeriod.length}
+              </span>
             </h3>
 
             {ofPeriod.length === 0 ? (
@@ -171,7 +176,7 @@ export function MyDay({
                   item.kind === "event" ? (
                     <div
                       key={item.id}
-                      className="flex items-center gap-3 rounded-xl border border-dashed border-border p-2.5"
+                      className="flex items-center gap-3 rounded-xl border border-dashed border-border p-2.5 transition-colors hover:bg-accent/40"
                     >
                       <CalendarClock className="size-4 shrink-0 text-muted-foreground" />
                       <span className="min-w-0 flex-1 truncate text-sm">{item.title}</span>
@@ -192,10 +197,14 @@ export function MyDay({
                     </div>
                   ) : (
                     <div key={item.task.id} className="space-y-1">
-                      <div className="flex items-center gap-3 rounded-xl border border-border p-2.5">
+                      <div
+                        className={`state-bar flex items-center gap-3 rounded-xl border border-border p-2.5 transition-colors hover:bg-accent/40 ${
+                          item.task.status?.polarity === "SUCCESS" ? "state-done" : "state-pending"
+                        }`}
+                      >
                         <input
                           type="checkbox"
-                          className="size-4 shrink-0 accent-[var(--color-primary)]"
+                          className="size-4 shrink-0 cursor-pointer accent-[var(--color-primary)]"
                           checked={item.task.status?.polarity === "SUCCESS"}
                           aria-label={`Concluir ${item.task.title}`}
                           onChange={async (e) => {
@@ -215,16 +224,22 @@ export function MyDay({
                           className="min-w-0 flex-1 text-left"
                         >
                           <span
-                            className={`block truncate text-sm ${
-                              item.task.status?.polarity === "SUCCESS"
-                                ? "text-muted-foreground line-through"
-                                : ""
+                            className={`block truncate text-sm font-semibold ${
+                              item.task.status?.polarity === "SUCCESS" ? "done-text" : ""
                             }`}
                           >
                             {item.task.title}
                           </span>
-                          <span className="block truncate text-[11px] text-muted-foreground">
-                            {item.task.space.icon} {item.task.space.name} › {item.task.board.name}
+                          <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                            <IconBadge
+                              name={item.task.space.icon}
+                              color={item.task.space.color}
+                              size="sm"
+                              fallback={DEFAULT_SPACE_ICON}
+                            />
+                            <span className="truncate">
+                              {item.task.space.name} › {item.task.board.name}
+                            </span>
                           </span>
                         </button>
                         <span className="font-mono text-[11px] text-muted-foreground">
@@ -235,11 +250,11 @@ export function MyDay({
                       {item.subtasks.map((subtask) => (
                         <div
                           key={subtask.id}
-                          className="ml-6 flex items-center gap-3 rounded-lg border border-border/60 p-2"
+                          className="ml-6 flex items-center gap-3 rounded-lg border border-border/60 bg-surface/60 p-2"
                         >
                           <input
                             type="checkbox"
-                            className="size-3.5 shrink-0 accent-[var(--color-primary)]"
+                            className="size-3.5 shrink-0 cursor-pointer accent-[var(--color-primary)]"
                             checked={subtask.completed}
                             aria-label={`Concluir ${subtask.title}`}
                             onChange={(e) =>
@@ -252,7 +267,7 @@ export function MyDay({
                           />
                           <span
                             className={`min-w-0 flex-1 truncate text-xs ${
-                              subtask.completed ? "text-muted-foreground line-through" : ""
+                              subtask.completed ? "done-text" : ""
                             }`}
                           >
                             {subtask.title}
@@ -325,7 +340,7 @@ function NewTaskShortcut({ accountId }: { accountId: string | null }) {
   }
 
   return (
-    <div className="w-full rounded-2xl border border-border bg-card p-3">
+    <div className="panel w-full p-3">
       <div className="grid gap-2 sm:grid-cols-4">
         <div className="space-y-1 sm:col-span-4">
           <Label htmlFor="meu-dia-titulo">Tarefa</Label>

@@ -76,13 +76,13 @@ export function PaginationBar<T>({
   const last = Math.min(total, page * pageSize);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted-foreground">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface/60 px-4 py-3 text-xs text-muted-foreground">
       <span>
         Mostrando{" "}
-        <span className="font-medium text-foreground">
+        <span className="font-bold text-foreground">
           {first}–{last}
         </span>{" "}
-        de <span className="font-medium text-foreground">{total}</span> {itemLabel}
+        de <span className="font-bold text-foreground">{total}</span> {itemLabel}
       </span>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -91,7 +91,7 @@ export function PaginationBar<T>({
           <select
             value={pageSize}
             onChange={(e) => setPageSize(Number(e.target.value))}
-            className="h-8 rounded-md border border-input bg-card px-2 text-xs text-foreground outline-none focus:ring-1 focus:ring-ring"
+            className="h-8 cursor-pointer rounded-lg border border-input bg-card px-2 text-xs font-medium text-foreground shadow-xs outline-none transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25"
             aria-label={`Registros por página (${itemLabel})`}
           >
             {PAGE_SIZES.map((size) => (
@@ -106,18 +106,18 @@ export function PaginationBar<T>({
           <button
             onClick={() => setPage(Math.max(1, page - 1))}
             disabled={page <= 1}
-            className="rounded-md border border-border p-1 transition-colors hover:bg-secondary disabled:pointer-events-none disabled:opacity-40"
+            className="rounded-lg border border-border bg-card p-1.5 shadow-xs transition-colors hover:border-primary hover:bg-primary-soft hover:text-primary disabled:pointer-events-none disabled:opacity-40"
             aria-label="Página anterior"
           >
             <ChevronLeft className="size-4" />
           </button>
           <span className="px-1 tabular-nums">
-            Página <span className="font-medium text-foreground">{page}</span> de {totalPages}
+            Página <span className="font-bold text-foreground">{page}</span> de {totalPages}
           </span>
           <button
             onClick={() => setPage(Math.min(totalPages, page + 1))}
             disabled={page >= totalPages}
-            className="rounded-md border border-border p-1 transition-colors hover:bg-secondary disabled:pointer-events-none disabled:opacity-40"
+            className="rounded-lg border border-border bg-card p-1.5 shadow-xs transition-colors hover:border-primary hover:bg-primary-soft hover:text-primary disabled:pointer-events-none disabled:opacity-40"
             aria-label="Próxima página"
           >
             <ChevronRight className="size-4" />

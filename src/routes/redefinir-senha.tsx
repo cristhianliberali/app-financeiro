@@ -109,13 +109,13 @@ function ResetPasswordPage() {
 
         {!token ? (
           <>
-            <h1 className="text-2xl font-bold tracking-tight">Redefinir senha</h1>
+            <h1 className="title-xl">Redefinir senha</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Informe o e-mail da sua conta e enviaremos um link para escolher uma nova senha.
             </p>
 
             {!mailEnabled && (
-              <p className="mt-4 rounded-lg border border-border bg-secondary/40 p-3 text-xs text-muted-foreground">
+              <p className="mt-4 rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
                 O envio de e-mail ainda não foi configurado neste servidor (variáveis SMTP_*).
                 Procure quem administra o app.
               </p>
@@ -154,7 +154,7 @@ function ResetPasswordPage() {
           <p className="text-sm text-muted-foreground">Conferindo o link…</p>
         ) : check?.valid ? (
           <>
-            <h1 className="text-2xl font-bold tracking-tight">Escolha uma nova senha</h1>
+            <h1 className="title-xl">Escolha uma nova senha</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Depois de salvar, as sessões abertas em outros dispositivos são encerradas.
             </p>
@@ -193,7 +193,7 @@ function ResetPasswordPage() {
           </>
         ) : (
           <>
-            <h1 className="text-2xl font-bold tracking-tight">Link expirado</h1>
+            <h1 className="title-xl">Link expirado</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Este link de redefinição não vale mais — ele expira em 60 minutos e só pode ser usado
               uma vez.

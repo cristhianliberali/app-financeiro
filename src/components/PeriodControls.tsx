@@ -1,6 +1,8 @@
+import { ArrowRight } from "lucide-react";
+
 import { useAppState } from "@/lib/app-state";
 import { toISODate } from "@/lib/format";
-import { datePickerProps } from "@/components/ui/date-field";
+import { DateField } from "@/components/ui/date-field";
 
 const presets = [
   {
@@ -35,49 +37,54 @@ const presets = [
   },
 ];
 
+/**
+ * Recorte de período do módulo Finanças: a base da data (transação ou
+ * vencimento), o intervalo e três saltos rápidos. Fica no cabeçalho, então
+ * tudo aqui é compacto — os campos usam a variante baixa do `DateField`.
+ */
 export function PeriodControls() {
   const { dateBasis, setDateBasis, from, to, setRange } = useAppState();
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="flex rounded-lg bg-secondary p-1 text-[10px] font-bold uppercase tracking-wider">
-        <button
-          onClick={() => setDateBasis("transaction_date")}
-          className={`rounded px-3 py-1 transition-colors ${
-            dateBasis === "transaction_date"
-              ? "bg-card shadow-sm text-foreground"
-              : "text-muted-foreground"
-          }`}
-        >
-          Data transação
-        </button>
-        <button
-          onClick={() => setDateBasis("due_date")}
-          className={`rounded px-3 py-1 transition-colors ${
-            dateBasis === "due_date" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"
-          }`}
-        >
-          Vencimento
-        </button>
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex rounded-lg bg-secondary p-0.5 text-[10px] font-bold uppercase tracking-wider">
+        {(
+          [
+            ["transaction_date", "Transação"],
+            ["due_date", "Vencimento"],
+          ] as const
+        ).map(([basis, label]) => (
+          <button
+            key={basis}
+            onClick={() => setDateBasis(basis)}
+            className={`rounded-[7px] px-2.5 py-1.5 transition-all ${
+              dateBasis === basis
+                ? "bg-card text-foreground shadow-xs ring-1 ring-border"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
-      <div className="flex items-center gap-1">
-        <input
-          type="date"
-          {...datePickerProps()}
+
+      <div className="flex items-center gap-1 rounded-xl border border-border bg-card px-1 py-1 shadow-xs">
+        <DateField
           value={from}
           onChange={(e) => setRange(e.target.value, to)}
-          className="rounded-md border border-border bg-card px-2 py-1 font-mono text-xs outline-none focus:ring-1 focus:ring-ring"
+          aria-label="Início do período"
+          className="h-8 w-[9.5rem] rounded-lg border-transparent bg-transparent text-xs shadow-none"
         />
-        <span className="text-xs text-muted-foreground">→</span>
-        <input
-          type="date"
-          {...datePickerProps()}
+        <ArrowRight className="size-3 shrink-0 text-muted-foreground" />
+        <DateField
           value={to}
           onChange={(e) => setRange(from, e.target.value)}
-          className="rounded-md border border-border bg-card px-2 py-1 font-mono text-xs outline-none focus:ring-1 focus:ring-ring"
+          aria-label="Fim do período"
+          className="h-8 w-[9.5rem] rounded-lg border-transparent bg-transparent text-xs shadow-none"
         />
       </div>
-      <div className="hidden gap-1 sm:flex">
+
+      <div className="hidden gap-0.5 sm:flex">
         {presets.map((p) => (
           <button
             key={p.label}
@@ -85,7 +92,7 @@ export function PeriodControls() {
               const [f, t] = p.range();
               setRange(f, t);
             }}
-            className="rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+            className="rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-primary-soft hover:text-primary"
           >
             {p.label}
           </button>

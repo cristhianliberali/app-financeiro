@@ -20,10 +20,10 @@ export function ActiveTimerBar() {
   const elapsed = Math.floor((now - new Date(timer.started_at).getTime()) / 1000);
 
   return (
-    <div className="flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 py-1 pl-3 pr-1 text-sm">
-      <Play className="size-3 shrink-0 fill-primary text-primary" />
+    <div className="flex items-center gap-2 rounded-full border border-primary/30 bg-primary-soft py-1 pl-3 pr-1 text-sm shadow-xs">
+      <Play className="pulse-alert size-3 shrink-0 fill-primary text-primary" />
       <button
-        className="max-w-[10rem] truncate font-medium hover:underline sm:max-w-xs"
+        className="max-w-[10rem] truncate font-semibold hover:underline sm:max-w-xs"
         title={`Abrir ${timer.task.title}`}
         onClick={() =>
           navigate({
@@ -35,14 +35,16 @@ export function ActiveTimerBar() {
       >
         {timer.task.title}
       </button>
-      <span className="font-mono text-xs tabular-nums text-primary">{formatClock(elapsed)}</span>
+      <span className="font-mono text-xs font-bold tabular-nums text-primary">
+        {formatClock(elapsed)}
+      </span>
       <button
         onClick={async () => {
           await stop.mutateAsync(timer.id);
           toast.success("Cronômetro pausado");
         }}
         disabled={stop.isPending}
-        className="rounded-full p-1.5 text-primary transition-colors hover:bg-primary/20"
+        className="rounded-full p-1.5 text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
         aria-label="Pausar cronômetro"
         title="Pausar cronômetro"
       >

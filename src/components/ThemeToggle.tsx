@@ -15,7 +15,7 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
     return (
       <button
         onClick={toggle}
-        className="rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        className="rounded-xl border border-border bg-card p-2 text-muted-foreground shadow-xs transition-colors hover:border-border-strong hover:bg-accent hover:text-foreground"
         aria-label={resolved === "dark" ? "Usar tema claro" : "Usar tema escuro"}
         title={resolved === "dark" ? "Usar tema claro" : "Usar tema escuro"}
       >
@@ -25,16 +25,20 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <div className="flex rounded-lg border border-border p-0.5" role="group" aria-label="Tema">
+    <div
+      className="flex rounded-xl border border-border bg-secondary p-0.5"
+      role="group"
+      aria-label="Tema"
+    >
       {OPTIONS.map((option) => (
         <button
           key={option.value}
           onClick={() => setPreference(option.value)}
           aria-pressed={preference === option.value}
           title={option.label}
-          className={`rounded-md px-2 py-1 transition-colors ${
+          className={`rounded-lg px-2 py-1.5 transition-all ${
             preference === option.value
-              ? "bg-secondary text-foreground"
+              ? "bg-card text-primary shadow-xs ring-1 ring-border"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >

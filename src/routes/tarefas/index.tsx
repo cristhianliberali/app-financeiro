@@ -54,7 +54,8 @@ import {
   todayKey,
   dayKey,
 } from "@/lib/tasks-analytics";
-import { datePickerProps } from "@/components/ui/date-field";
+import { DateField } from "@/components/ui/date-field";
+import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
 
 /** Estado do retorno do consentimento do Google (`/api/google/callback`). */
 type Search = { agenda?: string | undefined };
@@ -124,21 +125,31 @@ function Indicator({
   tone?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5">
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <Icon className={`size-4 ${tone}`} />
-        <p className="text-xs uppercase tracking-wider">{label}</p>
+    <div className="panel-interactive p-5">
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <p className="label-caps">{label}</p>
+        <span
+          className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${
+            tone.includes("negative")
+              ? "bg-negative-soft text-negative-soft-foreground"
+              : tone.includes("positive")
+                ? "bg-positive-soft text-positive-soft-foreground"
+                : "bg-primary-soft text-primary"
+          }`}
+        >
+          <Icon className="size-4" strokeWidth={2.25} />
+        </span>
       </div>
-      <p className={`mt-2 font-mono text-2xl font-bold ${tone}`}>{value}</p>
-      {hint && <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>}
+      <p className={`stat-figure ${tone}`}>{value}</p>
+      {hint && <p className="mt-1.5 text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5">
-      <h4 className="mb-4 font-bold">{title}</h4>
+    <div className="panel p-5">
+      <h4 className="mb-4 text-base font-bold tracking-tight">{title}</h4>
       {children}
     </div>
   );
@@ -381,24 +392,24 @@ function TasksDashboard() {
       }
     >
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Projetos e Tarefas</h1>
+        <h1 className="title-xl">Projetos e Tarefas</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Visão consolidada de todos os espaços e quadros aos quais você tem acesso.
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-1 rounded-xl border border-border p-1">
+      <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-secondary p-1">
         {TABS.map(([value, label, Icon]) => (
           <button
             key={value}
             onClick={() => setTab(value)}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors ${
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-all ${
               tab === value
-                ? "bg-secondary font-medium text-foreground"
+                ? "bg-card text-foreground shadow-sm ring-1 ring-border"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Icon className="size-3.5" />
+            <Icon className={`size-4 ${tab === value ? "text-primary" : ""}`} />
             {label}
           </button>
         ))}
@@ -454,17 +465,15 @@ function TasksDashboard() {
             </div>
             {rangeKey === "custom" && (
               <>
-                <input
-                  type="date"
-                  {...datePickerProps()}
-                  className={SELECT_CLASS}
+                <DateField
+                  className="h-9 w-36"
+                  aria-label="Início do período"
                   value={custom.from}
                   onChange={(e) => setCustom({ ...custom, from: e.target.value })}
                 />
-                <input
-                  type="date"
-                  {...datePickerProps()}
-                  className={SELECT_CLASS}
+                <DateField
+                  className="h-9 w-36"
+                  aria-label="Fim do período"
                   value={custom.to}
                   onChange={(e) => setCustom({ ...custom, to: e.target.value })}
                 />
@@ -481,7 +490,7 @@ function TasksDashboard() {
               <option value="">Todos os espaços</option>
               {spaces.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.icon} {s.name}
+                  {s.name}
                 </option>
               ))}
             </select>
@@ -584,9 +593,10 @@ function TasksDashboard() {
           </div>
 
           {!hasData && (
-            <div className="rounded-2xl border border-dashed border-border p-10 text-center">
-              <p className="text-sm text-muted-foreground">
-                Nenhuma tarefa ainda. Crie um espaço, um quadro e comece a registrar atividades.
+            <div className="panel brand-sheen p-12 text-center">
+              <p className="text-sm font-semibold">Nenhuma tarefa ainda</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Crie um espaço, um quadro e comece a registrar atividades.
               </p>
               <Button className="mt-4" asChild>
                 <Link to="/tarefas/espacos">Criar meu primeiro espaço</Link>
@@ -777,7 +787,12 @@ function TasksDashboard() {
                     <Tooltip formatter={(v: number) => `${v} tarefas`} />
                     <Bar dataKey="tarefas" radius={[0, 4, 4, 0]}>
                       {byResponsible.map((_, i) => (
-                        <Cell key={i} fill={tone(PALETTE[i % PALETTE.length]!)} />
+                        <Cell
+                          key={i}
+                          fill={tone(PALETTE[i % PALETTE.length]!)}
+                          stroke="var(--color-card)"
+                          strokeWidth={2}
+                        />
                       ))}
                     </Bar>
                   </BarChart>
@@ -797,11 +812,13 @@ function TasksDashboard() {
                       key={space.id}
                       to="/tarefas/espacos/$spaceId"
                       params={{ spaceId: space.id }}
-                      className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-md"
+                      className="panel-interactive flex items-center gap-3 p-4"
                     >
-                      <span className="flex size-9 items-center justify-center rounded-lg border border-border bg-secondary">
-                        {space.icon}
-                      </span>
+                      <IconBadge
+                        name={space.icon}
+                        color={space.color}
+                        fallback={DEFAULT_SPACE_ICON}
+                      />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{space.name}</p>
                         <p className="text-[11px] text-muted-foreground">

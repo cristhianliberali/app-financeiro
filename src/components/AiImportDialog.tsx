@@ -254,7 +254,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
         </DialogHeader>
 
         {config && !config.enabled && (
-          <p className="rounded-lg border border-border bg-secondary/40 p-3 text-xs text-muted-foreground">
+          <p className="rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
             A importação por IA não está configurada neste ambiente. Defina <code>PROVEDOR_IA</code>
             , <code>MODELO_IA</code> e <code>OPENAI_API_KEY</code> no serviço.
           </p>
@@ -336,7 +336,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
             )}
 
             {/* Resumo somado pelo código a partir do que a IA devolveu. */}
-            <div className="rounded-xl border border-border bg-secondary/30 p-3">
+            <div className="rounded-xl border border-border bg-surface p-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="text-xs font-semibold">Resumo da extração</p>
                 <p className="text-[11px] text-muted-foreground">
@@ -428,7 +428,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
             )}
 
             {coverage.projectedRows > 0 && (
-              <p className="flex items-center gap-2 rounded-lg border border-border bg-secondary/40 p-2.5 text-xs text-muted-foreground">
+              <p className="flex items-center gap-2 rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
                 <CalendarPlus className="size-4 shrink-0" />
                 {coverage.projectedRows === 1
                   ? "1 parcela ainda não cobrada foi projetada a partir das compras parceladas da fatura, com vencimento no mês seguinte."
@@ -560,7 +560,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                       .filter((c) => c.kind === r.kind)
                       .map((c) => (
                         <option key={c.id} value={c.id}>
-                          {c.emoji} {c.name}
+                          {c.name}
                         </option>
                       ))}
                   </select>

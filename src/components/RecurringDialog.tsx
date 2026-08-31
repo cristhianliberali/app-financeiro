@@ -125,7 +125,7 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
                 .filter((c) => c.kind === form.kind)
                 .map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.emoji} {c.name}
+                    {c.name}
                   </option>
                 ))}
             </select>

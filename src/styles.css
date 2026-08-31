@@ -5,17 +5,33 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design system — preto e branco (Aura)
+ * Design system — Aura Prisma
  *
- * Toda a interface vive numa escala de cinzas: o tema claro é papel branco com
- * tinta preta, o escuro é o inverso, e `primary` é sempre o extremo oposto do
- * fundo. Hierarquia e ênfase vêm de contraste, peso e espaço — não de matiz.
+ * A interface é construída sobre uma base neutra levemente fria (nunca cinza
+ * puro: todos os neutros carregam um resto de azul-violeta) e uma cor de marca
+ * viva — um violeta-índigo que atravessa botões, foco, links e gráficos.
  *
- * As exceções são as informações que precisam ser lidas num relance, e não numa
- * leitura atenta. `--positive` e `--negative` guardam um resto mínimo de cor
- * (verde e vermelho bem dessaturados) para entrada e saída de dinheiro; a
- * prioridade da tarefa é a outra, e vive em `PRIORITIES`, dentro de
- * `src/lib/tasks-analytics.ts`.
+ * A cor tem trabalho a fazer, não é enfeite. Cada matiz carrega um significado
+ * fixo em todo o app:
+ *
+ *   --primary   violeta   ação, seleção, o caminho principal
+ *   --accent-2  ciano     apoio da marca em gradientes e gráficos
+ *   --positive  esmeralda dinheiro que entra, tarefa concluída, dentro do prazo
+ *   --negative  rosa      dinheiro que sai, erro, atraso, teto estourado
+ *   --warning   âmbar     atenção: vence hoje, perto de estourar a estimativa
+ *   --info      azul      informação neutra, estado "em andamento"
+ *
+ * Cada uma tem três formas: a cor cheia (`--positive`), a cor do texto sobre
+ * ela (`--positive-foreground`) e uma versão suave para fundos de selo
+ * (`--positive-soft` / `--positive-soft-foreground`). Os selos usam sempre o
+ * par suave — cor cheia em área grande cansa a vista e rouba o destaque dos
+ * botões.
+ *
+ * Profundidade vem de `--shadow-*` (sombras coloridas pelo neutro da base, não
+ * pretas) e das utilidades `panel`, `panel-interactive` e `ring-glow` no fim do
+ * arquivo. Os estados de item — feito, pendente, atrasado — moram nas
+ * utilidades `state-*`, para que Finanças e Tarefas marquem a mesma coisa do
+ * mesmo jeito.
  */
 
 @theme inline {
@@ -35,15 +51,20 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-foreground: var(--primary-soft-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-2: var(--accent-2);
+  --color-accent-2-foreground: var(--accent-2-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
@@ -51,14 +72,28 @@
   --color-ink-foreground: var(--ink-foreground);
   --color-positive: var(--positive);
   --color-positive-foreground: var(--positive-foreground);
+  --color-positive-soft: var(--positive-soft);
+  --color-positive-soft-foreground: var(--positive-soft-foreground);
   --color-negative: var(--negative);
   --color-negative-foreground: var(--negative-foreground);
+  --color-negative-soft: var(--negative-soft);
+  --color-negative-soft-foreground: var(--negative-soft-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-soft-foreground: var(--warning-soft-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-soft: var(--info-soft);
+  --color-info-soft-foreground: var(--info-soft-foreground);
   --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -67,93 +102,187 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --shadow-xs: var(--elevation-xs);
+  --shadow-sm: var(--elevation-sm);
+  --shadow-md: var(--elevation-md);
+  --shadow-lg: var(--elevation-lg);
+  --shadow-xl: var(--elevation-xl);
+  --shadow-glow: var(--elevation-glow);
 }
 
 :root {
-  --radius: 0.75rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.16 0 0);
-  --surface: oklch(0.968 0 0);
+  --radius: 0.875rem;
+
+  /* Base neutra — branco de papel com um sopro de azul. */
+  --background: oklch(0.987 0.003 275);
+  --foreground: oklch(0.21 0.02 274);
+  --surface: oklch(0.968 0.006 275);
+  --surface-2: oklch(0.945 0.009 275);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.16 0 0);
+  --card-foreground: oklch(0.21 0.02 274);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.16 0 0);
-  --primary: oklch(0.18 0 0);
-  --primary-foreground: oklch(1 0 0);
-  --ink: oklch(0.16 0 0);
-  --ink-foreground: oklch(1 0 0);
-  --secondary: oklch(0.962 0 0);
-  --secondary-foreground: oklch(0.16 0 0);
-  --muted: oklch(0.962 0 0);
-  --muted-foreground: oklch(0.505 0 0);
-  --accent: oklch(0.945 0 0);
-  --accent-foreground: oklch(0.16 0 0);
-  /* Únicas cores do sistema: dinheiro que entra e dinheiro que sai. */
-  --positive: oklch(0.5 0.055 158);
-  --positive-foreground: oklch(1 0 0);
-  --negative: oklch(0.5 0.09 25);
-  --negative-foreground: oklch(1 0 0);
-  --destructive: oklch(0.5 0.09 25);
-  --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.905 0 0);
-  --input: oklch(0.905 0 0);
-  --ring: oklch(0.18 0 0);
-  /* Rampa de cinzas dos gráficos, do mais escuro ao mais claro. */
-  --chart-1: oklch(0.22 0 0);
-  --chart-2: oklch(0.38 0 0);
-  --chart-3: oklch(0.53 0 0);
-  --chart-4: oklch(0.68 0 0);
-  --chart-5: oklch(0.82 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.16 0 0);
-  --sidebar-primary: oklch(0.18 0 0);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.945 0 0);
-  --sidebar-accent-foreground: oklch(0.16 0 0);
-  --sidebar-border: oklch(0.905 0 0);
-  --sidebar-ring: oklch(0.18 0 0);
+  --popover-foreground: oklch(0.21 0.02 274);
+  --secondary: oklch(0.962 0.007 275);
+  --secondary-foreground: oklch(0.28 0.022 274);
+  --muted: oklch(0.962 0.007 275);
+  --muted-foreground: oklch(0.53 0.022 272);
+  --accent: oklch(0.948 0.012 278);
+  --accent-foreground: oklch(0.28 0.03 278);
+  --border: oklch(0.905 0.008 275);
+  --border-strong: oklch(0.85 0.012 275);
+  --input: oklch(0.9 0.009 275);
+
+  /* Marca — violeta-índigo, com o ciano como segunda voz. */
+  --primary: oklch(0.55 0.216 279);
+  --primary-foreground: oklch(0.995 0 0);
+  --primary-soft: oklch(0.955 0.028 279);
+  --primary-soft-foreground: oklch(0.44 0.2 279);
+  --accent-2: oklch(0.68 0.135 213);
+  --accent-2-foreground: oklch(0.99 0 0);
+  --ring: oklch(0.55 0.216 279);
+
+  /* Superfície escura de destaque (cartões "invertidos"). */
+  --ink: oklch(0.24 0.045 278);
+  --ink-foreground: oklch(0.98 0.006 275);
+
+  /* Semânticas. */
+  --positive: oklch(0.62 0.155 158);
+  --positive-foreground: oklch(0.99 0 0);
+  --positive-soft: oklch(0.955 0.04 158);
+  --positive-soft-foreground: oklch(0.46 0.12 158);
+  --negative: oklch(0.585 0.212 17);
+  --negative-foreground: oklch(0.99 0 0);
+  --negative-soft: oklch(0.958 0.03 17);
+  --negative-soft-foreground: oklch(0.5 0.19 17);
+  --warning: oklch(0.755 0.16 68);
+  --warning-foreground: oklch(0.24 0.05 68);
+  --warning-soft: oklch(0.96 0.045 74);
+  --warning-soft-foreground: oklch(0.52 0.13 62);
+  --info: oklch(0.6 0.175 250);
+  --info-foreground: oklch(0.99 0 0);
+  --info-soft: oklch(0.955 0.032 250);
+  --info-soft-foreground: oklch(0.47 0.16 250);
+  --destructive: oklch(0.585 0.212 17);
+  --destructive-foreground: oklch(0.99 0 0);
+
+  /* Gráficos: seis matizes distinguíveis, todos no mesmo nível de saturação. */
+  --chart-1: oklch(0.58 0.21 279);
+  --chart-2: oklch(0.68 0.14 205);
+  --chart-3: oklch(0.66 0.155 158);
+  --chart-4: oklch(0.76 0.155 72);
+  --chart-5: oklch(0.63 0.2 12);
+  --chart-6: oklch(0.63 0.19 325);
+
+  --sidebar: oklch(0.988 0.004 275);
+  --sidebar-foreground: oklch(0.21 0.02 274);
+  --sidebar-primary: oklch(0.55 0.216 279);
+  --sidebar-primary-foreground: oklch(0.995 0 0);
+  --sidebar-accent: oklch(0.955 0.02 279);
+  --sidebar-accent-foreground: oklch(0.36 0.14 279);
+  --sidebar-border: oklch(0.912 0.008 275);
+  --sidebar-ring: oklch(0.55 0.216 279);
+
+  /*
+   * Sombras tingidas pelo neutro da base. Sombra preta pura sobre fundo frio
+   * parece sujeira; com o mesmo matiz do fundo ela vira profundidade.
+   */
+  --elevation-xs: 0 1px 2px 0 oklch(0.3 0.05 275 / 0.06);
+  --elevation-sm: 0 1px 2px 0 oklch(0.3 0.05 275 / 0.05), 0 2px 6px -1px oklch(0.3 0.05 275 / 0.07);
+  --elevation-md:
+    0 2px 4px -1px oklch(0.3 0.05 275 / 0.06), 0 8px 20px -4px oklch(0.3 0.05 275 / 0.1);
+  --elevation-lg:
+    0 4px 8px -2px oklch(0.3 0.05 275 / 0.07), 0 16px 36px -8px oklch(0.3 0.05 275 / 0.14);
+  --elevation-xl:
+    0 8px 16px -4px oklch(0.3 0.05 275 / 0.08), 0 28px 64px -16px oklch(0.3 0.05 275 / 0.2);
+  --elevation-glow: 0 6px 24px -6px oklch(0.55 0.216 279 / 0.45);
+
+  --gradient-brand: linear-gradient(135deg, oklch(0.58 0.216 285), oklch(0.62 0.16 236));
+  --gradient-sheen: linear-gradient(
+    135deg,
+    oklch(0.55 0.216 279 / 0.1),
+    oklch(0.68 0.135 213 / 0.04)
+  );
 }
 
 .dark {
-  --background: oklch(0.115 0 0);
-  --foreground: oklch(0.98 0 0);
-  --surface: oklch(0.165 0 0);
-  --card: oklch(0.165 0 0);
-  --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.185 0 0);
-  --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.98 0 0);
-  --primary-foreground: oklch(0.13 0 0);
-  --ink: oklch(0.98 0 0);
-  --ink-foreground: oklch(0.13 0 0);
-  --secondary: oklch(0.225 0 0);
-  --secondary-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.225 0 0);
-  --muted-foreground: oklch(0.66 0 0);
-  --accent: oklch(0.255 0 0);
-  --accent-foreground: oklch(0.98 0 0);
-  --positive: oklch(0.72 0.06 158);
-  --positive-foreground: oklch(0.13 0 0);
-  --negative: oklch(0.68 0.1 25);
-  --negative-foreground: oklch(0.13 0 0);
-  --destructive: oklch(0.68 0.1 25);
-  --destructive-foreground: oklch(0.13 0 0);
-  --border: oklch(1 0 0 / 13%);
-  --input: oklch(1 0 0 / 17%);
-  --ring: oklch(0.85 0 0);
-  --chart-1: oklch(0.95 0 0);
-  --chart-2: oklch(0.8 0 0);
-  --chart-3: oklch(0.66 0 0);
-  --chart-4: oklch(0.52 0 0);
-  --chart-5: oklch(0.4 0 0);
-  --sidebar: oklch(0.145 0 0);
-  --sidebar-foreground: oklch(0.98 0 0);
-  --sidebar-primary: oklch(0.98 0 0);
-  --sidebar-primary-foreground: oklch(0.13 0 0);
-  --sidebar-accent: oklch(0.245 0 0);
-  --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(1 0 0 / 13%);
-  --sidebar-ring: oklch(0.85 0 0);
+  /* Base escura azul-violeta: nunca preto puro, que achata os cartões. */
+  --background: oklch(0.165 0.018 277);
+  --foreground: oklch(0.965 0.006 275);
+  --surface: oklch(0.205 0.021 277);
+  --surface-2: oklch(0.235 0.023 277);
+  --card: oklch(0.212 0.022 277);
+  --card-foreground: oklch(0.965 0.006 275);
+  --popover: oklch(0.235 0.024 277);
+  --popover-foreground: oklch(0.965 0.006 275);
+  --secondary: oklch(0.262 0.025 277);
+  --secondary-foreground: oklch(0.95 0.008 275);
+  --muted: oklch(0.262 0.025 277);
+  --muted-foreground: oklch(0.7 0.022 274);
+  --accent: oklch(0.3 0.035 279);
+  --accent-foreground: oklch(0.96 0.01 275);
+  --border: oklch(0.98 0.02 275 / 12%);
+  --border-strong: oklch(0.98 0.02 275 / 22%);
+  --input: oklch(0.98 0.02 275 / 16%);
+
+  --primary: oklch(0.68 0.185 285);
+  --primary-foreground: oklch(0.16 0.03 285);
+  --primary-soft: oklch(0.68 0.185 285 / 0.16);
+  --primary-soft-foreground: oklch(0.82 0.12 285);
+  --accent-2: oklch(0.74 0.125 210);
+  --accent-2-foreground: oklch(0.17 0.03 210);
+  --ring: oklch(0.72 0.16 285);
+
+  --ink: oklch(0.29 0.05 280);
+  --ink-foreground: oklch(0.97 0.008 275);
+
+  --positive: oklch(0.75 0.155 160);
+  --positive-foreground: oklch(0.17 0.04 160);
+  --positive-soft: oklch(0.75 0.155 160 / 0.16);
+  --positive-soft-foreground: oklch(0.83 0.13 160);
+  --negative: oklch(0.685 0.19 18);
+  --negative-foreground: oklch(0.16 0.04 18);
+  --negative-soft: oklch(0.685 0.19 18 / 0.18);
+  --negative-soft-foreground: oklch(0.8 0.14 18);
+  --warning: oklch(0.81 0.15 72);
+  --warning-foreground: oklch(0.19 0.04 72);
+  --warning-soft: oklch(0.81 0.15 72 / 0.17);
+  --warning-soft-foreground: oklch(0.87 0.12 76);
+  --info: oklch(0.7 0.155 250);
+  --info-foreground: oklch(0.16 0.04 250);
+  --info-soft: oklch(0.7 0.155 250 / 0.17);
+  --info-soft-foreground: oklch(0.82 0.11 250);
+  --destructive: oklch(0.685 0.19 18);
+  --destructive-foreground: oklch(0.16 0.04 18);
+
+  --chart-1: oklch(0.7 0.18 283);
+  --chart-2: oklch(0.76 0.125 205);
+  --chart-3: oklch(0.76 0.145 160);
+  --chart-4: oklch(0.82 0.145 76);
+  --chart-5: oklch(0.71 0.175 15);
+  --chart-6: oklch(0.72 0.165 325);
+
+  --sidebar: oklch(0.185 0.02 277);
+  --sidebar-foreground: oklch(0.965 0.006 275);
+  --sidebar-primary: oklch(0.68 0.185 285);
+  --sidebar-primary-foreground: oklch(0.16 0.03 285);
+  --sidebar-accent: oklch(0.68 0.185 285 / 0.18);
+  --sidebar-accent-foreground: oklch(0.87 0.1 285);
+  --sidebar-border: oklch(0.98 0.02 275 / 12%);
+  --sidebar-ring: oklch(0.72 0.16 285);
+
+  --elevation-xs: 0 1px 2px 0 oklch(0 0 0 / 0.35);
+  --elevation-sm: 0 1px 2px 0 oklch(0 0 0 / 0.3), 0 2px 6px -1px oklch(0 0 0 / 0.4);
+  --elevation-md: 0 2px 4px -1px oklch(0 0 0 / 0.35), 0 8px 20px -4px oklch(0 0 0 / 0.45);
+  --elevation-lg: 0 4px 8px -2px oklch(0 0 0 / 0.4), 0 16px 36px -8px oklch(0 0 0 / 0.55);
+  --elevation-xl: 0 8px 16px -4px oklch(0 0 0 / 0.45), 0 28px 64px -16px oklch(0 0 0 / 0.65);
+  --elevation-glow: 0 6px 26px -6px oklch(0.68 0.185 285 / 0.55);
+
+  --gradient-brand: linear-gradient(135deg, oklch(0.62 0.2 288), oklch(0.6 0.15 232));
+  --gradient-sheen: linear-gradient(
+    135deg,
+    oklch(0.68 0.185 285 / 0.16),
+    oklch(0.74 0.125 210 / 0.06)
+  );
 }
 
 @layer base {
@@ -166,66 +295,185 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   /*
-   * Campos de data e hora.
-   *
-   * O ícone do calendário é desenhado pelo navegador em preto fixo: no tema
-   * escuro ele ficava preto sobre fundo preto — invisível, como se o campo não
-   * tivesse ícone nenhum. `invert` devolve o contraste no escuro, e o cursor de
-   * mão diz que dá para clicar. A abertura do calendário ao clicar em qualquer
-   * ponto do campo é do `DateField` (src/components/ui/date-field.tsx).
+   * Números — valores, datas e relógios — em tabular: sem isso as colunas de
+   * dinheiro dançam a cada dígito que muda.
    */
-  input[type="date"]::-webkit-calendar-picker-indicator,
-  input[type="datetime-local"]::-webkit-calendar-picker-indicator,
-  input[type="month"]::-webkit-calendar-picker-indicator,
-  input[type="time"]::-webkit-calendar-picker-indicator,
-  input[type="week"]::-webkit-calendar-picker-indicator {
-    cursor: pointer;
-    opacity: 0.65;
-    transition: opacity 0.15s ease;
+  .font-mono,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
   }
 
-  input[type="date"]:hover::-webkit-calendar-picker-indicator,
-  input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator,
-  input[type="month"]:hover::-webkit-calendar-picker-indicator,
-  input[type="time"]:hover::-webkit-calendar-picker-indicator,
-  input[type="week"]:hover::-webkit-calendar-picker-indicator {
-    opacity: 1;
+  ::selection {
+    background-color: var(--color-primary);
+    color: var(--color-primary-foreground);
   }
 
-  .dark input[type="date"]::-webkit-calendar-picker-indicator,
-  .dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
-  .dark input[type="month"]::-webkit-calendar-picker-indicator,
-  .dark input[type="time"]::-webkit-calendar-picker-indicator,
-  .dark input[type="week"]::-webkit-calendar-picker-indicator {
-    filter: invert(1);
-  }
-
-  /* O campo vazio mostra "dd/mm/aaaa"; sem isto ele briga com o placeholder. */
-  input[type="date"],
-  input[type="datetime-local"],
-  input[type="month"],
-  input[type="time"],
-  input[type="week"] {
-    cursor: pointer;
+  /*
+   * Foco visível padrão. Todo controle interativo herda o mesmo anel da marca,
+   * então teclado e mouse enxergam o mesmo destaque em qualquer tela. Quem
+   * desenha o próprio anel desliga este com `focus-visible:outline-none`, que
+   * vem de uma camada posterior e ganha da regra base.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
   }
 }
 
+/* ------------------------------------------------------------------------ */
+/* Superfícies                                                               */
+/* ------------------------------------------------------------------------ */
+
+/** Cartão padrão: fundo, borda e canto do sistema, com sombra leve. */
 @utility panel {
   background-color: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: calc(var(--radius) + 8px);
+  box-shadow: var(--elevation-sm);
 }
 
+/** Cartão que responde ao mouse — usado em listas de itens clicáveis. */
+@utility panel-interactive {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius) + 8px);
+  box-shadow: var(--elevation-sm);
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+
+  &:hover {
+    border-color: var(--color-border-strong);
+    box-shadow: var(--elevation-md);
+    transform: translateY(-1px);
+  }
+}
+
+/** Faixa de destaque com o gradiente da marca. */
+@utility brand-gradient {
+  background-image: var(--gradient-brand);
+  color: oklch(0.99 0 0);
+}
+
+/** Véu translúcido da marca, para cabeçalhos e vazios ilustrados. */
+@utility brand-sheen {
+  background-image: var(--gradient-sheen);
+}
+
+/** Halo da marca em volta de um elemento em foco/ativo. */
+@utility ring-glow {
+  box-shadow: var(--elevation-glow);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Tipografia                                                                */
+/* ------------------------------------------------------------------------ */
+
 @utility label-caps {
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--color-muted-foreground);
 }
+
+/** Título de tela: grande, apertado, com peso. */
+@utility title-xl {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+/** Número em destaque (saldo, total, contador). */
+@utility stat-figure {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Estados de item — feito, pendente, atrasado                               */
+/* ------------------------------------------------------------------------ */
+
+/*
+ * Os quatro estados que Finanças e Tarefas compartilham. A regra é a mesma nos
+ * dois módulos: uma barra de cor na borda esquerda diz o estado num relance, e
+ * o conteúdo concluído recua (opacidade e risco) para que o que falta fazer
+ * fique por cima. Aplicar em cima de `panel` ou de uma linha de lista — em
+ * tabela, use `border-l-*` na primeira célula, porque `<tr>` não recorta.
+ */
+@utility state-bar {
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    width: 3px;
+    border-radius: 9999px;
+    background-color: var(--state-color, transparent);
+  }
+}
+
+@utility state-done {
+  --state-color: var(--color-positive);
+}
+
+@utility state-pending {
+  --state-color: var(--color-info);
+}
+
+@utility state-due {
+  --state-color: var(--color-warning);
+}
+
+@utility state-late {
+  --state-color: var(--color-negative);
+}
+
+/** Texto de um item concluído: recuado, riscado, sem sumir de vez. */
+@utility done-text {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: var(--color-positive);
+  opacity: 0.6;
+}
+
+/**
+ * Pulso discreto para o que exige ação agora (atrasado, timer rodando).
+ * Respeita quem pediu menos movimento no sistema.
+ */
+@utility pulse-alert {
+  animation: aura-pulse 2.4s ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes aura-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Rolagem                                                                   */
+/* ------------------------------------------------------------------------ */
 
 /*
  * Barras de rolagem discretas — o módulo de Projetos e Tarefas tem colunas de
@@ -233,7 +481,7 @@
  */
 @utility thin-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-border) transparent;
+  scrollbar-color: var(--color-border-strong) transparent;
 
   &::-webkit-scrollbar {
     width: 6px;
@@ -243,7 +491,10 @@
     background: transparent;
   }
   &::-webkit-scrollbar-thumb {
-    background: var(--color-border);
+    background: var(--color-border-strong);
     border-radius: 9999px;
+  }
+  &:hover::-webkit-scrollbar-thumb {
+    background: var(--color-muted-foreground);
   }
 }

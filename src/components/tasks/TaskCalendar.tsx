@@ -96,13 +96,10 @@ export function TaskCalendar({
     <button
       key={e.id}
       onClick={() => onOpen(e.task)}
-      className="flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[11px] transition-colors hover:bg-secondary"
+      className="flex w-full items-center gap-1.5 truncate rounded-md px-1.5 py-1 text-left text-[11px] font-medium transition-colors hover:bg-accent"
       title={`${e.title} · ${e.task.board.name}`}
     >
-      <span
-        className="size-1.5 shrink-0 rounded-full ring-1 ring-border"
-        style={{ backgroundColor: tone(e.color) }}
-      />
+      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: tone(e.color) }} />
       <span className={`truncate ${e.kind === "subtask" ? "text-muted-foreground" : ""}`}>
         {e.title}
       </span>
@@ -124,7 +121,7 @@ export function TaskCalendar({
           </Button>
           <span className="ml-2 text-sm font-semibold capitalize">{title}</span>
         </div>
-        <div className="flex rounded-lg border border-border p-0.5">
+        <div className="flex rounded-xl border border-border bg-secondary p-0.5">
           {(
             [
               ["month", "Mensal"],
@@ -135,9 +132,9 @@ export function TaskCalendar({
             <button
               key={value}
               onClick={() => setMode(value)}
-              className={`rounded-md px-3 py-1 text-xs transition-colors ${
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                 mode === value
-                  ? "bg-secondary font-medium text-foreground"
+                  ? "bg-card text-foreground shadow-xs ring-1 ring-border"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -148,7 +145,7 @@ export function TaskCalendar({
       </div>
 
       {mode === "day" ? (
-        <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="panel p-4">
           <p className="mb-3 text-sm font-semibold capitalize">
             {anchor.toLocaleDateString("pt-BR", { weekday: "long" })}
           </p>
@@ -160,10 +157,10 @@ export function TaskCalendar({
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-border bg-card">
-          <div className="grid grid-cols-7 border-b border-border text-center text-[11px] uppercase tracking-wider text-muted-foreground">
+        <div className="panel overflow-hidden">
+          <div className="grid grid-cols-7 border-b border-border bg-surface text-center">
             {WEEKDAY_LABELS.map((d) => (
-              <div key={d} className="py-2">
+              <div key={d} className="label-caps py-2.5">
                 {d}
               </div>
             ))}
@@ -177,13 +174,13 @@ export function TaskCalendar({
                 <div
                   key={key}
                   className={`min-h-24 space-y-0.5 border-b border-r border-border p-1.5 last:border-r-0 ${
-                    otherMonth ? "bg-secondary/20" : ""
+                    otherMonth ? "bg-surface/60" : ""
                   } ${mode === "week" ? "min-h-56" : ""}`}
                 >
                   <p
                     className={`mb-1 text-[11px] ${
                       key === today
-                        ? "inline-flex size-5 items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground"
+                        ? "inline-flex size-6 items-center justify-center rounded-full bg-primary font-bold text-primary-foreground shadow-glow"
                         : otherMonth
                           ? "text-muted-foreground/60"
                           : "text-muted-foreground"

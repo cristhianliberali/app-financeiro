@@ -99,7 +99,7 @@ function AccountPage() {
   return (
     <AppShell>
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Conta e equipe</h1>
+        <h1 className="title-xl">Conta e equipe</h1>
         <p className="text-sm text-muted-foreground">
           Cada conta é um espaço independente. Dentro dela você cria perfis (Pessoal, Empresa,
           Família…) que isolam totalmente os dados, e convida pessoas para ver ou editar.
@@ -107,10 +107,8 @@ function AccountPage() {
       </header>
 
       {/* Contas */}
-      <section className="rounded-2xl border border-border bg-card p-6">
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Minhas contas
-        </h2>
+      <section className="panel p-6">
+        <h2 className="label-caps mb-4">Minhas contas</h2>
         <div className="space-y-2">
           {accounts?.map((a) => (
             <div
@@ -173,10 +171,8 @@ function AccountPage() {
 
       {/* Dados da conta ativa */}
       {account && (
-        <section className="rounded-2xl border border-border bg-card p-6">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Conta ativa
-          </h2>
+        <section className="panel p-6">
+          <h2 className="label-caps mb-4">Conta ativa</h2>
           <div className="flex flex-wrap items-end gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="account-name">Nome</Label>
@@ -222,16 +218,17 @@ function AccountPage() {
       )}
 
       {/* Perfis */}
-      <section className="rounded-2xl border border-border bg-card p-6">
-        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Perfis desta conta
-        </h2>
+      <section className="panel p-6">
+        <h2 className="label-caps mb-1">Perfis desta conta</h2>
         <p className="mb-4 text-xs text-muted-foreground">
           Cada perfil tem transações, categorias, investimentos e metas totalmente isolados.
         </p>
         <div className="space-y-2">
           {profiles?.map((p) => (
-            <div key={p.id} className="flex items-center gap-3 rounded-xl border border-border p-3">
+            <div
+              key={p.id}
+              className="flex items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-accent/40"
+            >
               <span className="size-3 rounded-full" style={{ backgroundColor: p.color }} />
               <span className="font-medium">{p.name}</span>
               {p.is_default && <Badge variant="secondary">padrão</Badge>}
@@ -289,15 +286,13 @@ function AccountPage() {
       </section>
 
       {/* Membros */}
-      <section className="rounded-2xl border border-border bg-card p-6">
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Membros do grupo
-        </h2>
+      <section className="panel p-6">
+        <h2 className="label-caps mb-4">Membros do grupo</h2>
         <div className="space-y-2">
           {members?.map((m) => (
             <div
               key={m.id}
-              className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-3"
+              className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-accent/40"
             >
               <span className="text-sm font-medium">
                 {m.user_id === user?.id ? "Você" : (m.email ?? m.user_id.slice(0, 8))}
@@ -384,15 +379,13 @@ function AccountPage() {
 
       {/* Convites */}
       {isOwner && (invites?.length ?? 0) > 0 && (
-        <section className="rounded-2xl border border-border bg-card p-6">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Convites
-          </h2>
+        <section className="panel p-6">
+          <h2 className="label-caps mb-4">Convites</h2>
           <div className="space-y-2">
             {invites?.map((i) => (
               <div
                 key={i.id}
-                className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-3"
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-accent/40"
               >
                 <span className="text-sm font-medium">{i.email}</span>
                 <Badge variant="secondary">

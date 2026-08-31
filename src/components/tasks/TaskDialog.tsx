@@ -65,6 +65,7 @@ import { RichTextEditor, RichTextView } from "./RichText";
 import { TaskAttachments } from "./TaskAttachments";
 import { TaskReminders } from "./TaskReminders";
 import { UserAvatar, UserMultiSelect, UserSelect } from "./UserPicker";
+import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
 
 const ACTIVITY_TEXT: Record<string, string> = {
   task_created: "criou a tarefa",
@@ -99,7 +100,7 @@ function StatusSelect({
     <select
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value)}
-      className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+      className="h-11 w-full rounded-xl border border-input bg-card px-3 text-sm font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25"
     >
       <option value="" disabled>
         Selecione um status
@@ -130,8 +131,12 @@ function SubtaskRow({
   const state = deadlineState({ due_date: subtask.due_date, polarity: null });
 
   return (
-    <div className="rounded-lg border border-border">
-      <div className="flex items-center gap-2 px-3 py-2">
+    <div
+      className={`state-bar rounded-xl border border-border transition-colors ${
+        subtask.completed ? "state-done" : "state-pending"
+      }`}
+    >
+      <div className="flex items-center gap-2 px-3 py-2.5">
         <Checkbox
           checked={subtask.completed}
           onCheckedChange={(checked) => onSave({ completed: checked === true })}
@@ -141,8 +146,8 @@ function SubtaskRow({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => title.trim() && title !== subtask.title && onSave({ title: title.trim() })}
-          className={`flex-1 bg-transparent text-sm outline-none ${
-            subtask.completed ? "text-muted-foreground line-through" : ""
+          className={`flex-1 bg-transparent text-sm font-medium outline-none ${
+            subtask.completed ? "done-text" : ""
           }`}
         />
         {subtask.responsible_user_id && (
@@ -366,13 +371,19 @@ export function TaskDialog({
                   draft.title !== task.title &&
                   patch({ title: draft.title.trim() })
                 }
-                className="w-full bg-transparent text-lg font-bold outline-none"
+                className="w-full rounded-lg bg-transparent px-1 py-0.5 text-lg font-bold tracking-tight outline-none transition-colors hover:bg-accent/50 focus:bg-accent/50"
               />
             )}
           </DialogTitle>
           {task && (
-            <p className="text-xs text-muted-foreground">
-              {task.space.icon} {task.space.name} › {task.board.name}
+            <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <IconBadge
+                name={task.space.icon}
+                color={task.space.color}
+                size="sm"
+                fallback={DEFAULT_SPACE_ICON}
+              />
+              {task.space.name} › {task.board.name}
             </p>
           )}
         </DialogHeader>
@@ -514,7 +525,7 @@ export function TaskDialog({
         </div>
 
         {!isNew && (
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-secondary/30 p-3">
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-3">
             <Clock className="size-4 text-muted-foreground" />
             <div>
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -657,7 +668,7 @@ export function TaskDialog({
                   return (
                     <div
                       key={e.id}
-                      className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-xs"
+                      className="flex items-center gap-2 rounded-lg border border-border bg-surface/60 px-3 py-2 text-xs"
                     >
                       <UserAvatar
                         user={users.find((u) => u.user_id === e.user_id) ?? null}

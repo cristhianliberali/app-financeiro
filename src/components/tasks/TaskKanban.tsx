@@ -39,7 +39,7 @@ export function TaskKanban({
 
   if (columns.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+      <div className="rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center text-sm text-muted-foreground">
         Este quadro ainda não possui status configurados.
       </div>
     );
@@ -52,8 +52,10 @@ export function TaskKanban({
         return (
           <div
             key={col.id}
-            className={`flex w-72 shrink-0 flex-col rounded-2xl border bg-surface/40 p-2 transition-colors ${
-              over === col.id ? "border-primary bg-primary/5" : "border-border"
+            className={`flex w-72 shrink-0 flex-col rounded-2xl border bg-surface p-2 transition-all ${
+              over === col.id
+                ? "border-primary bg-primary-soft ring-2 ring-ring/25"
+                : "border-border"
             }`}
             onDragOver={(e) => {
               e.preventDefault();
@@ -69,19 +71,23 @@ export function TaskKanban({
               if (task && columnOf(task) !== col.id) onMove(task, col.id);
             }}
           >
-            <div className="mb-2 flex items-center gap-2 px-2 pt-1">
-              <span
-                className="size-2 rounded-full ring-1 ring-border"
-                style={{ backgroundColor: tone(col.color) }}
-              />
-              <span className="text-sm font-semibold" title={col.hint}>
+            {/* Faixa da cor do status no topo da coluna: identifica a coluna
+                mesmo quando o cabeçalho sai da tela na rolagem horizontal. */}
+            <div
+              className="mx-2 mb-2 mt-1 h-1 rounded-full"
+              style={{ backgroundColor: tone(col.color) }}
+            />
+            <div className="mb-2 flex items-center gap-2 px-2">
+              <span className="text-sm font-bold tracking-tight" title={col.hint}>
                 {col.name}
               </span>
-              <span className="text-xs text-muted-foreground">{items.length}</span>
+              <span className="rounded-full bg-secondary px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground">
+                {items.length}
+              </span>
               {onAdd && (
                 <button
                   onClick={() => onAdd(col.id)}
-                  className="ml-auto rounded p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  className="ml-auto rounded-lg p-1 text-muted-foreground transition-colors hover:bg-primary-soft hover:text-primary"
                   aria-label={`Nova tarefa em ${col.name}`}
                   title={`Nova tarefa em ${col.name}`}
                 >
@@ -107,7 +113,7 @@ export function TaskKanban({
                 />
               ))}
               {items.length === 0 && (
-                <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+                <p className="rounded-xl border border-dashed border-border px-2 py-8 text-center text-xs text-muted-foreground">
                   Arraste tarefas para cá
                 </p>
               )}

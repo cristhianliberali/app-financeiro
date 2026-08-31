@@ -5,6 +5,7 @@ import { useAuth, useAuthConfig } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -61,20 +62,30 @@ function AuthPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 flex items-center gap-2">
-          <div className="size-8 rounded-lg bg-primary" />
-          <span className="text-xl font-bold tracking-tight">AURA</span>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10">
+      {/*
+        Dois halos da marca ao fundo. Ficam atrás do cartão e bem desfocados:
+        dão profundidade à tela de entrada sem disputar leitura com o formulário.
+      */}
+      <span className="pointer-events-none absolute -left-32 -top-32 size-96 rounded-full bg-primary/20 blur-3xl" />
+      <span className="pointer-events-none absolute -bottom-32 -right-32 size-96 rounded-full bg-accent-2/20 blur-3xl" />
+
+      <div className="panel relative w-full max-w-sm p-8 shadow-xl">
+        <div className="mb-7 flex items-center gap-2.5">
+          <span className="brand-gradient flex size-10 items-center justify-center rounded-xl shadow-glow">
+            <Sparkles className="size-5" strokeWidth={2.5} />
+          </span>
+          <span className="flex flex-col leading-none">
+            <span className="text-xl font-extrabold tracking-tight">AURA</span>
+            <span className="label-caps text-[0.6rem]">Finanças &amp; Projetos</span>
+          </span>
         </div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {mode === "login" ? "Entrar na sua conta" : "Criar sua conta"}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="title-xl">{mode === "login" ? "Entrar na sua conta" : "Criar sua conta"}</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
           Gestão de gastos, orçamentos e economias em um só lugar.
         </p>
 
-        <form onSubmit={submit} className="mt-8 space-y-4">
+        <form onSubmit={submit} className="mt-7 space-y-4">
           {mode === "signup" && (
             <div className="space-y-1.5">
               <Label htmlFor="name">Nome</Label>
@@ -112,8 +123,8 @@ function AuthPage() {
               <p className="text-xs text-muted-foreground">Use pelo menos 8 caracteres.</p>
             )}
           </div>
-          <Button type="submit" className="w-full" disabled={busy}>
-            {mode === "login" ? "Entrar" : "Criar conta"}
+          <Button type="submit" variant="brand" size="lg" className="w-full" disabled={busy}>
+            {busy ? "Aguarde…" : mode === "login" ? "Entrar" : "Criar conta"}
           </Button>
         </form>
 
@@ -121,7 +132,7 @@ function AuthPage() {
           <Link
             to="/redefinir-senha"
             search={{}}
-            className="mt-4 block w-full text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+            className="mt-4 block w-full text-center text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
           >
             Esqueci minha senha
           </Link>
@@ -130,7 +141,7 @@ function AuthPage() {
         {signupEnabled ? (
           <button
             onClick={() => setMode(mode === "login" ? "signup" : "login")}
-            className="mt-6 w-full text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+            className="mt-6 w-full text-center text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
           >
             {mode === "login" ? "Não tem conta? Criar agora" : "Já tem conta? Entrar"}
           </button>

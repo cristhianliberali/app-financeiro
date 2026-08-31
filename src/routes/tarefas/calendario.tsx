@@ -50,7 +50,7 @@ function CalendarPage() {
   return (
     <TasksShell breadcrumbCurrent="Calendário">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Calendário</h1>
+        <h1 className="title-xl">Calendário</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Tarefas e subtarefas com datas definidas, de todos os espaços e quadros a que você tem
           acesso.

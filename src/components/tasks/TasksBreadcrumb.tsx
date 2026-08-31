@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useBoards, useSpaces } from "@/lib/tasks";
 import { useAppState } from "@/lib/app-state";
 import { useTone } from "@/hooks/use-tone";
+import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
 
 /**
  * Navegação hierárquica: Espaço / Quadro.
@@ -55,7 +56,12 @@ export function TasksBreadcrumb({
               params={{ spaceId: space.id }}
               className="flex min-w-0 items-center gap-1.5 rounded-l-md px-1.5 py-1 transition-colors hover:bg-secondary"
             >
-              <span aria-hidden>{space.icon}</span>
+              <IconBadge
+                name={space.icon}
+                color={space.color}
+                size="sm"
+                fallback={DEFAULT_SPACE_ICON}
+              />
               <span className={`truncate ${board ? "text-muted-foreground" : "font-semibold"}`}>
                 {space.name}
               </span>
@@ -68,7 +74,14 @@ export function TasksBreadcrumb({
               items={activeSpaces.map((option) => ({
                 id: option.id,
                 label: option.name,
-                prefix: option.icon,
+                prefix: (
+                  <IconBadge
+                    name={option.icon}
+                    color={option.color}
+                    size="sm"
+                    fallback={DEFAULT_SPACE_ICON}
+                  />
+                ),
                 active: option.id === space.id,
                 onSelect: () =>
                   navigate({
@@ -138,7 +151,7 @@ const Separator = () => (
 type PickerItem = {
   id: string;
   label: string;
-  prefix?: string;
+  prefix?: React.ReactNode;
   color?: string;
   active: boolean;
   onSelect: () => void;
@@ -181,7 +194,7 @@ function LevelPicker({
                 item.active ? "font-semibold" : ""
               }`}
             >
-              {item.prefix && <span aria-hidden>{item.prefix}</span>}
+              {item.prefix}
               {item.color && (
                 <span
                   className="size-2 shrink-0 rounded-full ring-1 ring-border"

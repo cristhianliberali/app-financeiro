@@ -46,7 +46,7 @@ export function TaskAttachments({ taskId, canEdit }: { taskId: string; canEdit: 
     return (
       <div className="space-y-2">
         <Label>Anexos</Label>
-        <p className="rounded-lg border border-border bg-secondary/40 p-3 text-xs text-muted-foreground">
+        <p className="rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
           O armazenamento de arquivos não está configurado neste ambiente. Defina as variáveis{" "}
           <code>S3_BUCKET</code>, <code>S3_ACCESS_KEY_ID</code> e <code>S3_SECRET_ACCESS_KEY</code>{" "}
           no serviço.

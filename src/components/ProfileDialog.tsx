@@ -92,7 +92,7 @@ export function ProfileDialog({
 
         <div className="space-y-5">
           {/* Nome */}
-          <section className="space-y-3 rounded-xl border border-border p-4">
+          <section className="space-y-3 rounded-xl border border-border bg-surface/60 p-4">
             <h3 className="flex items-center gap-2 text-sm font-semibold">
               <User className="size-4" /> Dados pessoais
             </h3>
@@ -121,7 +121,7 @@ export function ProfileDialog({
           </section>
 
           {/* E-mail */}
-          <section className="space-y-3 rounded-xl border border-border p-4">
+          <section className="space-y-3 rounded-xl border border-border bg-surface/60 p-4">
             <h3 className="flex items-center gap-2 text-sm font-semibold">
               <Mail className="size-4" /> E-mail de acesso
             </h3>
@@ -130,7 +130,7 @@ export function ProfileDialog({
             </p>
 
             {!mailEnabled && (
-              <p className="flex items-start gap-2 rounded-lg border border-border bg-secondary/40 p-3 text-xs text-muted-foreground">
+              <p className="flex items-start gap-2 rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
                 <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
                 Envio de e-mail não configurado no servidor (variáveis SMTP_*). A troca de e-mail e
                 o link de redefinição de senha ficam indisponíveis até isso ser configurado.
@@ -139,7 +139,7 @@ export function ProfileDialog({
 
             {pending ? (
               <div className="space-y-3">
-                <p className="flex items-start gap-2 rounded-lg border border-border bg-secondary/40 p-3 text-xs">
+                <p className="flex items-start gap-2 rounded-xl border border-border bg-surface p-3 text-xs">
                   <MailCheck className="mt-0.5 size-3.5 shrink-0" />
                   <span>
                     Enviamos um código de 6 dígitos para{" "}
@@ -227,13 +227,13 @@ export function ProfileDialog({
           </section>
 
           {/* Google Agenda */}
-          <section className="space-y-3 rounded-xl border border-border p-4">
+          <section className="space-y-3 rounded-xl border border-border bg-surface/60 p-4">
             <h3 className="flex items-center gap-2 text-sm font-semibold">
               <CalendarDays className="size-4" /> Google Agenda
             </h3>
 
             {google && !google.configured ? (
-              <p className="flex items-start gap-2 rounded-lg border border-border bg-secondary/40 p-3 text-xs text-muted-foreground">
+              <p className="flex items-start gap-2 rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
                 <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />A integração não está
                 configurada neste servidor (variáveis GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET).
               </p>
@@ -288,7 +288,7 @@ export function ProfileDialog({
           </section>
 
           {/* Senha */}
-          <section className="space-y-3 rounded-xl border border-border p-4">
+          <section className="space-y-3 rounded-xl border border-border bg-surface/60 p-4">
             <h3 className="flex items-center gap-2 text-sm font-semibold">
               <KeyRound className="size-4" /> Senha
             </h3>

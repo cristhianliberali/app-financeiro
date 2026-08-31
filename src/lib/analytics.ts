@@ -21,7 +21,9 @@ export function byCategory(txs: Transaction[], categories: Category[], kind: "in
       const cat = categories.find((c) => c.id === id);
       return {
         id,
-        name: cat ? `${cat.emoji} ${cat.name}` : "Sem categoria",
+        // Só o nome: a marca da categoria virou ícone, e o gráfico mostra a
+        // categoria pela cor da fatia, não por um desenho na legenda.
+        name: cat?.name ?? "Sem categoria",
         color: cat?.color ?? "#94A3B8",
         value,
       };
