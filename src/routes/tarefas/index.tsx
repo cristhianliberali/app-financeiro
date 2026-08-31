@@ -54,7 +54,7 @@ import {
   todayKey,
   dayKey,
 } from "@/lib/tasks-analytics";
-import { datePickerProps } from "@/components/ui/date-field";
+import { DateField } from "@/components/ui/date-field";
 
 /** Estado do retorno do consentimento do Google (`/api/google/callback`). */
 type Search = { agenda?: string | undefined };
@@ -454,17 +454,15 @@ function TasksDashboard() {
             </div>
             {rangeKey === "custom" && (
               <>
-                <input
-                  type="date"
-                  {...datePickerProps()}
-                  className={SELECT_CLASS}
+                <DateField
+                  className="h-9 w-36"
+                  aria-label="Início do período"
                   value={custom.from}
                   onChange={(e) => setCustom({ ...custom, from: e.target.value })}
                 />
-                <input
-                  type="date"
-                  {...datePickerProps()}
-                  className={SELECT_CLASS}
+                <DateField
+                  className="h-9 w-36"
+                  aria-label="Fim do período"
                   value={custom.to}
                   onChange={(e) => setCustom({ ...custom, to: e.target.value })}
                 />
