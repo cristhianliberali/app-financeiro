@@ -502,36 +502,6 @@
   }
 }
 
-/**
- * Fita de luz no topo de uma coluna ou cartão.
- *
- * Some nas pontas em vez de bater na borda: uma linha que termina em bico
- * parece luz, uma que termina reta parece moldura.
- */
-@utility neon-strip {
-  position: relative;
-
-  &::before {
-    content: "";
-    position: absolute;
-    z-index: 1;
-    inset-inline: 10%;
-    top: 0;
-    height: 3px;
-    border-radius: 9999px;
-    background: linear-gradient(90deg, transparent, var(--glow), transparent);
-    box-shadow: 0 0 12px color-mix(in oklab, var(--glow) var(--glow-strong), transparent);
-    pointer-events: none;
-  }
-}
-
-/** Selo na cor cheia com um halo da própria cor — o rótulo aceso. */
-@utility neon-chip {
-  box-shadow:
-    0 1px 2px oklch(0 0 0 / 0.2),
-    0 0 12px -2px color-mix(in oklab, var(--glow) var(--glow-strong), transparent);
-}
-
 /* ------------------------------------------------------------------------ */
 /* Tipografia                                                                */
 /* ------------------------------------------------------------------------ */
