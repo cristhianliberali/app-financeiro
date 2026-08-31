@@ -17,13 +17,13 @@ não é uma classe de erro possível.
 
 ### Corolários
 
-| Regra | Motivo |
-|---|---|
-| Toda linha recebe um `id` estável antes de qualquer processamento | Permite verificar completude por igualdade de conjuntos |
-| Nenhuma etapa descarta linha silenciosamente | Linha não classificada vira `AMBIGUA`, nunca lixo |
-| O LLM é chamado em blocos pequenos e sem estado | Elimina a condição para "esquecer" no meio de uma lista longa |
-| Completude é diferença de conjuntos, não heurística | `enviados − recebidos` é booleano, não é score |
-| Reconciliação confirma tipagem; não detecta omissão | Omissão já foi eliminada na camada de blocos |
+| Regra                                                             | Motivo                                                        |
+| ----------------------------------------------------------------- | ------------------------------------------------------------- |
+| Toda linha recebe um `id` estável antes de qualquer processamento | Permite verificar completude por igualdade de conjuntos       |
+| Nenhuma etapa descarta linha silenciosamente                      | Linha não classificada vira `AMBIGUA`, nunca lixo             |
+| O LLM é chamado em blocos pequenos e sem estado                   | Elimina a condição para "esquecer" no meio de uma lista longa |
+| Completude é diferença de conjuntos, não heurística               | `enviados − recebidos` é booleano, não é score                |
+| Reconciliação confirma tipagem; não detecta omissão               | Omissão já foi eliminada na camada de blocos                  |
 
 ## Camada 1 — Ingestão canônica (`canonical.server.ts`)
 
@@ -101,7 +101,7 @@ Blocos são independentes e sem estado, então rodam em paralelo com limite de
 concorrência, e a falha de um é retentável sozinha. Linhas de fronteira são
 julgadas duas vezes; divergência marca a linha para revisão.
 
-O **cache de merchants** é consultado *antes* de montar os blocos, com chave no
+O **cache de merchants** é consultado _antes_ de montar os blocos, com chave no
 descritor cru normalizado (`VIPI SUPERMERCADOS E`), global e não por usuário. Só
 merchant inédito entra na chamada.
 

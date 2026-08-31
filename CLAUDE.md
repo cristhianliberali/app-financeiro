@@ -12,11 +12,11 @@ O LLM recebe linhas numeradas e devolve apenas `id:classificacao`.
 
 Camadas (ver `docs/pipeline-extracao.md`):
 
-1. Ingestão canônica  — arquivo -> lista de Linha(id, pagina, bbox, texto)
-2. Tipagem            — regras genéricas, sem conhecimento de emissor
-3. Classificação      — LLM em blocos, contrato de contagem
-4. Reconciliação      — checksums declarados no próprio documento
-5. Quarentena         — nada abaixo do limiar entra no banco sem revisão
+1. Ingestão canônica — arquivo -> lista de Linha(id, pagina, bbox, texto)
+2. Tipagem — regras genéricas, sem conhecimento de emissor
+3. Classificação — LLM em blocos, contrato de contagem
+4. Reconciliação — checksums declarados no próprio documento
+5. Quarentena — nada abaixo do limiar entra no banco sem revisão
 
 Nunca adicione lógica específica de banco (Sicoob, Itaú, Nubank) nas camadas 1 e 2.
 
