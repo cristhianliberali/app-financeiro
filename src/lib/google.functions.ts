@@ -74,10 +74,14 @@ export const disconnectGoogle = createServerFn({ method: "POST" })
 /** Botão "sincronizar agora" do painel. */
 export const syncGoogleNow = createServerFn({ method: "POST" })
   .middleware([requireAuth])
-  .handler(async ({ context }): Promise<{ cleared: number; read: number; pushed: number }> => {
-    const { syncUser } = await import("@/integrations/postgres/google.server");
-    return syncUser(context.user.id);
-  });
+  .handler(
+    async ({
+      context,
+    }): Promise<{ cleared: number; read: number; pushed: number; error?: string }> => {
+      const { syncUser } = await import("@/integrations/postgres/google.server");
+      return syncUser(context.user.id);
+    },
+  );
 
 /** Compromissos da agenda numa janela de datas, para o calendário do painel. */
 export const fetchAgendaEvents = createServerFn({ method: "GET" })

@@ -132,6 +132,8 @@ rodada de sincronização recolhe o que tiver ficado para trás.
 - Compromisso apagado na agenda → a tarefa perde as datas, mas **não** é
   excluída: a tarefa é o registro do trabalho, a agenda é onde ele aparece no
   dia. Tudo isso fica na trilha de atividade da tarefa;
+- Os eventos vão para a **agenda principal** de cada pessoa (`primary`) — o app
+  não cria nem exige uma agenda separada;
 - Sincronização automática a cada 10 minutos (`GOOGLE_SYNC_INTERVALO_MINUTOS`),
   com leitura incremental para caber na cota, e um botão de sincronizar na hora
   no calendário do painel.
