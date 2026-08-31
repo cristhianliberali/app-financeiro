@@ -1,4 +1,4 @@
-import type { Category, Transaction } from "./data";
+import type { Category, RecurringRule, Transaction } from "./data";
 import { daysBetween, parseISODate } from "./format";
 import type { DateBasis } from "./app-state";
 
@@ -90,4 +90,130 @@ export function categoryBudgets(
       };
     })
     .sort((a, b) => b.pct - a.pct);
+}
+
+// ---------------------------------------------------------------------------
+// Linha do tempo de meses
+// ---------------------------------------------------------------------------
+
+/**
+ * Métricas que a linha do tempo do painel sabe somar mês a mês.
+ *
+ * `fixed_expense` e `fixed_income` não saem dos lançamentos: eles vêm das
+ * regras de recorrência, que são o que o app entende por "fixo". Um lançamento
+ * não guarda de qual regra nasceu, então somá-los daria o total do mês, não o
+ * compromisso fixo — a regra é a fonte certa.
+ */
+export type MonthMetric =
+  "balance" | "income_expense" | "expense" | "fixed_expense" | "income" | "fixed_income";
+
+export const MONTH_METRICS: Array<{ value: MonthMetric; label: string }> = [
+  { value: "balance", label: "Saldo previsto" },
+  { value: "income_expense", label: "Despesas e receitas" },
+  { value: "expense", label: "Despesas" },
+  { value: "fixed_expense", label: "Despesas fixas" },
+  { value: "income", label: "Receitas" },
+  { value: "fixed_income", label: "Receitas fixas" },
+];
+
+export type MonthPoint = {
+  /** Chave `YYYY-MM`. */
+  key: string;
+  income: number;
+  expense: number;
+  /** O número que a métrica escolhida mostra no cartão do mês. */
+  value: number;
+};
+
+/** A regra de recorrência vale neste mês? */
+function ruleAppliesTo(rule: RecurringRule, monthKey: string): boolean {
+  if (!rule.active) return false;
+  if (rule.start_date.slice(0, 7) > monthKey) return false;
+  if (rule.end_date && rule.end_date.slice(0, 7) < monthKey) return false;
+  // Anual só conta no mês em que começou; mensal e semanal caem todo mês.
+  return rule.frequency !== "yearly" || rule.start_date.slice(5, 7) === monthKey.slice(5, 7);
+}
+
+/** Quantas vezes a regra cobra dentro de um mês. */
+function ruleTimesPerMonth(rule: RecurringRule, monthKey: string): number {
+  if (rule.frequency !== "weekly") return 1;
+  const [year, month] = monthKey.split("-").map(Number);
+  return Math.floor(new Date(year!, month ?? 1, 0).getDate() / 7);
+}
+
+/**
+ * Totais mês a mês para a faixa de meses da linha do tempo.
+ *
+ * Recebe os lançamentos de toda a janela de uma vez e os distribui pela chave
+ * do mês — uma consulta só, em vez de uma por mês.
+ */
+export function monthTimeline(
+  months: string[],
+  txs: Transaction[],
+  rules: RecurringRule[],
+  basis: DateBasis,
+  metric: MonthMetric,
+): MonthPoint[] {
+  const buckets = new Map<string, { income: number; expense: number }>();
+  for (const month of months) buckets.set(month, { income: 0, expense: 0 });
+
+  for (const tx of txs) {
+    const bucket = buckets.get(tx[basis].slice(0, 7));
+    if (!bucket) continue;
+    if (tx.kind === "income") bucket.income += tx.amount;
+    else bucket.expense += tx.amount;
+  }
+
+  return months.map((key) => {
+    const bucket = buckets.get(key) ?? { income: 0, expense: 0 };
+    const fixed = (kind: "income" | "expense") =>
+      rules
+        .filter((rule) => rule.kind === kind && ruleAppliesTo(rule, key))
+        .reduce((sum, rule) => sum + rule.amount * ruleTimesPerMonth(rule, key), 0);
+
+    const value =
+      metric === "balance"
+        ? bucket.income - bucket.expense
+        : metric === "income_expense"
+          ? bucket.income - bucket.expense
+          : metric === "expense"
+            ? bucket.expense
+            : metric === "income"
+              ? bucket.income
+              : metric === "fixed_expense"
+                ? fixed("expense")
+                : fixed("income");
+
+    return { key, income: bucket.income, expense: bucket.expense, value };
+  });
+}
+
+/**
+ * Quebra os totais do período por situação: o que já aconteceu e o que ainda
+ * está por acontecer. É a leitura dos cartões do topo do painel — saldo
+ * disponível é só o que foi pago/recebido; saldo previsto conta tudo.
+ */
+export function settlement(txs: Transaction[]) {
+  const sum = (kind: "income" | "expense", status?: "paid" | "pending") =>
+    txs
+      .filter((t) => t.kind === kind && (!status || t.status === status))
+      .reduce((s, t) => s + t.amount, 0);
+
+  const received = sum("income", "paid");
+  const toReceive = sum("income", "pending");
+  const paid = sum("expense", "paid");
+  const toPay = sum("expense", "pending");
+
+  return {
+    income: received + toReceive,
+    received,
+    toReceive,
+    expense: paid + toPay,
+    paid,
+    toPay,
+    /** Já liquidado: entrou menos saiu de fato. */
+    available: received - paid,
+    /** Com tudo o que está agendado no período. */
+    projected: received + toReceive - paid - toPay,
+  };
 }
