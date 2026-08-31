@@ -16,6 +16,7 @@ import { Route as ContaRouteImport } from './routes/conta'
 import { Route as ConviteRouteImport } from './routes/convite'
 import { Route as InvestimentosRouteImport } from './routes/investimentos'
 import { Route as MetasRouteImport } from './routes/metas'
+import { Route as PendentesRouteImport } from './routes/pendentes'
 import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
 import { Route as TransacoesRouteImport } from './routes/transacoes'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
@@ -60,6 +61,11 @@ const InvestimentosRoute = InvestimentosRouteImport.update({
 const MetasRoute = MetasRouteImport.update({
   id: '/metas',
   path: '/metas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PendentesRoute = PendentesRouteImport.update({
+  id: '/pendentes',
+  path: '/pendentes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RedefinirSenhaRoute = RedefinirSenhaRouteImport.update({
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/convite': typeof ConviteRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
+  '/pendentes': typeof PendentesRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/transacoes': typeof TransacoesRoute
   '/api/health': typeof ApiHealthRoute
@@ -140,6 +147,7 @@ export interface FileRoutesByTo {
   '/convite': typeof ConviteRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
+  '/pendentes': typeof PendentesRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/transacoes': typeof TransacoesRoute
   '/api/health': typeof ApiHealthRoute
@@ -160,6 +168,7 @@ export interface FileRoutesById {
   '/convite': typeof ConviteRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
+  '/pendentes': typeof PendentesRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/transacoes': typeof TransacoesRoute
   '/api/health': typeof ApiHealthRoute
@@ -181,6 +190,7 @@ export interface FileRouteTypes {
     | '/convite'
     | '/investimentos'
     | '/metas'
+    | '/pendentes'
     | '/redefinir-senha'
     | '/transacoes'
     | '/api/health'
@@ -200,6 +210,7 @@ export interface FileRouteTypes {
     | '/convite'
     | '/investimentos'
     | '/metas'
+    | '/pendentes'
     | '/redefinir-senha'
     | '/transacoes'
     | '/api/health'
@@ -219,6 +230,7 @@ export interface FileRouteTypes {
     | '/convite'
     | '/investimentos'
     | '/metas'
+    | '/pendentes'
     | '/redefinir-senha'
     | '/transacoes'
     | '/api/health'
@@ -239,6 +251,7 @@ export interface RootRouteChildren {
   ConviteRoute: typeof ConviteRoute
   InvestimentosRoute: typeof InvestimentosRoute
   MetasRoute: typeof MetasRoute
+  PendentesRoute: typeof PendentesRoute
   RedefinirSenhaRoute: typeof RedefinirSenhaRoute
   TransacoesRoute: typeof TransacoesRoute
   ApiHealthRoute: typeof ApiHealthRoute
@@ -300,6 +313,13 @@ declare module '@tanstack/react-router' {
       path: '/metas'
       fullPath: '/metas'
       preLoaderRoute: typeof MetasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pendentes': {
+      id: '/pendentes'
+      path: '/pendentes'
+      fullPath: '/pendentes'
+      preLoaderRoute: typeof PendentesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/redefinir-senha': {
@@ -383,6 +403,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConviteRoute: ConviteRoute,
   InvestimentosRoute: InvestimentosRoute,
   MetasRoute: MetasRoute,
+  PendentesRoute: PendentesRoute,
   RedefinirSenhaRoute: RedefinirSenhaRoute,
   TransacoesRoute: TransacoesRoute,
   ApiHealthRoute: ApiHealthRoute,

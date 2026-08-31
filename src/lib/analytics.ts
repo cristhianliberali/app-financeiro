@@ -217,3 +217,27 @@ export function settlement(txs: Transaction[]) {
     projected: received + toReceive - paid - toPay,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Pendências
+// ---------------------------------------------------------------------------
+
+/**
+ * Situação de um lançamento que ainda não foi liquidado, pelo vencimento.
+ *
+ * É o que a tela de pendentes usa para ordenar e para pintar cada linha: o que
+ * já venceu vem primeiro e em vermelho, o que vence hoje em âmbar, o resto em
+ * azul. Mesmas cores dos estados do resto do app.
+ */
+export type PendingState = "overdue" | "today" | "upcoming";
+
+export function pendingState(dueDate: string, today: string): PendingState {
+  if (dueDate < today) return "overdue";
+  return dueDate === today ? "today" : "upcoming";
+}
+
+export const PENDING_LABEL: Record<PendingState, string> = {
+  overdue: "Atrasada",
+  today: "Vence hoje",
+  upcoming: "Em dia",
+};
