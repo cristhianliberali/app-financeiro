@@ -98,7 +98,6 @@ function body(input: CalendarEventInput) {
     start: { dateTime: input.start, timeZone },
     end: { dateTime: input.end, timeZone },
     extendedProperties: { private: { [TASK_ID_PROPERTY]: input.taskId } },
-    source: { title: "Aura" },
   });
 }
 

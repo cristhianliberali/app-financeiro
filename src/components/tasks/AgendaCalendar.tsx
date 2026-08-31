@@ -180,6 +180,12 @@ export function AgendaCalendar({
               disabled={sync.isPending || isFetching}
               onClick={async () => {
                 const result = await sync.mutateAsync();
+                if (result.error) {
+                  // O Google recusou: dizer o motivo é melhor do que um
+                  // "sincronizada" que não sincronizou nada.
+                  toast.error(`O Google recusou: ${result.error}`, { duration: 15000 });
+                  return;
+                }
                 const notas = [
                   result.pushed > 0 ? `${result.pushed} tarefa(s) enviadas` : null,
                   result.cleared > 0 ? `${result.cleared} com as datas limpas` : null,
@@ -203,6 +209,13 @@ export function AgendaCalendar({
           {status.configured
             ? "Conecte o Google Agenda no seu perfil para ver os compromissos aqui junto das tarefas."
             : "A integração com o Google Agenda não está configurada neste servidor."}
+        </p>
+      )}
+
+      {status?.connected && status.lastError && (
+        <p className="rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-xs text-foreground">
+          <span className="font-semibold">A última conversa com o Google falhou:</span>{" "}
+          {status.lastError}
         </p>
       )}
 

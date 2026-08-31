@@ -139,11 +139,13 @@ async function accessTokenFor(connection: GoogleConnection): Promise<string> {
   }
 
   const renewed = await refreshAccessToken(decryptToken(connection.refresh_token));
-  await query(
-    `UPDATE google_accounts SET access_token = $2, expires_at = $3, last_error = NULL
-      WHERE user_id = $1`,
-    [connection.user_id, encryptToken(renewed.accessToken), renewed.expiresAt],
-  );
+  // Renovar o acesso não desfaz o problema anterior — quem apaga o aviso é uma
+  // rodada de sincronização que termine inteira sem erro.
+  await query(`UPDATE google_accounts SET access_token = $2, expires_at = $3 WHERE user_id = $1`, [
+    connection.user_id,
+    encryptToken(renewed.accessToken),
+    renewed.expiresAt,
+  ]);
   return renewed.accessToken;
 }
 
@@ -228,7 +230,9 @@ async function dropEvent(
  * o evento. É chamada depois de criar, editar e excluir uma tarefa, e também
  * pela sincronização periódica.
  */
-export async function syncTaskToCalendar(taskId: string): Promise<void> {
+export type TaskSyncResult = { ok: true } | { ok: false; error: string };
+
+export async function syncTaskToCalendar(taskId: string): Promise<TaskSyncResult> {
   const task = await loadTask(taskId);
   const links = await query<LinkRow>(
     `SELECT user_id, event_id, calendar_id FROM task_calendar_events WHERE task_id = $1`,
@@ -238,7 +242,7 @@ export async function syncTaskToCalendar(taskId: string): Promise<void> {
   // Tarefa apagada: some da agenda de quem a tivesse.
   if (!task) {
     for (const link of links) await dropEvent(taskId, link, "tarefa excluída", false);
-    return;
+    return { ok: true };
   }
 
   const owner = task.responsible_user_id;
@@ -252,10 +256,10 @@ export async function syncTaskToCalendar(taskId: string): Promise<void> {
     }
   }
 
-  if (!owner || !window) return;
+  if (!owner || !window) return { ok: true };
 
   const connection = await getConnection(owner);
-  if (!connection) return;
+  if (!connection) return { ok: true };
 
   const input = {
     summary: task.title,
@@ -279,7 +283,7 @@ export async function syncTaskToCalendar(taskId: string): Promise<void> {
           [taskId, owner],
         );
         await logCalendar(taskId, owner, "calendar_event_updated", { event_id: current.event_id });
-        return;
+        return { ok: true };
       }
       // Evento sumiu da agenda: o vínculo antigo não vale mais.
       await query(`DELETE FROM task_calendar_events WHERE task_id = $1 AND user_id = $2`, [
@@ -296,11 +300,14 @@ export async function syncTaskToCalendar(taskId: string): Promise<void> {
       [taskId, owner, created.id, connection.calendar_id],
     );
     await logCalendar(taskId, owner, "calendar_event_created", { event_id: created.id });
+    return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await markError(owner, message);
-    if (error instanceof GoogleAuthError) return;
-    console.error(`[agenda] falha ao sincronizar a tarefa ${taskId}:`, message);
+    if (!(error instanceof GoogleAuthError)) {
+      console.error(`[agenda] falha ao sincronizar a tarefa ${taskId}:`, message);
+    }
+    return { ok: false, error: message };
   }
 }
 
@@ -347,6 +354,8 @@ export type SyncResult = {
   read: number;
   /** Tarefas que ainda não tinham compromisso e foram para a agenda agora. */
   pushed: number;
+  /** O que o Google respondeu quando alguma coisa não deu certo. */
+  error?: string;
 };
 
 /**
@@ -399,9 +408,11 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
     cleared += 1;
   }
 
+  // O erro registrado pela escrita não é apagado aqui: ler a agenda com
+  // sucesso não desfaz um evento que o Google recusou a criar. Quem limpa é a
+  // rodada inteira, quando nada falhou.
   await query(
-    `UPDATE google_accounts SET sync_token = $2, last_sync_at = now(), last_error = NULL
-      WHERE user_id = $1`,
+    `UPDATE google_accounts SET sync_token = $2, last_sync_at = now() WHERE user_id = $1`,
     [userId, page.nextSyncToken ?? connection.sync_token],
   );
 
@@ -438,9 +449,11 @@ export async function listCalendarEvents(
 
 /** Sincronização completa de um usuário: puxa a agenda e devolve o resumo. */
 export async function syncUser(userId: string): Promise<SyncResult> {
-  const pushed = await pushPendingTasks(userId);
+  const push = await pushPendingTasks(userId);
   const result = await pullCalendarChanges(userId);
-  return { ...result, pushed };
+  if (!push.error)
+    await query(`UPDATE google_accounts SET last_error = NULL WHERE user_id = $1`, [userId]);
+  return { ...result, pushed: push.pushed, ...(push.error ? { error: push.error } : {}) };
 }
 
 /**
@@ -455,7 +468,9 @@ export async function syncUser(userId: string): Promise<SyncResult> {
  * Olha só para a frente (e uns dias para trás): encher a agenda de quem
  * conectou com o arquivo morto de tarefas antigas não ajudaria ninguém.
  */
-export async function pushPendingTasks(userId: string): Promise<number> {
+export async function pushPendingTasks(
+  userId: string,
+): Promise<{ pushed: number; error?: string }> {
   const { maxEventsPerSync } = getGoogleSettings();
 
   let pending: Array<{ id: string }>;
@@ -478,23 +493,19 @@ export async function pushPendingTasks(userId: string): Promise<number> {
       [userId, maxEventsPerSync],
     );
   } catch (error) {
-    if (isMissingTable(error)) return 0;
+    if (isMissingTable(error)) return { pushed: 0 };
     throw error;
   }
 
   let pushed = 0;
   for (const task of pending) {
-    await syncTaskToCalendar(task.id);
-    // `syncTaskToCalendar` engole os erros do Google para não derrubar o
-    // salvamento; aqui a prova de que deu certo é o vínculo ter aparecido.
-    const link = await queryOne<{ event_id: string }>(
-      `SELECT event_id FROM task_calendar_events WHERE task_id = $1 AND user_id = $2`,
-      [task.id, userId],
-    );
-    if (link) pushed += 1;
-    else break; // Google fora do ar ou token vencido: o resto espera a próxima.
+    const result = await syncTaskToCalendar(task.id);
+    // Uma recusa do Google vale para todas as próximas: parar aqui devolve o
+    // motivo para quem pediu a sincronização, em vez de repetir o erro N vezes.
+    if (!result.ok) return { pushed, error: result.error };
+    pushed += 1;
   }
-  return pushed;
+  return { pushed };
 }
 
 /** Quem está conectado e já passou do intervalo — usado pelo agendador. */
