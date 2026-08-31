@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarClock, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toISODate } from "@/lib/format";
+import type { AgendaEvent } from "@/lib/google";
 import type { AccountUser, Task } from "@/lib/tasks";
 import {
   WEEKDAY_LABELS,
@@ -15,13 +16,30 @@ import { useTone } from "@/hooks/use-tone";
 
 type Mode = "month" | "week" | "day";
 
+/** Dia local do timestamp — o usuário pensa no fuso dele, não em UTC. */
+function localDay(iso: string): string {
+  const date = new Date(iso);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate(),
+  ).padStart(2, "0")}`;
+}
+
+/**
+ * Um item do calendário.
+ *
+ * Tarefa e subtarefa abrem o diálogo da tarefa; compromisso da agenda abre o
+ * evento no Google, porque ele não existe aqui dentro para ser editado — daí
+ * `task` ser opcional e `link` só existir no compromisso.
+ */
 type CalendarEvent = {
   id: string;
   day: string;
   title: string;
   color: string;
-  kind: "task" | "subtask";
-  task: Task;
+  kind: "task" | "subtask" | "agenda";
+  task?: Task;
+  at?: string | null;
+  link?: string | undefined;
 };
 
 /** Constrói os eventos do calendário: tarefas com datas e subtarefas datadas. */
@@ -47,7 +65,7 @@ function buildEvents(tasks: Task[]): CalendarEvent[] {
         id: `sub-${sub.id}`,
         day,
         title: `↳ ${sub.title}`,
-        color: "#8A8A8A",
+        color: "#94A3B8",
         kind: "subtask",
         task,
       });
@@ -58,16 +76,42 @@ function buildEvents(tasks: Task[]): CalendarEvent[] {
 
 export function TaskCalendar({
   tasks,
+  agenda = [],
   onOpen,
+  onRangeChange,
 }: {
   tasks: Task[];
   users?: AccountUser[];
+  /** Compromissos do Google já filtrados pela janela visível. */
+  agenda?: AgendaEvent[];
   onOpen: (task: Task) => void;
+  /** Avisa a tela qual janela está aberta, para ela buscar a agenda certa. */
+  onRangeChange?: (range: { from: string; to: string }) => void;
 }) {
   const [mode, setMode] = useState<Mode>("month");
   const [anchor, setAnchor] = useState(() => new Date());
 
-  const events = useMemo(() => buildEvents(tasks), [tasks]);
+  const events = useMemo(() => {
+    const list = buildEvents(tasks);
+    const taskIds = new Set(tasks.map((task) => task.id));
+
+    for (const event of agenda) {
+      // O compromisso que nasceu de uma tarefa já está na lista como tarefa.
+      if (event.taskId && taskIds.has(event.taskId)) continue;
+      list.push({
+        id: `agenda-${event.id}`,
+        day: localDay(event.start),
+        title: event.title,
+        color: "var(--color-warning)",
+        kind: "agenda",
+        at: event.start,
+        link: event.link,
+      });
+    }
+
+    return list;
+  }, [tasks, agenda]);
+
   const byDay = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     for (const e of events) map.set(e.day, [...(map.get(e.day) ?? []), e]);
@@ -92,19 +136,41 @@ export function TaskCalendar({
   const today = todayKey();
   const tone = useTone();
 
-  const eventChip = (e: CalendarEvent) => (
-    <button
-      key={e.id}
-      onClick={() => onOpen(e.task)}
-      className="flex w-full items-center gap-1.5 truncate rounded-md px-1.5 py-1 text-left text-[11px] font-medium transition-colors hover:bg-accent"
-      title={`${e.title} · ${e.task.board.name}`}
-    >
-      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: tone(e.color) }} />
-      <span className={`truncate ${e.kind === "subtask" ? "text-muted-foreground" : ""}`}>
-        {e.title}
-      </span>
-    </button>
-  );
+  // A janela visível define quais compromissos buscar; ela muda ao trocar de
+  // modo e ao andar no tempo, então é reportada em vez de recalculada lá fora.
+  const from = toISODate(days[0]!);
+  const to = toISODate(days[days.length - 1]!);
+  useEffect(() => {
+    onRangeChange?.({ from, to });
+  }, [from, to, onRangeChange]);
+
+  const eventChip = (e: CalendarEvent) =>
+    e.kind === "agenda" ? (
+      <a
+        key={e.id}
+        href={e.link ?? "#"}
+        target="_blank"
+        rel="noreferrer"
+        className="group flex w-full items-center gap-1.5 truncate rounded-md border border-dashed border-warning/40 bg-warning-soft px-1.5 py-1 text-left text-[11px] font-medium text-warning-soft-foreground transition-colors hover:border-warning"
+        title={`${e.title} · Google Agenda`}
+      >
+        <CalendarClock className="size-2.5 shrink-0" />
+        <span className="truncate">{e.title}</span>
+        <ExternalLink className="ml-auto size-2.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+      </a>
+    ) : (
+      <button
+        key={e.id}
+        onClick={() => e.task && onOpen(e.task)}
+        className="flex w-full items-center gap-1.5 truncate rounded-md px-1.5 py-1 text-left text-[11px] font-medium transition-colors hover:bg-accent"
+        title={`${e.title} · ${e.task?.board.name ?? ""}`}
+      >
+        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: tone(e.color) }} />
+        <span className={`truncate ${e.kind === "subtask" ? "text-muted-foreground" : ""}`}>
+          {e.title}
+        </span>
+      </button>
+    );
 
   return (
     <div className="space-y-3">
@@ -119,7 +185,7 @@ export function TaskCalendar({
           <Button variant="outline" size="sm" onClick={() => step(1)} aria-label="Próximo">
             <ChevronRight className="size-4" />
           </Button>
-          <span className="ml-2 text-sm font-semibold capitalize">{title}</span>
+          <span className="ml-2 text-sm font-semibold first-letter:uppercase">{title}</span>
         </div>
         <div className="flex rounded-xl border border-border bg-secondary p-0.5">
           {(
@@ -152,7 +218,7 @@ export function TaskCalendar({
           <div className="space-y-1">
             {(byDay.get(toISODate(anchor)) ?? []).map(eventChip)}
             {(byDay.get(toISODate(anchor)) ?? []).length === 0 && (
-              <p className="text-sm text-muted-foreground">Nenhuma tarefa neste dia.</p>
+              <p className="text-sm text-muted-foreground">Nada marcado neste dia.</p>
             )}
           </div>
         </div>
