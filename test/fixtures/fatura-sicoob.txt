@@ -5,42 +5,42 @@ Periodo de referencia: 05/01/2026 a 04/02/2026
 Titular: FULANO DE TAL
 
 RESUMO DA FATURA
-FATURA ANTERIOR                                         R$ 8,165.23
-PAGAMENTOS RECEBIDOS                                    R$ 8,338.69
-ENCARGOS E IOF                                          R$ 144.00
-COMPRAS DO PERIODO                                      R$ 6,628.04
-TOTAL A PAGAR                                           R$ 6,598.58
+FATURA ANTERIOR                                                R$ 8,165.23
+PAGAMENTOS RECEBIDOS                                           R$ 8,338.69
+ENCARGOS E IOF                                                   R$ 144.00
+COMPRAS DO PERIODO                                             R$ 6,628.04
+TOTAL A PAGAR                                                  R$ 6,598.58
 
-DATA     DESCRICAO                        CIDADE           VALOR
+DATA     DESCRICAO                        CIDADE                     VALOR
 
 PORTADOR FULANO DE TAL - FINAL 6567
-17 JUL   INDUSTRIA DE JOIAS C 06/10       CHAPECO       R$ 110.00
-TOTAL FINAL 6567                                        R$ 110.00
+17 JUL   INDUSTRIA DE JOIAS C 06/10       CHAPECO                R$ 110.00
+TOTAL FINAL 6567                                                 R$ 110.00
 
 PORTADOR BELTRANA DE TAL - FINAL 9661
-04 JAN   THE BEST ACAI MARAVI             MARAVILHA     R$ 14.82
-07 JAN   D CERUTTI 01/02 Maravilha        MARAVILHA     R$ 169.00
-12 JAN   VIPI SUPERMERCADOS E             MARAVILHA     R$ 251.65
-TOTAL FINAL 9661                                        R$ 435.47
+04 JAN   THE BEST ACAI MARAVI             MARAVILHA               R$ 14.82
+07 JAN   D CERUTTI 01/02                  MARAVILHA              R$ 169.00
+12 JAN   VIPI SUPERMERCADOS E             MARAVILHA              R$ 251.65
+TOTAL FINAL 9661                                                 R$ 435.47
 
 PORTADOR FULANO DE TAL - FINAL 5249
-04 JAN   PG *PAGTRUST TECNOLO             SANTANA DE PA R$ 29.90
-04 JAN   PG *PAGTRUST TECNOLO             SANTANA DE PA R$ -29.90
-04 JAN   Azul Linhas Aereas B 01/12       BARUERI       R$ 42.00
-08 JUN   AIRBNB * HMZPBW44PAV 05/06       SAO PAULO     R$ 1,240.50
-15 JAN   MERCADOLIVRE*LATICKI             OSASCO        R$ 189.90
-18 JAN   APPLE.COM/BILL                   SAO PAULO     R$ 34.90
-20 JAN   DM *Spotify                      SAO PAULO     R$ 21.90
-22 JAN   TIM*RECARGA                      SAO PAULO     R$ 50.00
-25 JAN   POSTO IPIRANGA                   CHAPECO       R$ 300.00
-28 JAN   SUPERMERCADO ANGELON             CHAPECO       R$ 1,000.00
-30 JAN   CONSTRUTORA X 03/10              CHAPECO       R$ 3,137.91
-TOTAL FINAL 5249                                        R$ 6,017.11
+04 JAN   PG *PAGTRUST TECNOLO             SANTANA DE PA           R$ 29.90
+04 JAN   PG *PAGTRUST TECNOLO             SANTANA DE PA          R$ -29.90
+04 JAN   Azul Linhas Aereas B 01/12       BARUERI                 R$ 42.00
+08 JUN   AIRBNB * HMZPBW44PAV 05/06       SAO PAULO            R$ 1,240.50
+15 JAN   MERCADOLIVRE*LATICKI             OSASCO                 R$ 189.90
+18 JAN   APPLE.COM/BILL                   SAO PAULO               R$ 34.90
+20 JAN   DM *Spotify                      SAO PAULO               R$ 21.90
+22 JAN   TIM*RECARGA                      SAO PAULO               R$ 50.00
+25 JAN   POSTO IPIRANGA                   CHAPECO                R$ 300.00
+28 JAN   SUPERMERCADO ANGELON             CHAPECO              R$ 1,000.00
+30 JAN   CONSTRUTORA X 03/10              CHAPECO              R$ 3,137.91
+TOTAL FINAL 5249                                               R$ 6,017.11
 
 MOVIMENTACOES DA CONTA
-05 JAN   ANUIDADE DIFERENCIADA                          R$ 36.00
-05 JAN   SEGURO PROTECAO                                R$ 29.46
-TOTAL MOVIMENTACOES                                     R$ 65.46
+05 JAN   ANUIDADE DIFERENCIADA                                    R$ 36.00
+05 JAN   SEGURO PROTECAO                                          R$ 29.46
+TOTAL MOVIMENTACOES                                               R$ 65.46
 
 SAC 0800 642 0000 | Ouvidoria 0800 646 4000
 Este documento nao e valido como comprovante fiscal.
