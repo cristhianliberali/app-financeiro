@@ -124,7 +124,7 @@ describe("camada 1 — PDF com camada de texto", () => {
   test("PDF digitalizado é detectado e falha com a densidade medida", async () => {
     const scan = { nome: "scan.pdf", bytes: makePdf([[{ x: 50, y: 800, text: "1 de 2" }]]) };
 
-    expect(canonizar(scan)).rejects.toThrow(OcrNecessarioError);
+    await expect(canonizar(scan)).rejects.toThrow(OcrNecessarioError);
     await canonizar(scan).catch((erro: OcrNecessarioError) => {
       expect(erro.caracteresPorPagina).toBe(6);
       expect(erro.message).toContain("OCR");
@@ -221,8 +221,8 @@ describe("camada 1 — texto", () => {
     ]);
   });
 
-  test("arquivo vazio falha na hora", () => {
-    expect(canonizar({ nome: "vazio.txt", bytes: new Uint8Array() })).rejects.toThrow(
+  test("arquivo vazio falha na hora", async () => {
+    await expect(canonizar({ nome: "vazio.txt", bytes: new Uint8Array() })).rejects.toThrow(
       "arquivo enviado está vazio",
     );
   });
