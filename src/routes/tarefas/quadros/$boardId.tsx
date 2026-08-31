@@ -1,16 +1,20 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Search, Settings2, X } from "lucide-react";
+import { Plus, Settings2 } from "lucide-react";
 import { TasksShell } from "@/components/tasks/TasksShell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { TaskCalendar } from "@/components/tasks/TaskCalendar";
 import { TaskDialog } from "@/components/tasks/TaskDialog";
 import { TaskKanban } from "@/components/tasks/TaskKanban";
 import { TaskListView } from "@/components/tasks/TaskListView";
 import { BoardDialog } from "@/components/tasks/BoardDialog";
-import { LabelFilter } from "@/components/tasks/LabelPicker";
+import {
+  EMPTY_FILTERS,
+  TaskFilterBar,
+  filterTasks,
+  type TaskFilterState,
+} from "@/components/tasks/TaskFilterBar";
 import { StatusManagerDialog } from "@/components/tasks/StatusManagerDialog";
 import { useTasksModule } from "@/components/tasks/useTasksModule";
 import {
@@ -24,7 +28,6 @@ import {
 } from "@/lib/tasks";
 import {
   BOARD_VIEWS,
-  PRIORITIES,
   formatDateTimeBR,
   formatHours,
   hoursOf,
@@ -47,9 +50,6 @@ export const Route = createFileRoute("/tarefas/quadros/$boardId")({
   component: BoardPage,
 });
 
-const SELECT_CLASS =
-  "h-9 rounded-md border border-input bg-card px-2 text-sm outline-none focus:ring-1 focus:ring-ring";
-
 function BoardPage() {
   const { boardId } = Route.useParams();
   const { task: taskParam } = Route.useSearch();
@@ -64,10 +64,7 @@ function BoardPage() {
   const move = useMoveTask();
 
   const [view, setView] = useState<BoardView>("kanban");
-  const [term, setTerm] = useState("");
-  const [priority, setPriority] = useState("");
-  const [responsible, setResponsible] = useState("");
-  const [labelFilter, setLabelFilter] = useState<string[]>([]);
+  const [filters, setFilters] = useState<TaskFilterState>(EMPTY_FILTERS);
   const [taskDialog, setTaskDialog] = useState<{
     open: boolean;
     task: Task | null;
@@ -87,29 +84,9 @@ function BoardPage() {
     if (found) setTaskDialog({ open: true, task: found });
   }, [taskParam, allTasks]);
 
-  // A lista/calendário têm filtros próprios; estes aqui valem para o Kanban,
-  // que é a visão sem filtro embutido.
-  const tasks = useMemo(() => {
-    const t = term.trim().toLowerCase();
-    return allTasks.filter((task) => {
-      if (
-        t &&
-        !task.title.toLowerCase().includes(t) &&
-        !task.labels.some((label) => label.name.toLowerCase().includes(t))
-      ) {
-        return false;
-      }
-      if (priority && task.priority !== priority) return false;
-      if (responsible && (task.responsible_user_id ?? "") !== responsible) return false;
-      if (
-        labelFilter.length > 0 &&
-        !labelFilter.every((id) => task.labels.some((label) => label.id === id))
-      ) {
-        return false;
-      }
-      return true;
-    });
-  }, [allTasks, term, priority, responsible, labelFilter]);
+  // A lista tem filtros próprios, no cabeçalho da tabela; estes aqui valem
+  // para o Kanban e o calendário, que não têm onde pendurá-los.
+  const tasks = useMemo(() => filterTasks(allTasks, filters), [allTasks, filters]);
 
   // Mantém o diálogo sincronizado com os dados recarregados.
   const openTask = taskDialog.task
@@ -130,8 +107,6 @@ function BoardPage() {
     }
     return { estimated, tracked: hoursOf(tracked) };
   }, [tasks]);
-
-  const filtersActive = !!term || !!priority || !!responsible || labelFilter.length > 0;
 
   function closeTaskDialog() {
     setTaskDialog({ open: false, task: null });
@@ -195,56 +170,15 @@ function BoardPage() {
         </div>
       </div>
 
-      {view === "kanban" && (
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-48 flex-1 sm:max-w-72">
-            <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
-              placeholder="Pesquisar tarefas ou etiquetas…"
-              className="pl-8"
-            />
-          </div>
-          <select
-            className={SELECT_CLASS}
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-          >
-            <option value="">Todas as prioridades</option>
-            {PRIORITIES.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-          <LabelFilter labels={labels} value={labelFilter} onChange={setLabelFilter} />
-          <select
-            className={SELECT_CLASS}
-            value={responsible}
-            onChange={(e) => setResponsible(e.target.value)}
-          >
-            <option value="">Todos os responsáveis</option>
-            {users.map((u) => (
-              <option key={u.user_id} value={u.user_id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
-          {filtersActive && (
-            <button
-              onClick={() => {
-                setTerm("");
-                setPriority("");
-                setResponsible("");
-                setLabelFilter([]);
-              }}
-              className="inline-flex h-9 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <X className="size-3.5" /> Limpar filtros ({tasks.length}/{allTasks.length})
-            </button>
-          )}
-        </div>
+      {view !== "list" && (
+        <TaskFilterBar
+          value={filters}
+          onChange={setFilters}
+          labels={labels}
+          users={users}
+          shown={tasks.length}
+          total={allTasks.length}
+        />
       )}
 
       {view === "kanban" && (

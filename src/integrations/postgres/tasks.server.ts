@@ -365,6 +365,27 @@ export async function listBoardStatuses(userId: string, boardId: string) {
   );
 }
 
+/**
+ * Status de todos os quadros do espaço, para o Kanban do espaço.
+ *
+ * A ordenação por quadro e depois por `sort_order` importa: é ela que dá a
+ * ordem em que as colunas iguais de quadros diferentes se encontram do outro
+ * lado, onde viram uma coluna só.
+ */
+export async function listSpaceStatuses(userId: string, spaceId: string) {
+  await requireSpaceAccess(userId, spaceId, "viewer");
+  return query(
+    `SELECT ${STATUS_COLUMNS.split(", ")
+      .map((c) => `bs.${c}`)
+      .join(", ")}
+       FROM board_statuses bs
+       JOIN boards b ON b.id = bs.board_id
+      WHERE b.space_id = $1
+      ORDER BY b.created_at, bs.sort_order`,
+    [spaceId],
+  );
+}
+
 export async function saveStatus(
   userId: string,
   input: {

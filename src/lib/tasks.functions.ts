@@ -263,6 +263,16 @@ export const fetchBoardStatuses = createServerFn({ method: "GET" })
     ),
   );
 
+export const fetchSpaceStatuses = createServerFn({ method: "GET" })
+  .middleware([requireAuth])
+  .inputValidator((input: { spaceId: string }) => ({ spaceId: requireId(input?.spaceId) }))
+  .handler(async ({ data, context }) =>
+    (await import("@/integrations/postgres/tasks.server")).listSpaceStatuses(
+      context.user.id,
+      data.spaceId,
+    ),
+  );
+
 export const saveStatus = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator(

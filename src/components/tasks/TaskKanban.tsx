@@ -1,14 +1,71 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { useTone } from "@/hooks/use-tone";
+import { contrastText } from "@/lib/tasks-analytics";
 import type { AccountUser, Task } from "@/lib/tasks";
 import { TaskCard } from "./TaskCard";
 
-export type KanbanColumn = { id: string; name: string; color: string; hint?: string };
+export type KanbanColumn = {
+  id: string;
+  name: string;
+  color: string;
+  /** Explicação da coluna, no title do cabeçalho. */
+  hint?: string;
+};
+
+/** Folga entre o fim do quadro e a borda de baixo da janela. */
+const BOTTOM_GAP = 20;
+/** Altura mínima, para o quadro não sumir numa janela baixa. */
+const MIN_HEIGHT = 320;
 
 /**
- * Kanban com movimentação por drag and drop. Ao soltar o cartão em outra
- * coluna o status da tarefa é atualizado automaticamente.
+ * Estica o quadro até o rodapé da janela.
+ *
+ * Um Kanban que termina onde termina a última tarefa deixa um vazio embaixo e
+ * encolhe a área onde se solta o cartão. Medindo onde ele começa dá para dizer
+ * exatamente quanto falta até o fim da tela — e a coluna vazia continua sendo
+ * uma coluna inteira, não uma tarja.
+ */
+function useFillHeight() {
+  // Ref de callback, e não `useRef`: enquanto os status não chegam o quadro
+  // renderiza o aviso de "sem status" e o elemento medido nem existe. Guardar
+  // o nó em estado é o que faz a medição acontecer quando ele enfim monta.
+  const [element, setElement] = useState<HTMLDivElement | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!element) return;
+
+    const measure = () => {
+      const top = element.getBoundingClientRect().top;
+      const next = Math.max(MIN_HEIGHT, Math.round(window.innerHeight - top - BOTTOM_GAP));
+      // Só reage a mudança de verdade: sem isso, a própria altura que
+      // acabamos de aplicar realimentaria o observador.
+      setHeight((current) => (current !== null && Math.abs(current - next) < 2 ? current : next));
+    };
+
+    measure();
+    window.addEventListener("resize", measure);
+    // O cabeçalho da tela cresce quando os filtros quebram em duas linhas.
+    const observer = new ResizeObserver(measure);
+    if (element.parentElement) observer.observe(element.parentElement);
+    return () => {
+      window.removeEventListener("resize", measure);
+      observer.disconnect();
+    };
+  }, [element]);
+
+  return { ref: setElement, height };
+}
+
+/**
+ * Kanban com movimentação por arraste. Ao soltar o cartão em outra coluna o
+ * status da tarefa é atualizado automaticamente.
+ *
+ * Cada coluna se pinta com a cor do próprio status, em dose leve: o fundo e a
+ * borda ficam num tom da cor e a etiqueta do topo é a cor cheia. É o que
+ * permite achar a coluna certa de relance num quadro largo, sem que sete
+ * colunas coloridas virem uma algazarra.
  */
 export function TaskKanban({
   columns,
@@ -36,6 +93,7 @@ export function TaskKanban({
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const tone = useTone();
+  const { ref, height } = useFillHeight();
 
   if (columns.length === 0) {
     return (
@@ -46,17 +104,26 @@ export function TaskKanban({
   }
 
   return (
-    <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2">
+    <div
+      ref={ref}
+      className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 thin-scrollbar"
+      style={height ? { height } : { minHeight: "70vh" }}
+    >
       {columns.map((col) => {
         const items = tasks.filter((t) => columnOf(t) === col.id);
+        const color = tone(col.color);
+        const active = over === col.id;
         return (
-          <div
+          <section
             key={col.id}
-            className={`flex w-72 shrink-0 flex-col rounded-2xl border bg-surface p-2 transition-all ${
-              over === col.id
-                ? "border-primary bg-primary-soft ring-2 ring-ring/25"
-                : "border-border"
-            }`}
+            className="flex h-full w-[19.5rem] shrink-0 flex-col overflow-hidden rounded-2xl border transition-shadow"
+            style={{
+              backgroundColor: `color-mix(in oklab, ${color} 7%, var(--color-surface))`,
+              borderColor: `color-mix(in oklab, ${color} ${active ? 55 : 22}%, var(--color-border))`,
+              ...(active
+                ? { boxShadow: `0 0 0 3px color-mix(in oklab, ${color} 22%, transparent)` }
+                : {}),
+            }}
             onDragOver={(e) => {
               e.preventDefault();
               setOver(col.id);
@@ -71,31 +138,44 @@ export function TaskKanban({
               if (task && columnOf(task) !== col.id) onMove(task, col.id);
             }}
           >
-            {/* Faixa da cor do status no topo da coluna: identifica a coluna
-                mesmo quando o cabeçalho sai da tela na rolagem horizontal. */}
-            <div
-              className="mx-2 mb-2 mt-1 h-1 rounded-full"
-              style={{ backgroundColor: tone(col.color) }}
-            />
-            <div className="mb-2 flex items-center gap-2 px-2">
-              <span className="text-sm font-bold tracking-tight" title={col.hint}>
+            <header
+              className="flex items-center gap-2 border-b px-3 py-2.5"
+              style={{
+                backgroundColor: `color-mix(in oklab, ${color} 10%, transparent)`,
+                borderColor: `color-mix(in oklab, ${color} 20%, var(--color-border))`,
+              }}
+            >
+              <span
+                className="max-w-44 truncate rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
+                style={{ backgroundColor: color, color: contrastText(color) }}
+                title={col.hint}
+              >
                 {col.name}
               </span>
-              <span className="rounded-full bg-secondary px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground">
+              <span
+                className="rounded-full px-2 py-0.5 font-mono text-[11px] font-bold"
+                style={{
+                  backgroundColor: `color-mix(in oklab, ${color} 18%, transparent)`,
+                  color: `color-mix(in oklab, ${color} 65%, var(--color-foreground))`,
+                }}
+              >
                 {items.length}
               </span>
               {onAdd && (
                 <button
                   onClick={() => onAdd(col.id)}
-                  className="ml-auto rounded-lg p-1 text-muted-foreground transition-colors hover:bg-primary-soft hover:text-primary"
+                  className="ml-auto rounded-lg p-1 text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
                   aria-label={`Nova tarefa em ${col.name}`}
                   title={`Nova tarefa em ${col.name}`}
                 >
-                  <Plus className="size-3.5" />
+                  <Plus className="size-4" />
                 </button>
               )}
-            </div>
-            <div className="flex flex-1 flex-col gap-2">
+            </header>
+
+            {/* Pilha em bloco, e não flex: como item de flex o cartão encolheria
+                para caber, e a coluna cheia viraria uma sanfona. */}
+            <div className="flex-1 space-y-2 overflow-y-auto p-2 thin-scrollbar">
               {items.map((task) => (
                 <TaskCard
                   key={task.id}
@@ -112,13 +192,23 @@ export function TaskKanban({
                   }}
                 />
               ))}
-              {items.length === 0 && (
-                <p className="rounded-xl border border-dashed border-border px-2 py-8 text-center text-xs text-muted-foreground">
-                  Arraste tarefas para cá
-                </p>
+
+              {onAdd ? (
+                <button
+                  onClick={() => onAdd(col.id)}
+                  className="flex w-full items-center gap-1.5 rounded-xl px-2.5 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+                >
+                  <Plus className="size-3.5" /> Adicionar tarefa
+                </button>
+              ) : (
+                items.length === 0 && (
+                  <p className="rounded-xl border border-dashed border-border/70 px-2 py-6 text-center text-xs text-muted-foreground">
+                    Arraste tarefas para cá
+                  </p>
+                )
               )}
             </div>
-          </div>
+          </section>
         );
       })}
     </div>
