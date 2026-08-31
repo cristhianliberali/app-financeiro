@@ -2,7 +2,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
-  CalendarDays,
+  CalendarSync,
   ChevronDown,
   ChevronRight,
   Layers,
@@ -12,8 +12,8 @@ import {
   PanelLeft,
   Pencil,
   Plus,
+  Sun,
   Trash2,
-  UserCheck,
   Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -51,10 +51,18 @@ import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
 const SIDEBAR_STORAGE_KEY = "aura.tasks.sidebarCollapsed";
 const EXPANDED_STORAGE_KEY = "aura.tasks.expandedSpaces";
 
+/**
+ * As telas do módulo, na ordem em que o dia costuma usá-las: o dia de hoje, a
+ * semana no calendário, o panorama e, por fim, a estrutura dos espaços.
+ *
+ * "Meu dia" e o calendário sincronizado eram abas dentro da visão geral, o que
+ * obrigava a abrir o panorama para chegar no recorte de hoje. Como entradas do
+ * menu, cada um abre direto.
+ */
 const NAV = [
   { to: "/tarefas", label: "Visão geral", icon: LayoutDashboard, exact: true },
-  { to: "/tarefas/minhas", label: "Minhas tarefas", icon: UserCheck, exact: false },
-  { to: "/tarefas/calendario", label: "Calendário", icon: CalendarDays, exact: false },
+  { to: "/tarefas/meu-dia", label: "Meu dia", icon: Sun, exact: false },
+  { to: "/tarefas/agenda", label: "Calendário sincronizado", icon: CalendarSync, exact: false },
   { to: "/tarefas/espacos", label: "Espaços", icon: Layers, exact: false },
 ] as const;
 

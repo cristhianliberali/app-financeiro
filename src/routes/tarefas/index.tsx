@@ -13,34 +13,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  AlarmClock,
-  CalendarCheck,
-  CalendarDays,
-  CheckCircle2,
-  Clock,
-  LayoutDashboard,
-  Loader,
-  Plus,
-  Sun,
-  Timer,
-} from "lucide-react";
+import { AlarmClock, CalendarCheck, CheckCircle2, Clock, Loader, Plus, Timer } from "lucide-react";
 import { TasksShell } from "@/components/tasks/TasksShell";
-import { AgendaCalendar } from "@/components/tasks/AgendaCalendar";
-import { MyDay } from "@/components/tasks/MyDay";
-import { TaskDialog } from "@/components/tasks/TaskDialog";
 import { Button } from "@/components/ui/button";
 import { useTasksModule } from "@/components/tasks/useTasksModule";
 import { useNow } from "@/hooks/use-now";
 import { useTone } from "@/hooks/use-tone";
-import {
-  useBoardStatuses,
-  useBoards,
-  useSpaces,
-  useTasks,
-  useAccountTimeEntries,
-  type Task,
-} from "@/lib/tasks";
+import { useBoards, useSpaces, useTasks, useAccountTimeEntries } from "@/lib/tasks";
 import { toISODate } from "@/lib/format";
 import {
   PALETTE,
@@ -81,15 +60,6 @@ export const Route = createFileRoute("/tarefas/")({
   }),
   component: TasksDashboard,
 });
-
-/** Abas do painel: a visão consolidada, o dia de hoje e o calendário. */
-type TabKey = "geral" | "dia" | "calendario";
-
-const TABS = [
-  ["geral", "Visão geral", LayoutDashboard],
-  ["dia", "Meu dia", Sun],
-  ["calendario", "Calendário", CalendarDays],
-] as const satisfies ReadonlyArray<readonly [TabKey, string, typeof LayoutDashboard]>;
 
 const SELECT_CLASS =
   "h-9 rounded-md border border-input bg-card px-2 text-sm outline-none focus:ring-1 focus:ring-ring";
@@ -164,10 +134,7 @@ function TasksDashboard() {
   const [spaceId, setSpaceId] = useState("");
   const [boardId, setBoardId] = useState("");
   const [responsible, setResponsible] = useState("");
-  const [tab, setTab] = useState<TabKey>("geral");
   const { agenda: agendaResult } = Route.useSearch();
-  /** Tarefa aberta a partir do "Meu dia" ou do calendário. */
-  const [selected, setSelected] = useState<Task | null>(null);
 
   const range = rangeKey === "custom" ? custom : rangeOf(rangeKey);
 
@@ -189,11 +156,16 @@ function TasksDashboard() {
         ),
     };
     (messages[agendaResult] ?? (() => {}))();
-    if (agendaResult === "conectado") setTab("calendario");
-    void navigate({ to: "/tarefas", search: {}, replace: true });
+    // Quem acabou de conectar a agenda quer ver a agenda. Antes isto trocava a
+    // aba desta tela; agora o calendário é uma tela própria, então o retorno do
+    // Google termina nela — e não no painel, que não mostra compromisso nenhum.
+    void navigate(
+      agendaResult === "conectado"
+        ? { to: "/tarefas/agenda", replace: true }
+        : { to: "/tarefas", search: {}, replace: true },
+    );
   }, [agendaResult, navigate]);
 
-  const { data: statusesOfSelected = [] } = useBoardStatuses(selected?.board_id ?? null);
   const { data: spaces = [] } = useSpaces(accountId);
   const { data: boards = [] } = useBoards({ accountId });
   const { data: allTasks = [] } = useTasks({ accountId });
@@ -398,440 +370,395 @@ function TasksDashboard() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-secondary p-1">
-        {TABS.map(([value, label, Icon]) => (
-          <button
-            key={value}
-            onClick={() => setTab(value)}
-            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-all ${
-              tab === value
-                ? "bg-card text-foreground shadow-sm ring-1 ring-border"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+      <>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-lg border border-border p-0.5">
+            {(
+              [
+                ["today", "Hoje"],
+                ["7d", "Últimos 7 dias"],
+                ["month", "Este mês"],
+                ["custom", "Personalizado"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                onClick={() => setRangeKey(value)}
+                className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
+                  rangeKey === value
+                    ? "bg-secondary font-medium text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {rangeKey === "custom" && (
+            <>
+              <DateField
+                className="h-9 w-36"
+                aria-label="Início do período"
+                value={custom.from}
+                onChange={(e) => setCustom({ ...custom, from: e.target.value })}
+              />
+              <DateField
+                className="h-9 w-36"
+                aria-label="Fim do período"
+                value={custom.to}
+                onChange={(e) => setCustom({ ...custom, to: e.target.value })}
+              />
+            </>
+          )}
+          <select
+            className={SELECT_CLASS}
+            value={spaceId}
+            onChange={(e) => {
+              setSpaceId(e.target.value);
+              setBoardId("");
+            }}
           >
-            <Icon className={`size-4 ${tab === value ? "text-primary" : ""}`} />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {tab === "dia" && (
-        <MyDay
-          tasks={allTasks}
-          currentUserId={currentUserId}
-          accountId={accountId}
-          onOpenTask={setSelected}
-        />
-      )}
-
-      {tab === "calendario" && <AgendaCalendar tasks={allTasks} onOpenTask={setSelected} />}
-
-      {selected && (
-        <TaskDialog
-          open
-          onOpenChange={(open) => !open && setSelected(null)}
-          task={selected}
-          boardId={selected.board_id}
-          statuses={statusesOfSelected}
-          users={users}
-          currentUserId={currentUserId}
-        />
-      )}
-
-      {tab === "geral" && (
-        <>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex rounded-lg border border-border p-0.5">
-              {(
-                [
-                  ["today", "Hoje"],
-                  ["7d", "Últimos 7 dias"],
-                  ["month", "Este mês"],
-                  ["custom", "Personalizado"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  onClick={() => setRangeKey(value)}
-                  className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
-                    rangeKey === value
-                      ? "bg-secondary font-medium text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {rangeKey === "custom" && (
-              <>
-                <DateField
-                  className="h-9 w-36"
-                  aria-label="Início do período"
-                  value={custom.from}
-                  onChange={(e) => setCustom({ ...custom, from: e.target.value })}
-                />
-                <DateField
-                  className="h-9 w-36"
-                  aria-label="Fim do período"
-                  value={custom.to}
-                  onChange={(e) => setCustom({ ...custom, to: e.target.value })}
-                />
-              </>
-            )}
-            <select
-              className={SELECT_CLASS}
-              value={spaceId}
-              onChange={(e) => {
-                setSpaceId(e.target.value);
-                setBoardId("");
-              }}
-            >
-              <option value="">Todos os espaços</option>
-              {spaces.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
+            <option value="">Todos os espaços</option>
+            {spaces.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <select
+            className={SELECT_CLASS}
+            value={boardId}
+            onChange={(e) => setBoardId(e.target.value)}
+          >
+            <option value="">Todos os quadros</option>
+            {boards
+              .filter((b) => !spaceId || b.space_id === spaceId)
+              .map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
                 </option>
               ))}
-            </select>
-            <select
-              className={SELECT_CLASS}
-              value={boardId}
-              onChange={(e) => setBoardId(e.target.value)}
-            >
-              <option value="">Todos os quadros</option>
-              {boards
-                .filter((b) => !spaceId || b.space_id === spaceId)
-                .map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
+          </select>
+          <select
+            className={SELECT_CLASS}
+            value={responsible}
+            onChange={(e) => setResponsible(e.target.value)}
+          >
+            <option value="">Todos os responsáveis</option>
+            {users.map((u) => (
+              <option key={u.user_id} value={u.user_id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <Indicator
+            icon={Loader}
+            label="Em andamento"
+            value={String(metrics.inProgress)}
+            hint="Polaridade em andamento"
+          />
+          <Indicator
+            icon={CheckCircle2}
+            label="Concluídas"
+            value={String(metrics.done)}
+            hint="Polaridade sucesso"
+            tone="text-positive"
+          />
+          <Indicator
+            icon={AlarmClock}
+            label="Atrasadas"
+            value={String(metrics.late)}
+            hint="Prazo vencido sem conclusão"
+            tone="text-negative"
+          />
+          <Indicator
+            icon={CalendarCheck}
+            label="Para hoje"
+            value={String(metrics.dueToday)}
+            hint="Início ou prazo hoje"
+          />
+          <Indicator
+            icon={Clock}
+            label="Meu tempo hoje"
+            value={formatDuration(timeToday)}
+            hint="Seus registros de hoje"
+          />
+          <Indicator
+            icon={Clock}
+            label="Tempo no período"
+            value={formatDuration(timePeriod)}
+            hint={`${range.from.slice(8, 10)}/${range.from.slice(5, 7)} a ${range.to.slice(8, 10)}/${range.to.slice(5, 7)}`}
+          />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Indicator
+            icon={Timer}
+            label="Horas estimadas"
+            value={formatHours(estimates.estimated)}
+            hint={`${estimates.withEstimate} tarefa(s) com estimativa · ${estimates.without} sem`}
+          />
+          <Indicator
+            icon={Clock}
+            label="Realizado nelas"
+            value={formatHours(estimates.tracked)}
+            hint="Tempo cronometrado nas tarefas estimadas"
+          />
+          <Indicator
+            icon={Timer}
+            label={estimates.balance >= 0 ? "Saldo de horas" : "Horas excedidas"}
+            value={formatHours(Math.abs(estimates.balance))}
+            hint={estimates.balance >= 0 ? "Ainda dentro do estimado" : "Acima do estimado"}
+            tone={estimates.balance >= 0 ? "" : "text-negative"}
+          />
+          <Indicator
+            icon={AlarmClock}
+            label="Estouraram a estimativa"
+            value={String(estimates.over)}
+            hint="Tarefas com tempo acima do estimado"
+            tone={estimates.over > 0 ? "text-negative" : ""}
+          />
+        </div>
+
+        {!hasData && (
+          <div className="panel brand-sheen p-12 text-center">
+            <p className="text-sm font-semibold">Nenhuma tarefa ainda</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Crie um espaço, um quadro e comece a registrar atividades.
+            </p>
+            <Button className="mt-4" asChild>
+              <Link to="/tarefas/espacos">Criar meu primeiro espaço</Link>
+            </Button>
+          </div>
+        )}
+
+        {hasData && (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Panel title="Horas registradas por dia">
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={byDay}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis tickLine={false} axisLine={false} fontSize={11} />
+                  <Tooltip formatter={(v: number) => `${v} h`} />
+                  <Bar dataKey="horas" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Panel>
+
+            <Panel title="Horas por usuário">
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={byUser} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.2} />
+                  <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis
+                    type="category"
+                    dataKey="label"
+                    width={100}
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={11}
+                  />
+                  <Tooltip formatter={(v: number) => `${v} h`} />
+                  <Bar dataKey="horas" fill="var(--chart-2)" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Panel>
+
+            <Panel title="Horas por quadro">
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={byBoard} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.2} />
+                  <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis
+                    type="category"
+                    dataKey="label"
+                    width={120}
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={11}
+                  />
+                  <Tooltip formatter={(v: number) => `${v} h`} />
+                  <Bar dataKey="horas" fill="var(--chart-4)" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Panel>
+
+            <Panel title="Horas por espaço">
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={bySpace} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.2} />
+                  <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis
+                    type="category"
+                    dataKey="label"
+                    width={120}
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={11}
+                  />
+                  <Tooltip formatter={(v: number) => `${v} h`} />
+                  <Bar dataKey="horas" fill="var(--chart-5)" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Panel>
+
+            <Panel title="Distribuição por status">
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie
+                    data={byStatus}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={2}
+                  >
+                    {byStatus.map((s) => (
+                      <Cell key={s.name} fill={s.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: number, n: string) => [`${v} tarefas`, n]} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                {byStatus.map((s) => (
+                  <span key={s.name} className="flex items-center gap-1.5">
+                    <span className="size-2 rounded-full" style={{ backgroundColor: s.color }} />
+                    {s.name} · {s.value}
+                  </span>
                 ))}
-            </select>
-            <select
-              className={SELECT_CLASS}
-              value={responsible}
-              onChange={(e) => setResponsible(e.target.value)}
-            >
-              <option value="">Todos os responsáveis</option>
-              {users.map((u) => (
-                <option key={u.user_id} value={u.user_id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <Indicator
-              icon={Loader}
-              label="Em andamento"
-              value={String(metrics.inProgress)}
-              hint="Polaridade em andamento"
-            />
-            <Indicator
-              icon={CheckCircle2}
-              label="Concluídas"
-              value={String(metrics.done)}
-              hint="Polaridade sucesso"
-              tone="text-positive"
-            />
-            <Indicator
-              icon={AlarmClock}
-              label="Atrasadas"
-              value={String(metrics.late)}
-              hint="Prazo vencido sem conclusão"
-              tone="text-negative"
-            />
-            <Indicator
-              icon={CalendarCheck}
-              label="Para hoje"
-              value={String(metrics.dueToday)}
-              hint="Início ou prazo hoje"
-            />
-            <Indicator
-              icon={Clock}
-              label="Meu tempo hoje"
-              value={formatDuration(timeToday)}
-              hint="Seus registros de hoje"
-            />
-            <Indicator
-              icon={Clock}
-              label="Tempo no período"
-              value={formatDuration(timePeriod)}
-              hint={`${range.from.slice(8, 10)}/${range.from.slice(5, 7)} a ${range.to.slice(8, 10)}/${range.to.slice(5, 7)}`}
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Indicator
-              icon={Timer}
-              label="Horas estimadas"
-              value={formatHours(estimates.estimated)}
-              hint={`${estimates.withEstimate} tarefa(s) com estimativa · ${estimates.without} sem`}
-            />
-            <Indicator
-              icon={Clock}
-              label="Realizado nelas"
-              value={formatHours(estimates.tracked)}
-              hint="Tempo cronometrado nas tarefas estimadas"
-            />
-            <Indicator
-              icon={Timer}
-              label={estimates.balance >= 0 ? "Saldo de horas" : "Horas excedidas"}
-              value={formatHours(Math.abs(estimates.balance))}
-              hint={estimates.balance >= 0 ? "Ainda dentro do estimado" : "Acima do estimado"}
-              tone={estimates.balance >= 0 ? "" : "text-negative"}
-            />
-            <Indicator
-              icon={AlarmClock}
-              label="Estouraram a estimativa"
-              value={String(estimates.over)}
-              hint="Tarefas com tempo acima do estimado"
-              tone={estimates.over > 0 ? "text-negative" : ""}
-            />
-          </div>
-
-          {!hasData && (
-            <div className="panel brand-sheen p-12 text-center">
-              <p className="text-sm font-semibold">Nenhuma tarefa ainda</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Crie um espaço, um quadro e comece a registrar atividades.
-              </p>
-              <Button className="mt-4" asChild>
-                <Link to="/tarefas/espacos">Criar meu primeiro espaço</Link>
-              </Button>
-            </div>
-          )}
-
-          {hasData && (
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Panel title="Horas registradas por dia">
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={byDay}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
-                    <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} />
-                    <YAxis tickLine={false} axisLine={false} fontSize={11} />
-                    <Tooltip formatter={(v: number) => `${v} h`} />
-                    <Bar dataKey="horas" fill="var(--primary)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Panel>
-
-              <Panel title="Horas por usuário">
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={byUser} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.2} />
-                    <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} />
-                    <YAxis
-                      type="category"
-                      dataKey="label"
-                      width={100}
-                      tickLine={false}
-                      axisLine={false}
-                      fontSize={11}
-                    />
-                    <Tooltip formatter={(v: number) => `${v} h`} />
-                    <Bar dataKey="horas" fill="var(--chart-2)" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Panel>
-
-              <Panel title="Horas por quadro">
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={byBoard} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.2} />
-                    <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} />
-                    <YAxis
-                      type="category"
-                      dataKey="label"
-                      width={120}
-                      tickLine={false}
-                      axisLine={false}
-                      fontSize={11}
-                    />
-                    <Tooltip formatter={(v: number) => `${v} h`} />
-                    <Bar dataKey="horas" fill="var(--chart-4)" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Panel>
-
-              <Panel title="Horas por espaço">
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={bySpace} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.2} />
-                    <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} />
-                    <YAxis
-                      type="category"
-                      dataKey="label"
-                      width={120}
-                      tickLine={false}
-                      axisLine={false}
-                      fontSize={11}
-                    />
-                    <Tooltip formatter={(v: number) => `${v} h`} />
-                    <Bar dataKey="horas" fill="var(--chart-5)" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Panel>
-
-              <Panel title="Distribuição por status">
-                <ResponsiveContainer width="100%" height={240}>
-                  <PieChart>
-                    <Pie
-                      data={byStatus}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={55}
-                      outerRadius={85}
-                      paddingAngle={2}
-                    >
-                      {byStatus.map((s) => (
-                        <Cell key={s.name} fill={s.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v: number, n: string) => [`${v} tarefas`, n]} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                  {byStatus.map((s) => (
-                    <span key={s.name} className="flex items-center gap-1.5">
-                      <span className="size-2 rounded-full" style={{ backgroundColor: s.color }} />
-                      {s.name} · {s.value}
-                    </span>
-                  ))}
-                </div>
-              </Panel>
-
-              <Panel title="Estimado x realizado por quadro">
-                {estimateByBoard.length === 0 ? (
-                  <p className="py-14 text-center text-sm text-muted-foreground">
-                    Nenhuma tarefa com estimativa de horas ainda. Informe a estimativa dentro da
-                    tarefa para acompanhar aqui.
-                  </p>
-                ) : (
-                  <>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={estimateByBoard} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.2} />
-                        <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} />
-                        <YAxis
-                          type="category"
-                          dataKey="label"
-                          width={120}
-                          tickLine={false}
-                          axisLine={false}
-                          fontSize={11}
-                        />
-                        <Tooltip formatter={(v: number) => `${v} h`} />
-                        <Bar dataKey="estimado" fill="var(--chart-4)" radius={[0, 4, 4, 0]} />
-                        <Bar dataKey="realizado" fill="var(--chart-1)" radius={[0, 4, 4, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1.5">
-                        <span className="size-2 rounded-full bg-chart-4" /> Estimado
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <span className="size-2 rounded-full bg-chart-1" /> Realizado
-                      </span>
-                    </div>
-                  </>
-                )}
-              </Panel>
-
-              <Panel title="Distribuição por prioridade">
-                <ResponsiveContainer width="100%" height={240}>
-                  <PieChart>
-                    <Pie
-                      data={byPriority}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={55}
-                      outerRadius={85}
-                      paddingAngle={2}
-                    >
-                      {byPriority.map((row) => (
-                        <Cell key={row.name} fill={row.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v: number, n: string) => [`${v} tarefas`, n]} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                  {byPriority.map((row) => (
-                    <span key={row.name} className="flex items-center gap-1.5">
-                      <span
-                        className="size-2 rounded-full"
-                        style={{ backgroundColor: row.color }}
-                      />
-                      {row.name} · {row.value}
-                    </span>
-                  ))}
-                </div>
-              </Panel>
-
-              <Panel title="Tarefas por responsável">
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={byResponsible} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.2} />
-                    <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} />
-                    <YAxis
-                      type="category"
-                      dataKey="label"
-                      width={110}
-                      tickLine={false}
-                      axisLine={false}
-                      fontSize={11}
-                    />
-                    <Tooltip formatter={(v: number) => `${v} tarefas`} />
-                    <Bar dataKey="tarefas" radius={[0, 4, 4, 0]}>
-                      {byResponsible.map((_, i) => (
-                        <Cell
-                          key={i}
-                          fill={tone(PALETTE[i % PALETTE.length]!)}
-                          stroke="var(--color-card)"
-                          strokeWidth={2}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </Panel>
-            </div>
-          )}
-
-          {spaces.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-muted-foreground">Acesso rápido</h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {spaces
-                  .filter((s) => !s.archived_at)
-                  .map((space) => (
-                    <Link
-                      key={space.id}
-                      to="/tarefas/espacos/$spaceId"
-                      params={{ spaceId: space.id }}
-                      className="panel-interactive flex items-center gap-3 p-4"
-                    >
-                      <IconBadge
-                        name={space.icon}
-                        color={space.color}
-                        fallback={DEFAULT_SPACE_ICON}
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{space.name}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {boards.filter((b) => b.space_id === space.id).length} quadros
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
               </div>
+            </Panel>
+
+            <Panel title="Estimado x realizado por quadro">
+              {estimateByBoard.length === 0 ? (
+                <p className="py-14 text-center text-sm text-muted-foreground">
+                  Nenhuma tarefa com estimativa de horas ainda. Informe a estimativa dentro da
+                  tarefa para acompanhar aqui.
+                </p>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={estimateByBoard} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.2} />
+                      <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} />
+                      <YAxis
+                        type="category"
+                        dataKey="label"
+                        width={120}
+                        tickLine={false}
+                        axisLine={false}
+                        fontSize={11}
+                      />
+                      <Tooltip formatter={(v: number) => `${v} h`} />
+                      <Bar dataKey="estimado" fill="var(--chart-4)" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="realizado" fill="var(--chart-1)" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-chart-4" /> Estimado
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-chart-1" /> Realizado
+                    </span>
+                  </div>
+                </>
+              )}
+            </Panel>
+
+            <Panel title="Distribuição por prioridade">
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie
+                    data={byPriority}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={2}
+                  >
+                    {byPriority.map((row) => (
+                      <Cell key={row.name} fill={row.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: number, n: string) => [`${v} tarefas`, n]} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                {byPriority.map((row) => (
+                  <span key={row.name} className="flex items-center gap-1.5">
+                    <span className="size-2 rounded-full" style={{ backgroundColor: row.color }} />
+                    {row.name} · {row.value}
+                  </span>
+                ))}
+              </div>
+            </Panel>
+
+            <Panel title="Tarefas por responsável">
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={byResponsible} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.2} />
+                  <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis
+                    type="category"
+                    dataKey="label"
+                    width={110}
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={11}
+                  />
+                  <Tooltip formatter={(v: number) => `${v} tarefas`} />
+                  <Bar dataKey="tarefas" radius={[0, 4, 4, 0]}>
+                    {byResponsible.map((_, i) => (
+                      <Cell
+                        key={i}
+                        fill={tone(PALETTE[i % PALETTE.length]!)}
+                        stroke="var(--color-card)"
+                        strokeWidth={2}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </Panel>
+          </div>
+        )}
+
+        {spaces.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold text-muted-foreground">Acesso rápido</h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {spaces
+                .filter((s) => !s.archived_at)
+                .map((space) => (
+                  <Link
+                    key={space.id}
+                    to="/tarefas/espacos/$spaceId"
+                    params={{ spaceId: space.id }}
+                    className="panel-interactive flex items-center gap-3 p-4"
+                  >
+                    <IconBadge
+                      name={space.icon}
+                      color={space.color}
+                      fallback={DEFAULT_SPACE_ICON}
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{space.name}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {boards.filter((b) => b.space_id === space.id).length} quadros
+                      </p>
+                    </div>
+                  </Link>
+                ))}
             </div>
-          )}
-        </>
-      )}
+          </div>
+        )}
+      </>
     </TasksShell>
   );
 }
