@@ -9,8 +9,12 @@ import { cn } from "@/lib/utils";
  *
  * Três níveis de ênfase, e a tela deve usar um de cada vez: `brand` (gradiente)
  * para a ação principal, `default` (violeta cheio) para as demais ações
- * afirmativas, e `outline`/`ghost` para o que apenas acompanha. O clique afunda
- * 1px — o retorno tátil que faltava — e o foco desenha o anel da marca.
+ * afirmativas, e `outline`/`ghost` para o que apenas acompanha.
+ *
+ * O botão responde ao mouse em duas camadas: sobe um fio e acende um halo da
+ * própria cor. O clique afunda de volta — `hover-lift` se cala enquanto o
+ * botão está pressionado, para o afundar de `active` não disputar com o
+ * levantar. `link` fica de fora do movimento: texto que pula na frase incomoda.
  */
 const buttonVariants = cva(
   [
@@ -24,17 +28,18 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md",
-        brand: "brand-gradient shadow-sm hover:shadow-glow",
+        default:
+          "bg-primary text-primary-foreground shadow-sm hover-lift hover-glow hover:bg-primary/90",
+        brand: "brand-gradient shadow-sm hover-lift hover-glow",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 hover:shadow-md",
+          "[--glow:var(--color-destructive)] bg-destructive text-destructive-foreground shadow-sm hover-lift hover-glow hover:bg-destructive/90",
         outline:
-          "border border-input bg-card text-foreground shadow-xs hover:border-border-strong hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground shadow-xs hover:bg-accent",
+          "border border-input bg-card text-foreground shadow-xs hover-lift hover:border-primary/40 hover:bg-accent hover:text-accent-foreground hover:shadow-md",
+        secondary: "bg-secondary text-secondary-foreground shadow-xs hover-lift hover:bg-accent",
         ghost: "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-        soft: "bg-primary-soft text-primary-soft-foreground hover:bg-primary/15",
+        soft: "bg-primary-soft text-primary-soft-foreground hover-lift hover:bg-primary/15",
         link: "text-primary underline-offset-4 hover:underline",
-        ink: "bg-ink text-ink-foreground shadow-sm hover:bg-ink/90 hover:shadow-md",
+        ink: "[--glow:var(--color-ink)] bg-ink text-ink-foreground shadow-sm hover-lift hover-glow hover:bg-ink/90",
       },
       size: {
         default: "h-10 rounded-xl px-4 text-sm",

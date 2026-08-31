@@ -464,9 +464,9 @@ function EventBlock({
       }}
       title={`${entry.title} · ${label}${entry.subtitle ? ` · ${entry.subtitle}` : ""}`}
       className={cn(
-        "group absolute overflow-hidden rounded-lg border px-2 py-1 text-left transition-shadow",
+        "group absolute overflow-hidden rounded-lg border px-2 py-1 text-left",
         entry.canMove ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
-        dragging ? "z-30 shadow-xl ring-2 ring-ring" : "z-10 hover:shadow-md",
+        dragging ? "z-30 glow-strong" : "z-10 hover-glow",
         agenda && "border-dashed",
       )}
       style={{
@@ -474,8 +474,9 @@ function EventBlock({
         height,
         left: `calc(${left}% + 2px)`,
         width: `calc(${width}% - 4px)`,
-        // A cor do item pinta a borda e um véu de fundo: cor cheia num bloco
-        // grande apagaria o texto e brigaria com os blocos vizinhos.
+        // A cor do item pinta a borda, um véu de fundo e o halo: cor cheia num
+        // bloco grande apagaria o texto e brigaria com os blocos vizinhos.
+        ["--glow" as string]: entry.color,
         borderColor: `color-mix(in oklab, ${entry.color} 45%, transparent)`,
         backgroundColor: `color-mix(in oklab, ${entry.color} 16%, var(--color-card))`,
         opacity: entry.done ? 0.65 : 1,
