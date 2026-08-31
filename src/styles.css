@@ -202,6 +202,18 @@
     oklch(0.55 0.216 279 / 0.1),
     oklch(0.68 0.135 213 / 0.04)
   );
+
+  /*
+   * Brilho. `--glow` é a cor do halo — por padrão a da marca, mas cada
+   * elemento pode trocá-la pela cor que ele já carrega (o status da coluna, o
+   * estado da tarefa), e o halo passa a dizer a mesma coisa que a cor diz.
+   * A intensidade é o que muda entre os temas: sobre papel branco um halo
+   * forte vira borrão, então aqui ele é quase um reflexo.
+   */
+  --glow: var(--color-primary);
+  --glow-soft: 22%;
+  --glow-strong: 34%;
+  --glow-edge: 30%;
 }
 
 .dark {
@@ -283,6 +295,11 @@
     oklch(0.68 0.185 285 / 0.16),
     oklch(0.74 0.125 210 / 0.06)
   );
+
+  /* No escuro a luz tem onde aparecer: o mesmo halo, bem mais aceso. */
+  --glow-soft: 45%;
+  --glow-strong: 70%;
+  --glow-edge: 55%;
 }
 
 @layer base {
@@ -322,6 +339,47 @@
     outline: 2px solid var(--color-ring);
     outline-offset: 2px;
   }
+
+  /*
+   * Barra de rolagem do sistema, em qualquer caixa que role.
+   *
+   * Isto é regra global, e não utilidade a aplicar caixa a caixa, porque uma
+   * utilidade só protege o lugar onde alguém lembrou de escrevê-la: bastava um
+   * diálogo novo para a barra cinza do navegador reaparecer no meio de uma tela
+   * que o resto do sistema já tinha desenhado.
+   */
+  * {
+    scrollbar-width: thin;
+    /*
+     * O polegar vem do cinza do texto secundário, não da cor de borda: a
+     * borda é quase transparente no tema escuro e a barra sumia de vez, o que
+     * é discreto demais para algo que se pega com o mouse.
+     */
+    scrollbar-color: color-mix(in oklab, var(--color-muted-foreground) 45%, transparent) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--color-muted-foreground) 45%, transparent);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted-foreground);
+  }
+
+  /* O canto entre as duas barras não pode ficar branco sobre fundo escuro. */
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }
 
 /* ------------------------------------------------------------------------ */
@@ -348,9 +406,17 @@
     transform 0.2s ease;
 
   &:hover {
-    border-color: var(--color-border-strong);
-    box-shadow: var(--elevation-md);
-    transform: translateY(-1px);
+    border-color: color-mix(in oklab, var(--glow) var(--glow-edge), var(--color-border-strong));
+    box-shadow:
+      var(--elevation-md),
+      0 8px 26px -10px color-mix(in oklab, var(--glow) var(--glow-strong), transparent);
+    transform: translateY(-2px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &:hover {
+      transform: none;
+    }
   }
 }
 
@@ -368,6 +434,102 @@
 /** Halo da marca em volta de um elemento em foco/ativo. */
 @utility ring-glow {
   box-shadow: var(--elevation-glow);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Brilho e movimento                                                        */
+/* ------------------------------------------------------------------------ */
+
+/*
+ * O brilho é o acabamento do sistema, não o assunto dele: um halo da cor que o
+ * elemento já tem, aceso o bastante para o olho achar o que está ativo e
+ * discreto o bastante para não competir com o conteúdo. Ele quase sempre
+ * aparece no hover — parado, a tela continua sóbria; com o mouse em cima, ela
+ * responde.
+ */
+
+/** Halo permanente, na cor de `--glow`. */
+@utility glow-soft {
+  box-shadow: 0 4px 18px -6px color-mix(in oklab, var(--glow) var(--glow-soft), transparent);
+}
+
+/** Halo aceso — item selecionado, arraste sobre a coluna, ação principal. */
+@utility glow-strong {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--glow) var(--glow-edge), transparent),
+    0 6px 26px -6px color-mix(in oklab, var(--glow) var(--glow-strong), transparent);
+}
+
+/*
+ * As duas utilidades de hover declaram a lista inteira de propriedades em
+ * transição, e não só a que cada uma anima. Elas convivem com o `transition-*`
+ * que o elemento já tenha, e `transition-property` é uma só: se a nossa
+ * ganhasse declarando apenas `transform`, a cor de fundo passaria a trocar
+ * seco. Declarando tudo, qualquer uma que vença anima a mesma coisa.
+ */
+@utility hover-glow {
+  transition-property: transform, box-shadow, background-color, border-color, color;
+  transition-duration: 0.18s;
+  transition-timing-function: ease;
+
+  &:hover {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--glow) var(--glow-edge), transparent),
+      0 8px 26px -8px color-mix(in oklab, var(--glow) var(--glow-strong), transparent);
+  }
+}
+
+/**
+ * O elemento sobe um fio com o mouse em cima.
+ *
+ * O `:not(:active)` é o que deixa o afundar do clique passar: enquanto o botão
+ * está pressionado esta regra se cala, em vez de disputar a mesma propriedade
+ * `transform` com ele.
+ */
+@utility hover-lift {
+  transition-property: transform, box-shadow, background-color, border-color, color;
+  transition-duration: 0.18s;
+  transition-timing-function: ease;
+
+  &:hover:not(:active) {
+    transform: translateY(-2px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &:hover:not(:active) {
+      transform: none;
+    }
+  }
+}
+
+/**
+ * Fita de luz no topo de uma coluna ou cartão.
+ *
+ * Some nas pontas em vez de bater na borda: uma linha que termina em bico
+ * parece luz, uma que termina reta parece moldura.
+ */
+@utility neon-strip {
+  position: relative;
+
+  &::before {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    inset-inline: 10%;
+    top: 0;
+    height: 3px;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, transparent, var(--glow), transparent);
+    box-shadow: 0 0 12px color-mix(in oklab, var(--glow) var(--glow-strong), transparent);
+    pointer-events: none;
+  }
+}
+
+/** Selo na cor cheia com um halo da própria cor — o rótulo aceso. */
+@utility neon-chip {
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 0.2),
+    0 0 12px -2px color-mix(in oklab, var(--glow) var(--glow-strong), transparent);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -468,33 +630,5 @@
   }
   50% {
     opacity: 0.45;
-  }
-}
-
-/* ------------------------------------------------------------------------ */
-/* Rolagem                                                                   */
-/* ------------------------------------------------------------------------ */
-
-/*
- * Barras de rolagem discretas — o módulo de Projetos e Tarefas tem colunas de
- * Kanban e árvore lateral roláveis, e a barra padrão pesa demais no layout.
- */
-@utility thin-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border-strong) transparent;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: var(--color-border-strong);
-    border-radius: 9999px;
-  }
-  &:hover::-webkit-scrollbar-thumb {
-    background: var(--color-muted-foreground);
   }
 }

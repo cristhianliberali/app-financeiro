@@ -4,6 +4,7 @@ import { AlertTriangle, Ban, CalendarPlus, FileUp, Sparkles, Trash2, X } from "l
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { DateField } from "@/components/ui/date-field";
 import { Label } from "@/components/ui/label";
@@ -376,16 +377,15 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                 </span>
                 <span className="flex items-center gap-3">
                   <label className="flex cursor-pointer items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      className="size-3.5 accent-[var(--color-primary)]"
+                    <Checkbox
+                      className="size-4"
                       checked={repeatDate[lastDate.field]}
-                      onChange={(e) => {
+                      onCheckedChange={(checked) => {
                         setRepeatDate((prev) => ({
                           ...prev,
-                          [lastDate.field]: e.target.checked,
+                          [lastDate.field]: checked === true,
                         }));
-                        if (e.target.checked) applyDateToAll(lastDate.field, lastDate.value);
+                        if (checked === true) applyDateToAll(lastDate.field, lastDate.value);
                       }}
                     />
                     Aplicar a todos os {rows.length} lançamentos
@@ -489,12 +489,11 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                           : "border-border"
                   }`}
                 >
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={r.include}
                     disabled={blocked}
-                    onChange={(e) => patch(i, { include: e.target.checked })}
-                    className="col-span-1 size-4 accent-[var(--color-primary)] disabled:cursor-not-allowed"
+                    onCheckedChange={(checked) => patch(i, { include: checked === true })}
+                    className="col-span-1"
                     aria-label={blocked ? "Lançamento já existente" : "Incluir lançamento"}
                   />
                   <div className="col-span-3 space-y-1">

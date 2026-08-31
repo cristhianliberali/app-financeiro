@@ -255,7 +255,7 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
                   {preview.length > 0 ? (
                     <div className="space-y-1">
                       <p className="label-caps">O que será lançado</p>
-                      <div className="max-h-40 space-y-1 overflow-y-auto pr-1 thin-scrollbar">
+                      <div className="max-h-40 space-y-1 overflow-y-auto pr-1">
                         {preview.map((part) => (
                           <div
                             key={part.no}

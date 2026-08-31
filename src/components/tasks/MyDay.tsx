@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CalendarClock, ExternalLink, Link2, Plus, Sun, Sunrise, Sunset } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAgendaEvents, useGoogleStatus } from "@/lib/google";
@@ -246,15 +247,14 @@ export function MyDay({
                           item.task.status?.polarity === "SUCCESS" ? "state-done" : "state-pending"
                         }`}
                       >
-                        <input
-                          type="checkbox"
-                          className="size-4 shrink-0 cursor-pointer accent-[var(--color-primary)]"
+                        <Checkbox
+                          className="shrink-0"
                           checked={item.task.status?.polarity === "SUCCESS"}
                           aria-label={`Concluir ${item.task.title}`}
-                          onChange={async (e) => {
+                          onCheckedChange={async (checked) => {
                             const result = await complete.mutateAsync({
                               id: item.task.id,
-                              polarity: e.target.checked ? "SUCCESS" : "IN_PROGRESS",
+                              polarity: checked === true ? "SUCCESS" : "IN_PROGRESS",
                             });
                             toast.success(
                               result?.statusName
@@ -296,16 +296,15 @@ export function MyDay({
                           key={subtask.id}
                           className="ml-6 flex items-center gap-3 rounded-lg border border-border/60 bg-surface/60 p-2"
                         >
-                          <input
-                            type="checkbox"
-                            className="size-3.5 shrink-0 cursor-pointer accent-[var(--color-primary)]"
+                          <Checkbox
+                            className="size-4 shrink-0"
                             checked={subtask.completed}
                             aria-label={`Concluir ${subtask.title}`}
-                            onChange={(e) =>
+                            onCheckedChange={(checked) =>
                               saveSubtask.mutate({
                                 id: subtask.id,
                                 task_id: subtask.task_id,
-                                completed: e.target.checked,
+                                completed: checked === true,
                               })
                             }
                           />

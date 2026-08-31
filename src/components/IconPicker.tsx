@@ -81,7 +81,7 @@ export function IconPicker({
             />
           </div>
         </div>
-        <div className="thin-scrollbar max-h-72 overflow-y-auto p-2">
+        <div className="max-h-72 overflow-y-auto p-2">
           {groups.length === 0 && (
             <p className="px-1 py-6 text-center text-xs text-muted-foreground">
               Nenhum ícone com esse nome.

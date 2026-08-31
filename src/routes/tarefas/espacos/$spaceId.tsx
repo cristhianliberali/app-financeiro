@@ -1,7 +1,7 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Pencil, Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { TasksShell } from "@/components/tasks/TasksShell";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,8 +37,7 @@ import {
   type Board,
   type Task,
 } from "@/lib/tasks";
-import { BOARD_STAGES, BOARD_VIEWS, formatDateTimeBR, type BoardView } from "@/lib/tasks-analytics";
-import { UserAvatar } from "@/components/tasks/UserPicker";
+import { BOARD_VIEWS, type BoardView } from "@/lib/tasks-analytics";
 import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
 
 export const Route = createFileRoute("/tarefas/espacos/$spaceId")({
@@ -72,7 +71,6 @@ function SpacePage() {
     board: null,
   });
   const [spaceDialog, setSpaceDialog] = useState(false);
-  const [showBoards, setShowBoards] = useState(true);
   const [view, setView] = useState<BoardView>("kanban");
   const [filters, setFilters] = useState<TaskFilterState>(EMPTY_FILTERS);
   const [taskDialog, setTaskDialog] = useState<{
@@ -155,102 +153,46 @@ function SpacePage() {
         </>
       }
     >
-      <div className="flex items-center gap-3">
-        <IconBadge
-          name={space?.icon}
-          color={space?.color}
-          size="lg"
-          fallback={DEFAULT_SPACE_ICON}
-        />
-        <div>
-          <h1 className="title-xl">{space?.name ?? "Espaço"}</h1>
-          {space?.description && (
-            <p className="text-sm text-muted-foreground">{space.description}</p>
-          )}
+      {/*
+        A tela do espaço é a das tarefas dele. Os quadros ficam na lateral, que
+        é de onde se escolhe um — repeti-los aqui em cartões era um índice a
+        mais para atravessar antes de chegar no trabalho.
+      */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <IconBadge
+            name={space?.icon}
+            color={space?.color}
+            size="lg"
+            fallback={DEFAULT_SPACE_ICON}
+          />
+          <div>
+            <h1 className="title-xl">{space?.name ?? "Espaço"}</h1>
+            <p className="text-sm text-muted-foreground">
+              {space?.description ??
+                `Tarefas dos ${boards.length} quadro(s) deste espaço, com os status iguais reunidos numa coluna só.`}
+            </p>
+          </div>
         </div>
+
+        {boards.length > 0 && (
+          <div className="flex rounded-lg border border-border p-0.5">
+            {BOARD_VIEWS.map((v) => (
+              <button
+                key={v.value}
+                onClick={() => setView(v.value)}
+                className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
+                  view === v.value
+                    ? "bg-secondary font-medium text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
-
-      {boards.length > 0 && (
-        <section className="space-y-3">
-          <button
-            onClick={() => setShowBoards((v) => !v)}
-            className="flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
-            aria-expanded={showBoards}
-          >
-            {showBoards ? (
-              <ChevronDown className="size-3.5" />
-            ) : (
-              <ChevronRight className="size-3.5" />
-            )}
-            <span className="label-caps">Quadros ({boards.length})</span>
-          </button>
-
-          {showBoards && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {boards.map((board) => {
-                const boardTasks = spaceTasks.filter((t) => t.board_id === board.id);
-                const done = boardTasks.filter((t) => t.status?.polarity === "SUCCESS").length;
-                const pct = boardTasks.length ? Math.round((done / boardTasks.length) * 100) : 0;
-                const stage = BOARD_STAGES.find((s) => s.value === board.status)?.label ?? "";
-                return (
-                  <div
-                    key={board.id}
-                    className="group relative rounded-2xl border border-border bg-card p-5 transition-shadow hover:shadow-md"
-                  >
-                    <button
-                      onClick={() => setBoardDialog({ open: true, board })}
-                      className="absolute right-3 top-3 rounded p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-secondary hover:text-foreground group-hover:opacity-100"
-                      aria-label={`Editar ${board.name}`}
-                    >
-                      <Pencil className="size-3.5" />
-                    </button>
-                    <Link
-                      to="/tarefas/quadros/$boardId"
-                      params={{ boardId: board.id }}
-                      className="block"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="size-2.5 rounded-full ring-1 ring-border"
-                          style={{ backgroundColor: tone(board.color) }}
-                        />
-                        <p className="font-semibold">{board.name}</p>
-                      </div>
-                      {board.description && (
-                        <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
-                          {board.description}
-                        </p>
-                      )}
-                      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary">
-                        <div className="h-full bg-positive" style={{ width: `${pct}%` }} />
-                      </div>
-                      <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
-                        <span>
-                          {done}/{boardTasks.length} concluídas · {stage}
-                        </span>
-                        {board.owner_id && (
-                          <UserAvatar
-                            user={users.find((u) => u.user_id === board.owner_id) ?? null}
-                            size={20}
-                          />
-                        )}
-                      </div>
-                      {(board.start_date || board.due_date) && (
-                        <p className="mt-2 text-[11px] text-muted-foreground">
-                          {board.start_date &&
-                            `Início ${formatDateTimeBR(board.start_date, false)}`}
-                          {board.due_date &&
-                            ` · Previsão ${formatDateTimeBR(board.due_date, false)}`}
-                        </p>
-                      )}
-                    </Link>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      )}
 
       {boards.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-10 text-center">
@@ -264,31 +206,6 @@ function SpacePage() {
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-bold tracking-tight">Tarefas do espaço</h2>
-              <p className="text-xs text-muted-foreground">
-                Todas as tarefas dos {boards.length} quadro(s) deste espaço, com os status iguais
-                reunidos numa coluna só.
-              </p>
-            </div>
-            <div className="flex rounded-lg border border-border p-0.5">
-              {BOARD_VIEWS.map((v) => (
-                <button
-                  key={v.value}
-                  onClick={() => setView(v.value)}
-                  className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
-                    view === v.value
-                      ? "bg-secondary font-medium text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {v.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {view !== "list" && (
             <TaskFilterBar
               value={filters}

@@ -155,7 +155,7 @@ export function LabelPicker({
               className="h-8 text-xs"
             />
 
-            <div className="mt-2 max-h-56 space-y-0.5 overflow-y-auto thin-scrollbar">
+            <div className="mt-2 max-h-56 space-y-0.5 overflow-y-auto">
               {filtered.map((label) => {
                 const active = value.includes(label.id);
                 return (
@@ -244,7 +244,7 @@ export function LabelFilter({
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-60 p-2">
-        <div className="max-h-64 space-y-0.5 overflow-y-auto thin-scrollbar">
+        <div className="max-h-64 space-y-0.5 overflow-y-auto">
           {labels.map((label) => {
             const active = value.includes(label.id);
             return (

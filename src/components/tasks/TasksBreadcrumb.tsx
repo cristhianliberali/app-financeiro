@@ -182,7 +182,7 @@ function LevelPicker({
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-60 p-1">
-        <div className="max-h-72 space-y-0.5 overflow-y-auto thin-scrollbar">
+        <div className="max-h-72 space-y-0.5 overflow-y-auto">
           {items.map((item) => (
             <button
               key={item.id}

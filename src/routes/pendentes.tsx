@@ -495,7 +495,7 @@ function PendingPage() {
                   </span>
                   .
                 </p>
-                <ul className="thin-scrollbar max-h-40 space-y-1 overflow-y-auto rounded-xl border border-border bg-surface p-3 text-xs">
+                <ul className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-border bg-surface p-3 text-xs">
                   {(confirming ?? []).map((t) => (
                     <li key={t.id} className="flex items-center justify-between gap-3">
                       <span className="truncate">{t.description}</span>

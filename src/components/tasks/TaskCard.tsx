@@ -1,4 +1,6 @@
 import {
+  ArrowLeft,
+  ArrowRight,
   BellRing,
   CalendarClock,
   CheckCircle2,
@@ -31,6 +33,10 @@ export function TaskCard({
   onOpen,
   onToggleTimer,
   onDragStart,
+  onMovePrev,
+  onMoveNext,
+  prevName,
+  nextName,
   showBoard = false,
 }: {
   task: Task;
@@ -39,6 +45,11 @@ export function TaskCard({
   onOpen: () => void;
   onToggleTimer: () => void;
   onDragStart?: (e: React.DragEvent) => void;
+  /** Empurra o cartão para a coluna anterior; some quando não há uma. */
+  onMovePrev?: (() => void) | undefined;
+  onMoveNext?: (() => void) | undefined;
+  prevName?: string | undefined;
+  nextName?: string | undefined;
   showBoard?: boolean;
 }) {
   const now = useNow(task.running ? 1000 : 60_000);
@@ -72,10 +83,25 @@ export function TaskCard({
             ? ""
             : "state-pending";
 
+  /*
+   * O halo do hover usa a mesma cor do estado. Assim o brilho não é enfeite:
+   * um cartão atrasado acende em vermelho, um concluído em verde, e o mouse
+   * passeando pelo quadro confirma o que a barra da esquerda já dizia.
+   */
+  const glow =
+    state === "done"
+      ? "var(--color-positive)"
+      : state === "late"
+        ? "var(--color-negative)"
+        : state === "due_today"
+          ? "var(--color-warning)"
+          : "var(--color-info)";
+
   return (
     <div
       draggable={!!onDragStart}
       onDragStart={onDragStart}
+      style={{ ["--glow" as string]: glow }}
       className={`panel-interactive state-bar group cursor-pointer p-3 ${stateBar} ${
         state === "archived" ? "opacity-60" : ""
       }`}
@@ -178,6 +204,38 @@ export function TaskCard({
           </span>
         )}
         <span className="ml-auto flex items-center gap-1">
+          {/* Mover sem arrastar: as setas só existem enquanto o mouse está no
+              cartão, para não poluir um quadro cheio. */}
+          {(onMovePrev || onMoveNext) && (
+            <span className="mr-1 hidden items-center gap-0.5 group-hover:flex">
+              {onMovePrev && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMovePrev();
+                  }}
+                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  aria-label={`Mover para ${prevName ?? "a coluna anterior"}`}
+                  title={`Mover para ${prevName ?? "a coluna anterior"}`}
+                >
+                  <ArrowLeft className="size-3.5" />
+                </button>
+              )}
+              {onMoveNext && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMoveNext();
+                  }}
+                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  aria-label={`Mover para ${nextName ?? "a próxima coluna"}`}
+                  title={`Mover para ${nextName ?? "a próxima coluna"}`}
+                >
+                  <ArrowRight className="size-3.5" />
+                </button>
+              )}
+            </span>
+          )}
           {task.participants.length > 0 && (
             <UserStack ids={task.participants} users={users} max={3} size={18} />
           )}

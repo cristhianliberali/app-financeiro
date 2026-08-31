@@ -230,11 +230,11 @@ export function TasksShell({
               key={item.to}
               to={item.to}
               title={item.label}
-              className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-all ${
+              className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-all motion-safe:hover:translate-x-0.5 ${
                 collapsed ? "justify-center" : ""
               } ${
                 active
-                  ? "bg-primary-soft text-primary-soft-foreground"
+                  ? "glow-soft bg-primary-soft text-primary-soft-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >
@@ -245,7 +245,7 @@ export function TasksShell({
         })}
       </nav>
 
-      <div className="flex-1 overflow-y-auto px-2 py-3 thin-scrollbar">
+      <div className="flex-1 overflow-y-auto px-2 py-3">
         {collapsed ? (
           <div className="space-y-1">
             {activeSpaces.map((space) => (
@@ -520,7 +520,7 @@ export function TasksShell({
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto thin-scrollbar">
+        <div className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[1600px] space-y-6 p-4 lg:p-6">{children}</div>
         </div>
       </main>

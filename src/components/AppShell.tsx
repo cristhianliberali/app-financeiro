@@ -124,9 +124,9 @@ export function AppShell({
             <Link
               key={item.to}
               to={item.to}
-              className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+              className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all motion-safe:hover:translate-x-0.5 ${
                 active
-                  ? "bg-primary-soft text-primary-soft-foreground"
+                  ? "glow-soft bg-primary-soft text-primary-soft-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >

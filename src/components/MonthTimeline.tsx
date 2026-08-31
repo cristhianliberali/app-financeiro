@@ -116,7 +116,7 @@ export function MonthTimeline({
           <ChevronLeft className="size-4" />
         </button>
 
-        <div ref={strip} className="thin-scrollbar flex gap-2 overflow-x-auto px-6 pb-2">
+        <div ref={strip} className="flex gap-2 overflow-x-auto px-6 pb-2">
           {points.map((point) => {
             const isFocus = point.key === selected;
             const isPast = point.key <= thisMonth;

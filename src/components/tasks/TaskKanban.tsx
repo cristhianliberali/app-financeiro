@@ -62,10 +62,14 @@ function useFillHeight() {
  * Kanban com movimentação por arraste. Ao soltar o cartão em outra coluna o
  * status da tarefa é atualizado automaticamente.
  *
- * Cada coluna se pinta com a cor do próprio status, em dose leve: o fundo e a
- * borda ficam num tom da cor e a etiqueta do topo é a cor cheia. É o que
- * permite achar a coluna certa de relance num quadro largo, sem que sete
- * colunas coloridas virem uma algazarra.
+ * Cada coluna se pinta com a cor do próprio status, em dose leve: fundo e
+ * borda num tom da cor, uma fita de luz no topo e o selo do nome na cor cheia,
+ * aceso. É o que permite achar a coluna certa de relance num quadro largo, sem
+ * que sete colunas coloridas virem uma algazarra. Arrastar por cima acende a
+ * coluna inteira — o alvo do solte se anuncia sozinho.
+ *
+ * O rodapé com "adicionar tarefa" fica preso embaixo, fora da rolagem: numa
+ * coluna cheia ele não deve fugir junto com o último cartão.
  */
 export function TaskKanban({
   columns,
@@ -106,23 +110,28 @@ export function TaskKanban({
   return (
     <div
       ref={ref}
-      className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 thin-scrollbar"
+      className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1"
       style={height ? { height } : { minHeight: "70vh" }}
     >
       {columns.map((col) => {
         const items = tasks.filter((t) => columnOf(t) === col.id);
         const color = tone(col.color);
         const active = over === col.id;
+        // Colunas vizinhas: é para elas que as setinhas do cartão empurram.
+        const index = columns.indexOf(col);
+        const prev = columns[index - 1];
+        const next = columns[index + 1];
         return (
           <section
             key={col.id}
-            className="flex h-full w-[19.5rem] shrink-0 flex-col overflow-hidden rounded-2xl border transition-shadow"
+            className={`neon-strip flex h-full w-[19.5rem] shrink-0 flex-col overflow-hidden rounded-2xl border transition-shadow ${
+              active ? "glow-strong" : ""
+            }`}
             style={{
+              // A cor do status vira a cor do halo desta coluna inteira.
+              ["--glow" as string]: color,
               backgroundColor: `color-mix(in oklab, ${color} 7%, var(--color-surface))`,
               borderColor: `color-mix(in oklab, ${color} ${active ? 55 : 22}%, var(--color-border))`,
-              ...(active
-                ? { boxShadow: `0 0 0 3px color-mix(in oklab, ${color} 22%, transparent)` }
-                : {}),
             }}
             onDragOver={(e) => {
               e.preventDefault();
@@ -146,7 +155,7 @@ export function TaskKanban({
               }}
             >
               <span
-                className="max-w-44 truncate rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
+                className="neon-chip max-w-44 truncate rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
                 style={{ backgroundColor: color, color: contrastText(color) }}
                 title={col.hint}
               >
@@ -164,7 +173,7 @@ export function TaskKanban({
               {onAdd && (
                 <button
                   onClick={() => onAdd(col.id)}
-                  className="ml-auto rounded-lg p-1 text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+                  className="hover-lift hover-glow ml-auto rounded-lg p-1 text-muted-foreground hover:bg-card hover:text-foreground"
                   aria-label={`Nova tarefa em ${col.name}`}
                   title={`Nova tarefa em ${col.name}`}
                 >
@@ -175,7 +184,7 @@ export function TaskKanban({
 
             {/* Pilha em bloco, e não flex: como item de flex o cartão encolheria
                 para caber, e a coluna cheia viraria uma sanfona. */}
-            <div className="flex-1 space-y-2 overflow-y-auto p-2 thin-scrollbar">
+            <div className="flex-1 space-y-2 overflow-y-auto p-2">
               {items.map((task) => (
                 <TaskCard
                   key={task.id}
@@ -185,6 +194,12 @@ export function TaskKanban({
                   showBoard={showBoard}
                   onOpen={() => onOpen(task)}
                   onToggleTimer={() => onToggleTimer(task)}
+                  {...(prev
+                    ? { onMovePrev: () => onMove(task, prev.id), prevName: prev.name }
+                    : {})}
+                  {...(next
+                    ? { onMoveNext: () => onMove(task, next.id), nextName: next.name }
+                    : {})}
                   onDragStart={(e) => {
                     setDragging(task.id);
                     e.dataTransfer.setData("text/plain", task.id);
@@ -193,21 +208,41 @@ export function TaskKanban({
                 />
               ))}
 
-              {onAdd ? (
+              {items.length === 0 && (
+                <div className="flex h-full flex-col items-center justify-center gap-2 py-8 text-center">
+                  {onAdd && (
+                    <button
+                      onClick={() => onAdd(col.id)}
+                      className="hover-lift hover-glow flex size-11 items-center justify-center rounded-full border border-dashed text-muted-foreground hover:text-foreground"
+                      style={{
+                        borderColor: `color-mix(in oklab, ${color} 45%, var(--color-border))`,
+                      }}
+                      aria-label={`Nova tarefa em ${col.name}`}
+                    >
+                      <Plus className="size-5" />
+                    </button>
+                  )}
+                  <p className="text-xs font-medium text-muted-foreground">Nenhuma tarefa</p>
+                  <p className="max-w-48 text-[11px] text-muted-foreground/70">
+                    {onAdd ? "Solte aqui ou clique no + para adicionar" : "Arraste tarefas para cá"}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {onAdd && (
+              <div className="p-2 pt-0">
                 <button
                   onClick={() => onAdd(col.id)}
-                  className="flex w-full items-center gap-1.5 rounded-xl px-2.5 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+                  className="hover-lift flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed px-2.5 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                  style={{
+                    borderColor: `color-mix(in oklab, ${color} 30%, var(--color-border))`,
+                  }}
                 >
                   <Plus className="size-3.5" /> Adicionar tarefa
                 </button>
-              ) : (
-                items.length === 0 && (
-                  <p className="rounded-xl border border-dashed border-border/70 px-2 py-6 text-center text-xs text-muted-foreground">
-                    Arraste tarefas para cá
-                  </p>
-                )
-              )}
-            </div>
+              </div>
+            )}
           </section>
         );
       })}
