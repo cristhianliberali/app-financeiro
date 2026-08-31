@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { useTone } from "@/hooks/use-tone";
-import { contrastText } from "@/lib/tasks-analytics";
 import type { AccountUser, Task } from "@/lib/tasks";
 import { TaskCard } from "./TaskCard";
 
@@ -62,11 +61,13 @@ function useFillHeight() {
  * Kanban com movimentação por arraste. Ao soltar o cartão em outra coluna o
  * status da tarefa é atualizado automaticamente.
  *
- * Cada coluna se pinta com a cor do próprio status, em dose leve: fundo e
- * borda num tom da cor, uma fita de luz no topo e o selo do nome na cor cheia,
- * aceso. É o que permite achar a coluna certa de relance num quadro largo, sem
- * que sete colunas coloridas virem uma algazarra. Arrastar por cima acende a
- * coluna inteira — o alvo do solte se anuncia sozinho.
+ * A coluna usa as mesmas peças do resto do sistema: superfície e borda
+ * neutras, o nome em `label-caps` e o contador no selo cinza que a lateral já
+ * usa. A cor do status entra num pontinho, do jeito que quadro e etiqueta
+ * aparecem na árvore lateral e no caminho — é identificação suficiente, e
+ * quatro colunas inteiras pintadas de vermelho, azul e verde competiam com as
+ * tarefas, que são o que a tela tem para dizer. O destaque colorido fica para
+ * o alvo do arraste, que é momentâneo e precisa saltar.
  *
  * O rodapé com "adicionar tarefa" fica preso embaixo, fora da rolagem: numa
  * coluna cheia ele não deve fugir junto com o último cartão.
@@ -124,15 +125,11 @@ export function TaskKanban({
         return (
           <section
             key={col.id}
-            className={`neon-strip flex h-full w-[19.5rem] shrink-0 flex-col overflow-hidden rounded-2xl border transition-shadow ${
-              active ? "glow-strong" : ""
+            className={`flex h-full w-[19.5rem] shrink-0 flex-col overflow-hidden rounded-2xl border transition-colors ${
+              active
+                ? "border-primary bg-primary-soft ring-2 ring-ring/25"
+                : "border-border bg-surface"
             }`}
-            style={{
-              // A cor do status vira a cor do halo desta coluna inteira.
-              ["--glow" as string]: color,
-              backgroundColor: `color-mix(in oklab, ${color} 7%, var(--color-surface))`,
-              borderColor: `color-mix(in oklab, ${color} ${active ? 55 : 22}%, var(--color-border))`,
-            }}
             onDragOver={(e) => {
               e.preventDefault();
               setOver(col.id);
@@ -147,33 +144,22 @@ export function TaskKanban({
               if (task && columnOf(task) !== col.id) onMove(task, col.id);
             }}
           >
-            <header
-              className="flex items-center gap-2 border-b px-3 py-2.5"
-              style={{
-                backgroundColor: `color-mix(in oklab, ${color} 10%, transparent)`,
-                borderColor: `color-mix(in oklab, ${color} 20%, var(--color-border))`,
-              }}
-            >
+            <header className="flex items-center gap-2 border-b border-border px-3 py-2.5">
               <span
-                className="neon-chip max-w-44 truncate rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
-                style={{ backgroundColor: color, color: contrastText(color) }}
-                title={col.hint}
-              >
+                className="size-2.5 shrink-0 rounded-full ring-1 ring-border"
+                style={{ backgroundColor: color }}
+                aria-hidden
+              />
+              <span className="label-caps truncate text-foreground" title={col.hint}>
                 {col.name}
               </span>
-              <span
-                className="rounded-full px-2 py-0.5 font-mono text-[11px] font-bold"
-                style={{
-                  backgroundColor: `color-mix(in oklab, ${color} 18%, transparent)`,
-                  color: `color-mix(in oklab, ${color} 65%, var(--color-foreground))`,
-                }}
-              >
+              <span className="rounded-full bg-secondary px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground">
                 {items.length}
               </span>
               {onAdd && (
                 <button
                   onClick={() => onAdd(col.id)}
-                  className="hover-lift hover-glow ml-auto rounded-lg p-1 text-muted-foreground hover:bg-card hover:text-foreground"
+                  className="ml-auto rounded-lg p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   aria-label={`Nova tarefa em ${col.name}`}
                   title={`Nova tarefa em ${col.name}`}
                 >
@@ -213,10 +199,7 @@ export function TaskKanban({
                   {onAdd && (
                     <button
                       onClick={() => onAdd(col.id)}
-                      className="hover-lift hover-glow flex size-11 items-center justify-center rounded-full border border-dashed text-muted-foreground hover:text-foreground"
-                      style={{
-                        borderColor: `color-mix(in oklab, ${color} 45%, var(--color-border))`,
-                      }}
+                      className="flex size-11 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground transition-colors hover:border-border-strong hover:bg-accent hover:text-foreground"
                       aria-label={`Nova tarefa em ${col.name}`}
                     >
                       <Plus className="size-5" />
@@ -234,10 +217,7 @@ export function TaskKanban({
               <div className="p-2 pt-0">
                 <button
                   onClick={() => onAdd(col.id)}
-                  className="hover-lift flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed px-2.5 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
-                  style={{
-                    borderColor: `color-mix(in oklab, ${color} 30%, var(--color-border))`,
-                  }}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border px-2.5 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-border-strong hover:bg-accent hover:text-foreground"
                 >
                   <Plus className="size-3.5" /> Adicionar tarefa
                 </button>
