@@ -21,7 +21,9 @@ import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
 import { Route as TransacoesRouteImport } from './routes/transacoes'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as TarefasIndexRouteImport } from './routes/tarefas/index'
+import { Route as TarefasAgendaRouteImport } from './routes/tarefas/agenda'
 import { Route as TarefasCalendarioRouteImport } from './routes/tarefas/calendario'
+import { Route as TarefasMeuDiaRouteImport } from './routes/tarefas/meu-dia'
 import { Route as TarefasMinhasRouteImport } from './routes/tarefas/minhas'
 import { Route as ApiGoogleCallbackRouteImport } from './routes/api/google/callback'
 import { Route as TarefasEspacosIndexRouteImport } from './routes/tarefas/espacos/index'
@@ -88,9 +90,19 @@ const TarefasIndexRoute = TarefasIndexRouteImport.update({
   path: '/tarefas/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TarefasAgendaRoute = TarefasAgendaRouteImport.update({
+  id: '/tarefas/agenda',
+  path: '/tarefas/agenda',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TarefasCalendarioRoute = TarefasCalendarioRouteImport.update({
   id: '/tarefas/calendario',
   path: '/tarefas/calendario',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TarefasMeuDiaRoute = TarefasMeuDiaRouteImport.update({
+  id: '/tarefas/meu-dia',
+  path: '/tarefas/meu-dia',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TarefasMinhasRoute = TarefasMinhasRouteImport.update({
@@ -131,7 +143,9 @@ export interface FileRoutesByFullPath {
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/transacoes': typeof TransacoesRoute
   '/api/health': typeof ApiHealthRoute
+  '/tarefas/agenda': typeof TarefasAgendaRoute
   '/tarefas/calendario': typeof TarefasCalendarioRoute
+  '/tarefas/meu-dia': typeof TarefasMeuDiaRoute
   '/tarefas/minhas': typeof TarefasMinhasRoute
   '/tarefas/': typeof TarefasIndexRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
@@ -151,7 +165,9 @@ export interface FileRoutesByTo {
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/transacoes': typeof TransacoesRoute
   '/api/health': typeof ApiHealthRoute
+  '/tarefas/agenda': typeof TarefasAgendaRoute
   '/tarefas/calendario': typeof TarefasCalendarioRoute
+  '/tarefas/meu-dia': typeof TarefasMeuDiaRoute
   '/tarefas/minhas': typeof TarefasMinhasRoute
   '/tarefas': typeof TarefasIndexRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
@@ -172,7 +188,9 @@ export interface FileRoutesById {
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/transacoes': typeof TransacoesRoute
   '/api/health': typeof ApiHealthRoute
+  '/tarefas/agenda': typeof TarefasAgendaRoute
   '/tarefas/calendario': typeof TarefasCalendarioRoute
+  '/tarefas/meu-dia': typeof TarefasMeuDiaRoute
   '/tarefas/minhas': typeof TarefasMinhasRoute
   '/tarefas/': typeof TarefasIndexRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
@@ -194,7 +212,9 @@ export interface FileRouteTypes {
     | '/redefinir-senha'
     | '/transacoes'
     | '/api/health'
+    | '/tarefas/agenda'
     | '/tarefas/calendario'
+    | '/tarefas/meu-dia'
     | '/tarefas/minhas'
     | '/tarefas/'
     | '/api/google/callback'
@@ -214,7 +234,9 @@ export interface FileRouteTypes {
     | '/redefinir-senha'
     | '/transacoes'
     | '/api/health'
+    | '/tarefas/agenda'
     | '/tarefas/calendario'
+    | '/tarefas/meu-dia'
     | '/tarefas/minhas'
     | '/tarefas'
     | '/api/google/callback'
@@ -234,7 +256,9 @@ export interface FileRouteTypes {
     | '/redefinir-senha'
     | '/transacoes'
     | '/api/health'
+    | '/tarefas/agenda'
     | '/tarefas/calendario'
+    | '/tarefas/meu-dia'
     | '/tarefas/minhas'
     | '/tarefas/'
     | '/api/google/callback'
@@ -255,7 +279,9 @@ export interface RootRouteChildren {
   RedefinirSenhaRoute: typeof RedefinirSenhaRoute
   TransacoesRoute: typeof TransacoesRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  TarefasAgendaRoute: typeof TarefasAgendaRoute
   TarefasCalendarioRoute: typeof TarefasCalendarioRoute
+  TarefasMeuDiaRoute: typeof TarefasMeuDiaRoute
   TarefasMinhasRoute: typeof TarefasMinhasRoute
   TarefasIndexRoute: typeof TarefasIndexRoute
   ApiGoogleCallbackRoute: typeof ApiGoogleCallbackRoute
@@ -350,11 +376,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TarefasIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tarefas/agenda': {
+      id: '/tarefas/agenda'
+      path: '/tarefas/agenda'
+      fullPath: '/tarefas/agenda'
+      preLoaderRoute: typeof TarefasAgendaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tarefas/calendario': {
       id: '/tarefas/calendario'
       path: '/tarefas/calendario'
       fullPath: '/tarefas/calendario'
       preLoaderRoute: typeof TarefasCalendarioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tarefas/meu-dia': {
+      id: '/tarefas/meu-dia'
+      path: '/tarefas/meu-dia'
+      fullPath: '/tarefas/meu-dia'
+      preLoaderRoute: typeof TarefasMeuDiaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tarefas/minhas': {
@@ -407,7 +447,9 @@ const rootRouteChildren: RootRouteChildren = {
   RedefinirSenhaRoute: RedefinirSenhaRoute,
   TransacoesRoute: TransacoesRoute,
   ApiHealthRoute: ApiHealthRoute,
+  TarefasAgendaRoute: TarefasAgendaRoute,
   TarefasCalendarioRoute: TarefasCalendarioRoute,
+  TarefasMeuDiaRoute: TarefasMeuDiaRoute,
   TarefasMinhasRoute: TarefasMinhasRoute,
   TarefasIndexRoute: TarefasIndexRoute,
   ApiGoogleCallbackRoute: ApiGoogleCallbackRoute,
