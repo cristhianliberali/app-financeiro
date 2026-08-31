@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarClock, ExternalLink, Plus, Sun, Sunrise, Sunset } from "lucide-react";
+import { CalendarClock, ExternalLink, Link2, Plus, Sun, Sunrise, Sunset } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAgendaEvents } from "@/lib/google";
+import { useAgendaEvents, useGoogleStatus } from "@/lib/google";
 import {
   useBoardStatuses,
   useBoards,
@@ -85,6 +85,7 @@ export function MyDay({
   onOpenTask: (task: Task) => void;
 }) {
   const today = todayKey();
+  const { data: google } = useGoogleStatus();
   const { data: agenda = [] } = useAgendaEvents({ from: today, to: today });
   const complete = useMoveTaskByPolarity();
   const saveSubtask = useSaveSubtask();
@@ -124,6 +125,13 @@ export function MyDay({
     for (const event of agenda) {
       // Compromisso que nasceu de uma tarefa já aparece como tarefa.
       if (event.taskId && mine.some((task) => task.id === event.taskId)) continue;
+      /*
+       * A janela pedida ao servidor já é só hoje, mas o compromisso de vários
+       * dias volta com o início lá atrás. Conferir a sobreposição aqui é o que
+       * garante que "Meu dia" mostre exatamente o que cruza o dia de hoje —
+       * inclusive o que começou ontem e termina agora.
+       */
+      if (localDay(event.start) > today || localDay(event.end) < today) continue;
       list.push({
         kind: "event",
         at: event.start,
@@ -139,6 +147,7 @@ export function MyDay({
   const done = items.filter(
     (item) => item.kind === "task" && item.task.status?.polarity === "SUCCESS",
   ).length;
+  const agendaCount = items.filter((item) => item.kind === "event").length;
 
   return (
     <div className="space-y-4">
@@ -149,10 +158,34 @@ export function MyDay({
             {items.length === 0
               ? "Nada marcado para hoje."
               : `${items.length} item(ns) hoje · ${done} concluído(s)`}
+            {google?.connected && agendaCount > 0 && (
+              <>
+                {" · "}
+                <span className="font-medium text-foreground">
+                  {agendaCount} da agenda do Google
+                </span>
+              </>
+            )}
           </p>
         </div>
         <NewTaskShortcut accountId={accountId} />
       </div>
+
+      {/*
+        Sem conta conectada, o dia mostra só as tarefas — e não há nada na tela
+        que explique a ausência dos compromissos. Esta linha explica e leva ao
+        lugar de conectar.
+      */}
+      {google?.configured && !google.connected && (
+        <p className="flex flex-wrap items-center gap-1.5 rounded-xl border border-dashed border-border bg-surface px-3 py-2.5 text-xs text-muted-foreground">
+          <Link2 className="size-3.5 shrink-0" />
+          Conecte sua conta do Google em
+          <a href="/conta" className="font-semibold text-primary hover:underline">
+            Conta &amp; equipe
+          </a>
+          para ver aqui também os compromissos da agenda.
+        </p>
+      )}
 
       {PERIODS.map((period) => {
         const ofPeriod = items.filter((item) => periodOf(item.at) === period.key);
@@ -174,12 +207,22 @@ export function MyDay({
               <div className="space-y-1.5">
                 {ofPeriod.map((item) =>
                   item.kind === "event" ? (
+                    /*
+                      Compromisso da agenda: borda tracejada e o selo "Google
+                      Agenda" o separam das tarefas do app, que são as únicas
+                      que se pode concluir daqui.
+                    */
                     <div
                       key={item.id}
-                      className="flex items-center gap-3 rounded-xl border border-dashed border-border p-2.5 transition-colors hover:bg-accent/40"
+                      className="state-bar state-due flex items-center gap-3 rounded-xl border border-dashed border-border p-2.5 transition-colors hover:bg-accent/40"
                     >
-                      <CalendarClock className="size-4 shrink-0 text-muted-foreground" />
-                      <span className="min-w-0 flex-1 truncate text-sm">{item.title}</span>
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-warning-soft text-warning-soft-foreground">
+                        <CalendarClock className="size-3.5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold">{item.title}</span>
+                        <span className="label-caps text-[0.6rem]">Google Agenda</span>
+                      </span>
                       <span className="font-mono text-[11px] text-muted-foreground">
                         {hourLabel(item.at)}
                       </span>
@@ -188,8 +231,9 @@ export function MyDay({
                           href={item.link}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-muted-foreground transition-colors hover:text-foreground"
+                          className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                           aria-label="Abrir na agenda"
+                          title="Abrir na agenda do Google"
                         >
                           <ExternalLink className="size-3.5" />
                         </a>

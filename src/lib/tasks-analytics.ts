@@ -289,9 +289,16 @@ export const deadlineClass = (state: DeadlineState) =>
 
 /** Lista de dias (YYYY-MM-DD) cobertos por um intervalo, limitada a `max` dias. */
 export function daysOfRange(startISO: string | null, endISO: string | null, max = 60) {
-  const start = dayKey(startISO) ?? dayKey(endISO);
-  const end = dayKey(endISO) ?? dayKey(startISO);
-  if (!start || !end) return [] as string[];
+  const first = dayKey(startISO) ?? dayKey(endISO);
+  const last = dayKey(endISO) ?? dayKey(startISO);
+  if (!first || !last) return [] as string[];
+  /*
+   * Nada impede que uma tarefa acabe com o início depois do prazo — basta
+   * alguém corrigir uma das duas datas e esquecer a outra. Sem esta troca, o
+   * laço abaixo não roda nenhuma vez e a tarefa simplesmente some do
+   * calendário, que é o pior jeito de avisar que as datas estão trocadas.
+   */
+  const [start, end] = first <= last ? [first, last] : [last, first];
   const out: string[] = [];
   const cursor = parseISODate(start);
   const limit = parseISODate(end);

@@ -19,10 +19,10 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   CheckCircle2,
+  CircleDollarSign,
   Clock3,
   PiggyBank,
   Plus,
-  TrendingUp,
   Wallet,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -35,8 +35,10 @@ import {
   byCategory,
   categoryBudgets,
   monthlySeries,
-  totals,
+  settlement,
+  type MonthMetric,
 } from "@/lib/analytics";
+import { MonthTimeline } from "@/components/MonthTimeline";
 import { brl, brlCompact, formatDateBR, monthLabel } from "@/lib/format";
 import { DEFAULT_CATEGORY_ICON, IconBadge } from "@/lib/icons";
 import { StatusPill } from "@/components/ui/status";
@@ -70,42 +72,64 @@ const TOOLTIP_STYLE = {
 } as const;
 
 /**
- * Cartão de número do topo do painel.
+ * Cartão de um lado do caixa, com a quebra por situação.
  *
- * O tom pinta só o ícone e o seu quadrado — o número fica na cor do texto, que
- * é onde o olho pousa primeiro. Cor de fundo cheia aqui roubaria a leitura do
- * próprio valor.
+ * O total sozinho esconde a pergunta que importa no fim do mês: quanto disso já
+ * aconteceu e quanto ainda vai acontecer. As duas linhas de baixo respondem
+ * isso sem exigir um clique.
  */
-function StatCard({
+function SettlementCard({
   label,
-  value,
-  hint,
+  total,
   icon: Icon,
   tone,
+  rows,
 }: {
   label: string;
-  value: string;
-  hint: string;
+  total: string;
   icon: typeof Wallet;
-  tone: "brand" | "positive" | "negative" | "info";
+  tone: "positive" | "negative";
+  rows: Array<{ label: string; value: string; state: "done" | "pending" }>;
 }) {
-  const tones = {
-    brand: "bg-primary-soft text-primary",
-    positive: "bg-positive-soft text-positive-soft-foreground",
-    negative: "bg-negative-soft text-negative-soft-foreground",
-    info: "bg-info-soft text-info-soft-foreground",
-  } as const;
+  const accent = tone === "positive" ? "text-positive" : "text-negative";
+  const chip =
+    tone === "positive"
+      ? "bg-positive-soft text-positive-soft-foreground"
+      : "bg-negative-soft text-negative-soft-foreground";
 
   return (
-    <div className="panel-interactive p-5">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <p className="label-caps">{label}</p>
-        <span className={`flex size-9 items-center justify-center rounded-xl ${tones[tone]}`}>
-          <Icon className="size-4" strokeWidth={2.25} />
-        </span>
+    <div
+      className={`panel state-bar overflow-hidden ${tone === "positive" ? "state-done" : "state-late"}`}
+    >
+      {/* Rótulo em cima, número embaixo: lado a lado, o nome longo espremia o
+          valor, que é justamente o que se quer ler primeiro. */}
+      <div className="p-5 pb-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-sm font-bold tracking-tight">{label}</p>
+          <span className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${chip}`}>
+            <Icon className="size-4" strokeWidth={2.25} />
+          </span>
+        </div>
+        <p className={`stat-figure ${accent}`}>{total}</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">No período selecionado</p>
       </div>
-      <p className="stat-figure">{value}</p>
-      <p className="mt-2 text-[11px] text-muted-foreground">{hint}</p>
+      <div className="divide-y divide-border border-t border-border">
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-center justify-between px-5 py-2.5">
+            <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              {row.state === "done" ? (
+                <CheckCircle2 className="size-3.5 text-positive" />
+              ) : (
+                <Clock3 className="size-3.5 text-info" />
+              )}
+              {row.label}
+            </span>
+            <span className="font-mono text-xs font-bold" data-numeric>
+              {row.value}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -135,6 +159,7 @@ function Panel({
 function Dashboard() {
   const { profileId, from, to, dateBasis } = useAppState();
   const [dialog, setDialog] = useState<null | "income" | "expense">(null);
+  const [metric, setMetric] = useState<MonthMetric>("balance");
 
   const { data: txs = [] } = useTransactions({ profileId, from, to, basis: dateBasis });
   const { data: yearTxs = [] } = useTransactions({
@@ -147,7 +172,7 @@ function Dashboard() {
   const { data: investments = [] } = useInvestments(profileId);
   const { data: goals = [] } = useGoals(profileId);
 
-  const t = useMemo(() => totals(txs), [txs]);
+  const cash = useMemo(() => settlement(txs), [txs]);
   const expenseCats = useMemo(() => byCategory(txs, categories, "expense"), [txs, categories]);
   const incomeCats = useMemo(() => byCategory(txs, categories, "income"), [txs, categories]);
   const months = useMemo(() => monthlySeries(yearTxs, dateBasis), [yearTxs, dateBasis]);
@@ -174,35 +199,68 @@ function Dashboard() {
     >
       <h1 className="sr-only">Dashboard financeiro</h1>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Saldo do período"
-          value={brl(t.balance)}
-          hint={`${txs.length} lançamentos no intervalo`}
-          icon={Wallet}
-          tone={t.balance < 0 ? "negative" : "brand"}
-        />
-        <StatCard
+      <MonthTimeline metric={metric} onMetricChange={setMetric} />
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <SettlementCard
           label="Receitas"
-          value={brl(t.income)}
-          hint={`${incomeCats.length} categorias de entrada`}
+          total={brl(cash.income)}
           icon={ArrowUpRight}
           tone="positive"
+          rows={[
+            { label: "Recebido", value: brl(cash.received), state: "done" },
+            { label: "A receber", value: brl(cash.toReceive), state: "pending" },
+          ]}
         />
-        <StatCard
+        <SettlementCard
           label="Despesas"
-          value={brl(t.expense)}
-          hint={`${expenseCats.length} categorias de saída`}
+          total={brl(cash.expense)}
           icon={ArrowDownRight}
           tone="negative"
+          rows={[
+            { label: "Pago", value: brl(cash.paid), state: "done" },
+            { label: "Não pago", value: brl(cash.toPay), state: "pending" },
+          ]}
         />
-        <StatCard
-          label="Investido"
-          value={brl(invested)}
-          hint={`${investments.length} posições acompanhadas`}
-          icon={TrendingUp}
-          tone="info"
-        />
+        {/*
+          Os dois saldos lado a lado: o que está em caixa agora e onde o período
+          termina se tudo o que está agendado acontecer.
+        */}
+        <div className="panel divide-y divide-border">
+          {(
+            [
+              {
+                label: "Saldo disponível",
+                hint: "Só o que já foi liquidado",
+                value: cash.available,
+                icon: Wallet,
+                chip: "bg-positive-soft text-positive-soft-foreground",
+                accent: cash.available < 0 ? "text-negative" : "text-positive",
+              },
+              {
+                label: "Saldo previsto",
+                hint: "Com o que ainda está agendado",
+                value: cash.projected,
+                icon: CircleDollarSign,
+                chip: "bg-primary-soft text-primary",
+                accent: cash.projected < 0 ? "text-negative" : "text-primary",
+              },
+            ] as const
+          ).map((row) => (
+            <div key={row.label} className="flex flex-1 flex-col justify-center p-5">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-sm font-bold tracking-tight">{row.label}</p>
+                <span
+                  className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${row.chip}`}
+                >
+                  <row.icon className="size-4" strokeWidth={2.25} />
+                </span>
+              </div>
+              <p className={`stat-figure ${row.accent}`}>{brl(row.value)}</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">{row.hint}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -460,7 +518,12 @@ function Dashboard() {
           </div>
         </div>
 
-        <Panel title="Investimentos" subtitle="Rendimento estimado x real">
+        <Panel
+          title="Investimentos"
+          subtitle={`${brl(invested)} em ${investments.length} ${
+            investments.length === 1 ? "posição acompanhada" : "posições acompanhadas"
+          }`}
+        >
           <div className="space-y-3">
             {investments.slice(0, 5).map((i) => {
               const real = i.current_amount - i.invested_amount;

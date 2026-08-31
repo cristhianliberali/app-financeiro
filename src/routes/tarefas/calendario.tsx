@@ -1,10 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { CalendarClock } from "lucide-react";
 import { TasksShell } from "@/components/tasks/TasksShell";
 import { TaskCalendar } from "@/components/tasks/TaskCalendar";
 import { TaskDialog } from "@/components/tasks/TaskDialog";
 import { useTasksModule } from "@/components/tasks/useTasksModule";
 import { useBoardStatuses, useBoards, useSpaces, useTasks, type Task } from "@/lib/tasks";
+import { useAgendaEvents, useGoogleStatus } from "@/lib/google";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export const Route = createFileRoute("/tarefas/calendario")({
   head: () => ({
@@ -21,7 +24,7 @@ export const Route = createFileRoute("/tarefas/calendario")({
 });
 
 const SELECT_CLASS =
-  "h-9 rounded-md border border-input bg-card px-2 text-sm outline-none focus:ring-1 focus:ring-ring";
+  "h-10 rounded-xl border border-input bg-card px-2.5 text-sm font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25";
 
 function CalendarPage() {
   const { accountId, users, currentUserId } = useTasksModule();
@@ -33,6 +36,26 @@ function CalendarPage() {
   const [responsible, setResponsible] = useState("");
   const [selected, setSelected] = useState<Task | null>(null);
   const { data: statuses = [] } = useBoardStatuses(selected?.board_id ?? null);
+
+  /*
+   * Quem conectou a agenda quer vê-la junto das tarefas — é o ponto de ter
+   * conectado. Por isso o filtro nasce ligado; desmarcar é para quando a
+   * agenda pessoal atrapalha a leitura do trabalho.
+   */
+  const [showAgenda, setShowAgenda] = useState(true);
+  const [range, setRange] = useState<{ from: string; to: string } | null>(null);
+  const { data: google } = useGoogleStatus();
+  const { data: agenda = [] } = useAgendaEvents(google?.connected && showAgenda ? range : null);
+
+  // Estável entre renderizações: o calendário reporta a janela num efeito, e uma
+  // função nova a cada render o faria reportar em laço.
+  const handleRange = useCallback(
+    (next: { from: string; to: string }) =>
+      setRange((current) =>
+        current?.from === next.from && current.to === next.to ? current : next,
+      ),
+    [],
+  );
 
   const tasks = useMemo(
     () =>
@@ -69,7 +92,7 @@ function CalendarPage() {
           <option value="">Todos os espaços</option>
           {spaces.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.icon} {s.name}
+              {s.name}
             </option>
           ))}
         </select>
@@ -101,7 +124,40 @@ function CalendarPage() {
         </select>
       </div>
 
-      <TaskCalendar tasks={tasks} users={users} onOpen={setSelected} />
+      {google?.configured &&
+        (google.connected ? (
+          <label className="flex w-fit cursor-pointer items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-medium shadow-xs transition-colors hover:border-border-strong">
+            <Checkbox
+              checked={showAgenda}
+              onCheckedChange={(checked) => setShowAgenda(checked === true)}
+              aria-label="Mostrar compromissos do Google Agenda"
+            />
+            <CalendarClock className="size-4 text-warning-soft-foreground" />
+            Mostrar compromissos do Google Agenda
+            {showAgenda && agenda.length > 0 && (
+              <span className="rounded-full bg-warning-soft px-2 py-0.5 font-mono text-[10px] font-bold text-warning-soft-foreground">
+                {agenda.length}
+              </span>
+            )}
+          </label>
+        ) : (
+          <p className="flex w-fit items-center gap-2 rounded-xl border border-dashed border-border bg-surface px-3 py-2.5 text-xs text-muted-foreground">
+            <CalendarClock className="size-3.5 shrink-0" />
+            Conecte sua conta do Google em
+            <a href="/conta" className="font-semibold text-primary hover:underline">
+              Conta &amp; equipe
+            </a>
+            para ver os compromissos da agenda aqui.
+          </p>
+        ))}
+
+      <TaskCalendar
+        tasks={tasks}
+        users={users}
+        agenda={agenda}
+        onOpen={setSelected}
+        onRangeChange={handleRange}
+      />
 
       {openTask && (
         <TaskDialog

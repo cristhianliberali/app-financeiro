@@ -16,7 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAppState } from "@/lib/app-state";
 import { useProfiles } from "@/lib/data";
 import { useAccounts } from "@/lib/accounts";
-import { PeriodControls } from "@/components/PeriodControls";
+import { PeriodBar } from "@/components/PeriodBar";
 import { ModuleSwitcher } from "@/components/ModuleSwitcher";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -233,9 +233,6 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-
-            <div className="hidden h-5 w-px bg-border sm:block" />
-            <PeriodControls />
           </div>
           <div className="flex items-center gap-2">
             <ActiveTimerBar />
@@ -244,7 +241,15 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
             {actions}
           </div>
         </header>
-        <div className="mx-auto max-w-7xl space-y-6 p-4 lg:p-8">{children}</div>
+        <div className="mx-auto max-w-7xl space-y-6 p-4 lg:p-8">
+          {/*
+            O recorte de período comanda tudo o que as telas de Finanças
+            mostram, então ele abre o conteúdo em largura total, em vez de
+            disputar espaço com os seletores de conta e perfil no cabeçalho.
+          */}
+          <PeriodBar />
+          {children}
+        </div>
       </main>
     </div>
   );
