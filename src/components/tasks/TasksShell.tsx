@@ -245,7 +245,7 @@ export function TasksShell({
         })}
       </nav>
 
-      <div className="flex-1 overflow-y-auto px-2 py-3 thin-scrollbar">
+      <div className="flex-1 overflow-y-auto px-2 py-3">
         {collapsed ? (
           <div className="space-y-1">
             {activeSpaces.map((space) => (
@@ -520,7 +520,7 @@ export function TasksShell({
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto thin-scrollbar">
+        <div className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[1600px] space-y-6 p-4 lg:p-6">{children}</div>
         </div>
       </main>

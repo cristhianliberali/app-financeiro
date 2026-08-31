@@ -110,7 +110,7 @@ export function TaskKanban({
   return (
     <div
       ref={ref}
-      className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 thin-scrollbar"
+      className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1"
       style={height ? { height } : { minHeight: "70vh" }}
     >
       {columns.map((col) => {
@@ -184,7 +184,7 @@ export function TaskKanban({
 
             {/* Pilha em bloco, e não flex: como item de flex o cartão encolheria
                 para caber, e a coluna cheia viraria uma sanfona. */}
-            <div className="flex-1 space-y-2 overflow-y-auto p-2 thin-scrollbar">
+            <div className="flex-1 space-y-2 overflow-y-auto p-2">
               {items.map((task) => (
                 <TaskCard
                   key={task.id}

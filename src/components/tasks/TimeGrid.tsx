@@ -320,7 +320,7 @@ export function TimeGrid({ days, entries, onOpen, onMove, onResize }: Props) {
         </div>
       )}
 
-      <div ref={scroller} className="thin-scrollbar max-h-[68vh] overflow-y-auto">
+      <div ref={scroller} className="max-h-[68vh] overflow-y-auto">
         <div className="grid" style={{ gridTemplateColumns: columns }}>
           {/* Régua das horas. */}
           <div className="relative" style={{ height: 24 * HOUR }}>
