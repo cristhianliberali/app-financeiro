@@ -5,7 +5,9 @@ import { TasksShell } from "@/components/tasks/TasksShell";
 import { Button } from "@/components/ui/button";
 import { SpaceDialog } from "@/components/tasks/SpaceDialog";
 import { useTasksModule } from "@/components/tasks/useTasksModule";
+import { useTone } from "@/hooks/use-tone";
 import { useBoards, useSpaces, useTasks, type Space } from "@/lib/tasks";
+import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
 
 export const Route = createFileRoute("/tarefas/espacos/")({
   head: () => ({
@@ -23,6 +25,7 @@ export const Route = createFileRoute("/tarefas/espacos/")({
 
 function SpacesPage() {
   const { accountId } = useTasksModule();
+  const tone = useTone();
   const { data: spaces = [] } = useSpaces(accountId);
   const { data: boards = [] } = useBoards({ accountId });
   const { data: tasks = [] } = useTasks({ accountId });
@@ -39,10 +42,7 @@ function SpacesPage() {
     const spaceTasks = tasks.filter((t) => t.space.id === space.id);
     const open = spaceTasks.filter((t) => t.status?.polarity === "IN_PROGRESS").length;
     return (
-      <div
-        key={space.id}
-        className="group relative rounded-2xl border border-border bg-card p-5 transition-shadow hover:shadow-md"
-      >
+      <div key={space.id} className="panel-interactive group relative p-5">
         <button
           onClick={() => setDialog({ open: true, space })}
           className="absolute right-3 top-3 rounded p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-secondary hover:text-foreground group-hover:opacity-100"
@@ -52,9 +52,12 @@ function SpacesPage() {
         </button>
         <Link to="/tarefas/espacos/$spaceId" params={{ spaceId: space.id }} className="block">
           <div className="flex items-center gap-3">
-            <span className="flex size-11 items-center justify-center rounded-xl border border-border bg-secondary text-xl">
-              {space.icon}
-            </span>
+            <IconBadge
+              name={space.icon}
+              color={tone(space.color)}
+              size="lg"
+              fallback={DEFAULT_SPACE_ICON}
+            />
             <div>
               <p className="font-semibold">{space.name}</p>
               <p className="text-xs text-muted-foreground">

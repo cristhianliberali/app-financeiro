@@ -10,6 +10,7 @@ import { useTone } from "@/hooks/use-tone";
 import { useBoards, useSpaces, useTasks, type Board } from "@/lib/tasks";
 import { BOARD_STAGES, formatDateTimeBR } from "@/lib/tasks-analytics";
 import { UserAvatar } from "@/components/tasks/UserPicker";
+import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
 
 export const Route = createFileRoute("/tarefas/espacos/$spaceId")({
   head: () => ({
@@ -56,9 +57,12 @@ function SpacePage() {
       }
     >
       <div className="flex items-center gap-3">
-        <span className="flex size-12 items-center justify-center rounded-xl border border-border bg-secondary text-2xl">
-          {space?.icon ?? "📁"}
-        </span>
+        <IconBadge
+          name={space?.icon}
+          color={space?.color}
+          size="lg"
+          fallback={DEFAULT_SPACE_ICON}
+        />
         <div>
           <h1 className="title-xl">{space?.name ?? "Espaço"}</h1>
           {space?.description && (

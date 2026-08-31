@@ -29,11 +29,16 @@ export function LabelChip({
   const tone = useTone();
   return (
     <span
-      className={`inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px] font-medium ${className}`}
+      className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${className}`}
       title={label.name}
+      style={{
+        color: tone(label.color),
+        borderColor: `color-mix(in oklab, ${tone(label.color)} 35%, transparent)`,
+        backgroundColor: `color-mix(in oklab, ${tone(label.color)} 12%, transparent)`,
+      }}
     >
       <span
-        className="size-1.5 shrink-0 rounded-full ring-1 ring-border"
+        className="size-1.5 shrink-0 rounded-full"
         style={{ backgroundColor: tone(label.color) }}
       />
       <span className="truncate">{label.name}</span>

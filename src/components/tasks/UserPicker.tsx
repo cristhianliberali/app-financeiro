@@ -29,8 +29,8 @@ export function UserAvatar({
   return (
     <span
       // O anel mantém o avatar recortado do fundo mesmo quando o tom do usuário
-      // é próximo da cor do cartão — inevitável numa paleta de cinzas.
-      className="inline-flex items-center justify-center rounded-full font-semibold ring-1 ring-border"
+      // é próximo da cor do cartão.
+      className="inline-flex items-center justify-center rounded-full font-bold ring-2 ring-card"
       style={{
         width: size,
         height: size,

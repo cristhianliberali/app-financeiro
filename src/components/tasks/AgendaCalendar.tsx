@@ -152,7 +152,7 @@ export function AgendaCalendar({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg border border-border p-0.5">
+          <div className="flex rounded-xl border border-border bg-secondary p-0.5">
             {(
               [
                 ["week", "Semana"],
@@ -162,9 +162,9 @@ export function AgendaCalendar({
               <button
                 key={value}
                 onClick={() => setMode(value)}
-                className={`rounded-md px-3 py-1 text-xs transition-colors ${
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                   mode === value
-                    ? "bg-secondary font-medium text-foreground"
+                    ? "bg-card text-foreground shadow-xs ring-1 ring-border"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -236,8 +236,8 @@ export function AgendaCalendar({
           return (
             <div
               key={day}
-              className={`min-h-24 rounded-xl border p-2 ${
-                isToday ? "border-primary bg-secondary/40" : "border-border"
+              className={`min-h-24 rounded-xl border p-2 transition-colors ${
+                isToday ? "border-primary bg-primary-soft ring-1 ring-primary/20" : "border-border"
               } ${mode === "month" ? "min-h-20" : ""}`}
             >
               <p className="mb-1 text-[11px] font-medium text-muted-foreground">
@@ -251,10 +251,10 @@ export function AgendaCalendar({
                     <button
                       key={entry.id}
                       onClick={() => entry.task && onOpenTask(entry.task)}
-                      className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] transition-colors hover:bg-secondary"
+                      className="flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-[11px] font-medium transition-colors hover:bg-accent"
                     >
                       <span
-                        className="size-1.5 shrink-0 rounded-full ring-1 ring-border"
+                        className="size-2 shrink-0 rounded-full"
                         style={{ backgroundColor: tone(entry.color) }}
                       />
                       <span className="min-w-0 flex-1 truncate">{entry.title}</span>
@@ -268,7 +268,7 @@ export function AgendaCalendar({
                       href={entry.link ?? "#"}
                       target={entry.link ? "_blank" : undefined}
                       rel="noreferrer"
-                      className="flex w-full items-center gap-1 rounded border border-dashed border-border px-1 py-0.5 text-[11px] transition-colors hover:bg-secondary"
+                      className="flex w-full items-center gap-1.5 rounded-md border border-dashed border-border px-1.5 py-1 text-[11px] transition-colors hover:bg-accent"
                       title="Compromisso da agenda"
                     >
                       <CalendarClock className="size-3 shrink-0 text-muted-foreground" />

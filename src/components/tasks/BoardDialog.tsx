@@ -297,8 +297,10 @@ export function BoardDialog({
                 <button
                   key={color}
                   onClick={() => setForm({ ...form, color })}
-                  className={`size-7 rounded-full border-2 transition-transform ${
-                    form.color === color ? "scale-110 border-foreground" : "border-transparent"
+                  className={`size-8 rounded-full border-2 transition-transform ${
+                    form.color === color
+                      ? "scale-110 border-foreground shadow-md"
+                      : "border-transparent hover:scale-105"
                   }`}
                   style={{ backgroundColor: color }}
                   aria-label={`Cor ${color}`}
@@ -309,7 +311,7 @@ export function BoardDialog({
         </div>
 
         {!board && (
-          <div className="space-y-3 rounded-xl border border-border p-3">
+          <div className="space-y-3 rounded-xl border border-border bg-surface/60 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Label>Status das tarefas</Label>
               <div className="flex gap-1">

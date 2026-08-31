@@ -47,13 +47,13 @@ export function PrioritySelect({
             disabled={disabled}
             onClick={() => onChange(option.value)}
             aria-pressed={active}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors disabled:opacity-50 ${
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-all disabled:opacity-50 ${
               active
-                ? "border-foreground bg-secondary font-semibold text-foreground"
-                : "border-border text-muted-foreground hover:text-foreground"
+                ? "border-primary bg-primary-soft font-bold text-primary-soft-foreground shadow-xs"
+                : "border-border text-muted-foreground hover:border-border-strong hover:bg-accent hover:text-foreground"
             }`}
           >
-            <span className={`size-2 rounded-full ${option.dot}`} />
+            <span className={`size-2.5 rounded-full ${option.dot}`} />
             {option.label}
           </button>
         );

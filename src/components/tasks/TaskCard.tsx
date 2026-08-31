@@ -1,4 +1,13 @@
-import { BellRing, Clock, ListChecks, Pause, Play, Timer } from "lucide-react";
+import {
+  BellRing,
+  CalendarClock,
+  CheckCircle2,
+  Clock,
+  ListChecks,
+  Pause,
+  Play,
+  Timer,
+} from "lucide-react";
 import { useNow } from "@/hooks/use-now";
 import type { AccountUser, Task } from "@/lib/tasks";
 import {
@@ -10,6 +19,7 @@ import {
   formatDuration,
   formatHours,
 } from "@/lib/tasks-analytics";
+import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
 import { LabelChip } from "./LabelPicker";
 import { PriorityBadge } from "./PriorityPicker";
 import { UserAvatar, UserStack } from "./UserPicker";
@@ -44,26 +54,48 @@ export function TaskCard({
   const isMine = running?.user_id === currentUserId;
   const estimate = estimateState(task.estimate_hours, seconds);
   const pendingReminders = task.reminders.filter((r) => !r.delivered_at).length;
+  const done = state === "done";
+
+  /*
+   * A barra na borda esquerda é o estado da tarefa num relance: verde para
+   * concluída, vermelho para atrasada, âmbar para o que vence hoje, azul para o
+   * que ainda está em andamento. É a mesma leitura das linhas de Finanças.
+   */
+  const stateBar =
+    state === "done"
+      ? "state-done"
+      : state === "late"
+        ? "state-late"
+        : state === "due_today"
+          ? "state-due"
+          : state === "archived"
+            ? ""
+            : "state-pending";
 
   return (
     <div
       draggable={!!onDragStart}
       onDragStart={onDragStart}
-      className="group cursor-pointer rounded-xl border border-border bg-card p-3 transition-shadow hover:shadow-md"
+      className={`panel-interactive state-bar group cursor-pointer p-3 ${stateBar} ${
+        state === "archived" ? "opacity-60" : ""
+      }`}
       onClick={onOpen}
     >
       <div className="flex items-start gap-2">
-        <p className="flex-1 text-sm font-medium leading-snug">{task.title}</p>
+        {done && <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-positive" />}
+        <p className={`flex-1 text-sm font-semibold leading-snug ${done ? "done-text" : ""}`}>
+          {task.title}
+        </p>
         <PriorityBadge priority={task.priority} className="mt-0.5 shrink-0" />
         <button
           onClick={(e) => {
             e.stopPropagation();
             onToggleTimer();
           }}
-          className={`shrink-0 rounded-full p-1 transition-colors ${
+          className={`shrink-0 rounded-full p-1.5 transition-colors ${
             running && isMine
-              ? "bg-primary/15 text-primary"
-              : "text-muted-foreground opacity-0 hover:bg-secondary group-hover:opacity-100"
+              ? "bg-primary-soft text-primary shadow-glow"
+              : "text-muted-foreground opacity-0 hover:bg-accent hover:text-foreground group-hover:opacity-100"
           }`}
           aria-label={running && isMine ? "Pausar cronômetro" : "Iniciar cronômetro"}
           title={running && isMine ? "Pausar cronômetro" : "Iniciar cronômetro"}
@@ -73,8 +105,16 @@ export function TaskCard({
       </div>
 
       {showBoard && (
-        <p className="mt-1 truncate text-[11px] text-muted-foreground">
-          {task.space.icon} {task.space.name} › {task.board.name}
+        <p className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+          <IconBadge
+            name={task.space.icon}
+            color={task.space.color}
+            size="sm"
+            fallback={DEFAULT_SPACE_ICON}
+          />
+          <span className="truncate">
+            {task.space.name} › {task.board.name}
+          </span>
         </p>
       )}
 
@@ -91,7 +131,8 @@ export function TaskCard({
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
         {task.due_date && (
-          <span className={deadlineClass(state)}>
+          <span className={`inline-flex items-center gap-1 ${deadlineClass(state)}`}>
+            <CalendarClock className={`size-3 ${state === "late" ? "pulse-alert" : ""}`} />
             {new Date(task.due_date).toLocaleDateString("pt-BR", {
               day: "2-digit",
               month: "2-digit",
@@ -99,7 +140,11 @@ export function TaskCard({
           </span>
         )}
         {task.subtasks.length > 0 && (
-          <span className="inline-flex items-center gap-1">
+          <span
+            className={`inline-flex items-center gap-1 ${
+              doneSubtasks === task.subtasks.length ? "font-semibold text-positive" : ""
+            }`}
+          >
             <ListChecks className="size-3" />
             {doneSubtasks}/{task.subtasks.length}
           </span>

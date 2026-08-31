@@ -24,20 +24,20 @@ export function NotificationBell({ enabled = true }: { enabled?: boolean }) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="relative rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          className="relative rounded-xl border border-border bg-card p-2 text-muted-foreground shadow-xs transition-colors hover:border-border-strong hover:bg-accent hover:text-foreground"
           aria-label="Lembretes"
           title="Lembretes"
         >
           <Icon className="size-4" />
           {upcoming.length > 0 && (
-            <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-[9px] font-bold text-background">
+            <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-negative px-1 text-[9px] font-bold text-negative-foreground shadow-xs">
               {upcoming.length > 9 ? "9+" : upcoming.length}
             </span>
           )}
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-3">
-        <p className="text-sm font-semibold">Lembretes</p>
+        <p className="text-sm font-bold tracking-tight">Lembretes</p>
 
         {needsPermission && (
           <div className="mt-2 rounded-xl border border-border bg-surface p-3">
@@ -71,9 +71,9 @@ export function NotificationBell({ enabled = true }: { enabled?: boolean }) {
               params={{ boardId: reminder.board_id }}
               search={{ task: reminder.task_id }}
               onClick={() => setOpen(false)}
-              className="block rounded-lg border border-border p-2.5 transition-colors hover:bg-secondary"
+              className="state-bar state-due block rounded-xl border border-border p-2.5 transition-colors hover:bg-accent"
             >
-              <p className="truncate text-xs font-medium">{reminder.task_title}</p>
+              <p className="truncate text-xs font-semibold">{reminder.task_title}</p>
               <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
                 {reminder.space_name} › {reminder.board_name}
               </p>
