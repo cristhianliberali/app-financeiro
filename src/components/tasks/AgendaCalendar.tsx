@@ -180,9 +180,13 @@ export function AgendaCalendar({
               disabled={sync.isPending || isFetching}
               onClick={async () => {
                 const result = await sync.mutateAsync();
+                const notas = [
+                  result.pushed > 0 ? `${result.pushed} tarefa(s) enviadas` : null,
+                  result.cleared > 0 ? `${result.cleared} com as datas limpas` : null,
+                ].filter(Boolean);
                 toast.success(
-                  result.cleared > 0
-                    ? `Agenda sincronizada · ${result.cleared} tarefa(s) tiveram as datas limpas`
+                  notas.length > 0
+                    ? `Agenda sincronizada · ${notas.join(" · ")}`
                     : "Agenda sincronizada",
                 );
               }}

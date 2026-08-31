@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useNow } from "@/hooks/use-now";
+import { useGoogleStatus } from "@/lib/google";
 import { useAppState } from "@/lib/app-state";
 import {
   useDeleteSubtask,
@@ -297,6 +298,10 @@ export function TaskDialog({
 
   const estimate = estimateState(task?.estimate_hours ?? null, totalSeconds);
 
+  // Só vale avisar sobre a agenda para quem conectou a conta do Google.
+  const { data: googleStatus } = useGoogleStatus();
+  const agendaConectada = googleStatus?.connected === true;
+
   const userName = useMemo(
     () => (id: string | null | undefined) =>
       id ? (users.find((u) => u.user_id === id)?.name ?? "Alguém") : "Alguém",
@@ -441,6 +446,11 @@ export function TaskDialog({
               }}
             />
           </div>
+          {agendaConectada && !draft.start_date && !draft.due_date && (
+            <p className="text-[11px] text-muted-foreground sm:col-span-2">
+              Sem data marcada, a tarefa não entra na sua agenda do Google.
+            </p>
+          )}
           <div className="space-y-1.5 sm:col-span-2">
             <Label>Participantes</Label>
             <UserMultiSelect

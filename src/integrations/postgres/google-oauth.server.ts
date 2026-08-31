@@ -12,7 +12,7 @@ import { deleteCookie, getCookie, setCookie } from "@tanstack/react-start/server
 import { getSiteUrl } from "@/lib/site-url";
 import { authorizationUrl, exchangeCode } from "../google/oauth.server";
 import { readSession } from "./session.server";
-import { saveConnection } from "./google.server";
+import { saveConnection, syncUser } from "./google.server";
 
 const STATE_COOKIE = "aura_google_state";
 const STATE_TTL_SECONDS = 10 * 60;
@@ -58,6 +58,16 @@ export async function finishGoogleConnection(input: {
   try {
     const tokens = await exchangeCode({ code: input.code, siteUrl: getSiteUrl() });
     await saveConnection(user.id, tokens);
+    // A agenda de quem acabou de conectar não pode nascer vazia: as tarefas com
+    // prazo que já existiam sobem agora. Se o Google falhar aqui, a conexão
+    // continua feita e a próxima rodada tenta de novo.
+    const pushed = await syncUser(user.id).catch((error) => {
+      console.error("[agenda] primeira sincronização falhou:", error);
+      return { pushed: 0 };
+    });
+    if (pushed.pushed > 0) {
+      console.info(`[agenda] ${pushed.pushed} tarefa(s) existentes foram para a agenda`);
+    }
     console.info(
       `[agenda] ${user.email} conectou a agenda ${tokens.email ?? "(e-mail não informado)"}`,
     );
