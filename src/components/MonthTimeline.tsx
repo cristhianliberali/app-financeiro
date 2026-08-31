@@ -212,8 +212,25 @@ export function MonthTimeline({
     return cards.length > 1 ? cards[1]!.offsetLeft - cards[0]!.offsetLeft : el.clientWidth / 3;
   }
 
-  // O mês em foco entra na tela sozinho: trocar o período pela barra de cima ou
-  // pelas setas de mês não deveria exigir rolar a faixa atrás dele.
+  /**
+   * Onde a faixa precisa parar para deixar `card` no meio dela.
+   *
+   * A conta é feita com retângulos de tela, e não com `offsetLeft`, porque
+   * `offsetLeft` conta a partir do ancestral posicionado — que não é a faixa. No
+   * painel isso soma a barra lateral e o recuo da página ao alvo, e o cartão
+   * parava fora do centro ou nem saía do lugar, porque o alvo estourava a
+   * rolagem e era aparado. A diferença entre dois retângulos é sempre relativa à
+   * faixa, esteja ela onde estiver na página.
+   */
+  function centerOf(el: HTMLElement, card: HTMLElement) {
+    const cardBox = card.getBoundingClientRect();
+    const stripBox = el.getBoundingClientRect();
+    const start = cardBox.left - stripBox.left - el.clientLeft + el.scrollLeft;
+    return start - (el.clientWidth - cardBox.width) / 2;
+  }
+
+  // O mês em foco vai para o meio da faixa sozinho: escolher um mês, seja
+  // clicando no cartão ou pela barra de período, deixa ele centrado.
   //
   // `painted` guarda em que janela a faixa foi desenhada da última vez. Começa
   // vazio para a primeira pintura já nascer no lugar, sem deslizar do zero, e
@@ -227,7 +244,7 @@ export function MonthTimeline({
 
     const rebuilt = painted.current !== center;
     painted.current = center;
-    glide(el, card.offsetLeft - (el.clientWidth - card.offsetWidth) / 2, rebuilt ? 0 : SLIDE_MS);
+    glide(el, centerOf(el, card), rebuilt ? 0 : SLIDE_MS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus, center]);
 
