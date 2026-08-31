@@ -20,7 +20,13 @@ import { TransactionDialog } from "@/components/TransactionDialog";
 import { Button } from "@/components/ui/button";
 import { useAppState } from "@/lib/app-state";
 import { useCategories, useGoals, useInvestments, useTransactions } from "@/lib/data";
-import { balanceEvolution, byCategory, categoryBudgets, monthlySeries, totals } from "@/lib/analytics";
+import {
+  balanceEvolution,
+  byCategory,
+  categoryBudgets,
+  monthlySeries,
+  totals,
+} from "@/lib/analytics";
 import { brl, brlCompact, formatDateBR, monthLabel } from "@/lib/format";
 
 export const Route = createFileRoute("/")({
@@ -292,9 +298,7 @@ function Dashboard() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-xs">
-                      {cat ? `${cat.emoji} ${cat.name}` : "—"}
-                    </td>
+                    <td className="px-6 py-4 text-xs">{cat ? `${cat.emoji} ${cat.name}` : "—"}</td>
                     <td className="px-6 py-4 text-xs">
                       {tx.status === "paid"
                         ? tx.kind === "income"
@@ -389,7 +393,11 @@ function Dashboard() {
   );
 }
 
-function CategoryPie({ data }: { data: Array<{ id: string; name: string; color: string; value: number }> }) {
+function CategoryPie({
+  data,
+}: {
+  data: Array<{ id: string; name: string; color: string; value: number }>;
+}) {
   if (data.length === 0) {
     return <p className="text-sm text-muted-foreground">Sem dados no período.</p>;
   }

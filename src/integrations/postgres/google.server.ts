@@ -46,13 +46,35 @@ const DEFAULT_EVENT_MINUTES = 60;
 
 // ───────────────────────────── conexão ──────────────────────────────────
 
-export async function getConnection(userId: string): Promise<GoogleConnection | null> {
-  return queryOne<GoogleConnection>(
-    `SELECT user_id, google_email, calendar_id, access_token, refresh_token, expires_at,
-            sync_token, last_sync_at, last_error
-       FROM google_accounts WHERE user_id = $1`,
-    [userId],
+/** Erro do Postgres de tabela que não existe. */
+function isMissingTable(error: unknown): boolean {
+  return (
+    typeof error === "object" && error !== null && (error as { code?: string }).code === "42P01"
   );
+}
+
+let avisouTabela = false;
+
+export async function getConnection(userId: string): Promise<GoogleConnection | null> {
+  try {
+    return await queryOne<GoogleConnection>(
+      `SELECT user_id, google_email, calendar_id, access_token, refresh_token, expires_at,
+              sync_token, last_sync_at, last_error
+         FROM google_accounts WHERE user_id = $1`,
+      [userId],
+    );
+  } catch (error) {
+    // Deploy com o código novo e o `db:migrate` ainda por rodar: o resto do app
+    // continua de pé, só sem agenda. Avisa uma vez, não a cada requisição.
+    if (!isMissingTable(error)) throw error;
+    if (!avisouTabela) {
+      avisouTabela = true;
+      console.error(
+        "[agenda] as tabelas da agenda não existem neste banco — rode `bun run db:migrate`",
+      );
+    }
+    return null;
+  }
 }
 
 /** Guarda (ou atualiza) a conexão. Os tokens são cifrados antes de gravar. */
@@ -418,10 +440,16 @@ export async function syncUser(userId: string): Promise<SyncResult> {
 
 /** Quem está conectado e já passou do intervalo — usado pelo agendador. */
 export async function usersDueForSync(intervalMinutes: number): Promise<string[]> {
-  const rows = await query<{ user_id: string }>(
-    `SELECT user_id FROM google_accounts
-      WHERE last_sync_at IS NULL OR last_sync_at < now() - ($1 || ' minutes')::interval`,
-    [String(intervalMinutes)],
-  );
-  return rows.map((row) => row.user_id);
+  try {
+    const rows = await query<{ user_id: string }>(
+      `SELECT user_id FROM google_accounts
+        WHERE last_sync_at IS NULL OR last_sync_at < now() - ($1 || ' minutes')::interval`,
+      [String(intervalMinutes)],
+    );
+    return rows.map((row) => row.user_id);
+  } catch (error) {
+    // Banco ainda sem as tabelas: nada a sincronizar, e o aviso já saiu uma vez.
+    if (isMissingTable(error)) return [];
+    throw error;
+  }
 }

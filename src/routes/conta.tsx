@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Copy, Plus, Trash2, UserPlus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -87,6 +88,9 @@ function AccountPage() {
   const [inviteRole, setInviteRole] = useState<"editor" | "viewer">("viewer");
   const [profileName, setProfileName] = useState("");
   const [profileColor, setProfileColor] = useState("#3B82F6");
+  // Exclusões que levam tudo junto pedem o nome digitado antes de acontecer.
+  const [deletingAccount, setDeletingAccount] = useState<{ id: string; name: string } | null>(null);
+  const [deletingProfile, setDeletingProfile] = useState<{ id: string; name: string } | null>(null);
 
   const displayName = useMemo(() => name || account?.name || "", [name, account]);
 
@@ -128,11 +132,8 @@ function AccountPage() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={async () => {
-                      if (!confirm(`Excluir a conta "${a.name}" e todos os seus dados?`)) return;
-                      await deleteAccount.mutateAsync(a.id);
-                      toast.success("Conta excluída");
-                    }}
+                    onClick={() => setDeletingAccount({ id: a.id, name: a.name })}
+                    aria-label={`Excluir a conta ${a.name}`}
                   >
                     <Trash2 className="size-4" />
                   </Button>
@@ -194,9 +195,7 @@ function AccountPage() {
                 type="color"
                 value={account.color}
                 disabled={!isOwner}
-                onChange={(e) =>
-                  updateAccount.mutate({ id: account.id, color: e.target.value })
-                }
+                onChange={(e) => updateAccount.mutate({ id: account.id, color: e.target.value })}
                 className="h-10 w-16 p-1"
               />
             </div>
@@ -241,11 +240,8 @@ function AccountPage() {
                   size="sm"
                   variant="ghost"
                   className="ml-auto"
-                  onClick={async () => {
-                    if (!confirm(`Excluir o perfil "${p.name}" e todos os seus dados?`)) return;
-                    await removeProfile.mutateAsync(p.id);
-                    toast.success("Perfil excluído");
-                  }}
+                  onClick={() => setDeletingProfile({ id: p.id, name: p.name })}
+                  aria-label={`Excluir o perfil ${p.name}`}
                 >
                   <Trash2 className="size-4" />
                 </Button>
@@ -311,9 +307,7 @@ function AccountPage() {
               ) : (
                 <Select
                   value={m.role}
-                  onValueChange={(v) =>
-                    updateMember.mutate({ id: m.id, role: v as AccountRole })
-                  }
+                  onValueChange={(v) => updateMember.mutate({ id: m.id, role: v as AccountRole })}
                 >
                   <SelectTrigger className="h-8 w-32">
                     <SelectValue />
@@ -354,7 +348,10 @@ function AccountPage() {
                 className="w-64"
               />
             </div>
-            <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as "editor" | "viewer")}>
+            <Select
+              value={inviteRole}
+              onValueChange={(v) => setInviteRole(v as "editor" | "viewer")}
+            >
               <SelectTrigger className="h-10 w-32">
                 <SelectValue />
               </SelectTrigger>
@@ -437,6 +434,54 @@ function AccountPage() {
           </div>
         </section>
       )}
+
+      <ConfirmDeleteDialog
+        open={deletingAccount !== null}
+        onOpenChange={(value) => !value && setDeletingAccount(null)}
+        itemLabel="conta"
+        itemName={deletingAccount?.name ?? ""}
+        description={
+          <>
+            A conta <span className="font-semibold text-foreground">{deletingAccount?.name}</span> e
+            tudo que existe dentro dela some para todo mundo que participa. Não há como desfazer.
+          </>
+        }
+        consequences={[
+          "Todos os perfis desta conta, com transações, categorias, investimentos e metas",
+          "Todos os espaços, quadros, tarefas, subtarefas, anexos e apontamentos de tempo",
+          "Os membros e os convites pendentes perdem o acesso na hora",
+        ]}
+        confirmLabel="Excluir conta"
+        onConfirm={async () => {
+          await deleteAccount.mutateAsync(deletingAccount!.id);
+          setDeletingAccount(null);
+          toast.success("Conta excluída");
+        }}
+      />
+
+      <ConfirmDeleteDialog
+        open={deletingProfile !== null}
+        onOpenChange={(value) => !value && setDeletingProfile(null)}
+        itemLabel="perfil"
+        itemName={deletingProfile?.name ?? ""}
+        description={
+          <>
+            O perfil <span className="font-semibold text-foreground">{deletingProfile?.name}</span>{" "}
+            e todos os dados financeiros dele somem. Os outros perfis da conta não são afetados.
+          </>
+        }
+        consequences={[
+          "Todos os lançamentos do perfil, incluindo os já conciliados",
+          "As categorias e os tetos de orçamento definidos nele",
+          "Os investimentos, as metas e as regras de recorrência do perfil",
+        ]}
+        confirmLabel="Excluir perfil"
+        onConfirm={async () => {
+          await removeProfile.mutateAsync(deletingProfile!.id);
+          setDeletingProfile(null);
+          toast.success("Perfil excluído");
+        }}
+      />
     </AppShell>
   );
 }

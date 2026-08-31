@@ -171,6 +171,11 @@ function TasksDashboard() {
       sessao: () => toast.error("Sessão expirada durante a conexão. Entre e tente de novo."),
       invalido: () => toast.error("O retorno do Google não pôde ser validado. Tente de novo."),
       falhou: () => toast.error("Não foi possível concluir a conexão com o Google Agenda."),
+      banco: () =>
+        toast.error(
+          "O banco ainda não tem as tabelas da agenda. Rode `bun run db:migrate` no servidor.",
+          { duration: 12000 },
+        ),
     };
     (messages[agendaResult] ?? (() => {}))();
     if (agendaResult === "conectado") setTab("calendario");

@@ -20,7 +20,11 @@ export const parseISODate = (s: string) => {
 };
 
 export const formatDateBR = (s: string) =>
-  parseISODate(s).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  parseISODate(s).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 
 export const monthLabel = (key: string) => {
   const [y, m] = key.split("-").map(Number);

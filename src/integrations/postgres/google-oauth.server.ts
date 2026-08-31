@@ -64,6 +64,16 @@ export async function finishGoogleConnection(input: {
     return destino("conectado");
   } catch (error) {
     console.error("[agenda] falha ao concluir a conexão:", error);
+    // 42P01 = tabela inexistente: o deploy subiu com o código novo, mas o
+    // `db:migrate` ainda não rodou. Vale distinguir, porque a saída é outra.
+    if (isMissingTable(error)) return destino("banco");
     return destino("falhou");
   }
+}
+
+/** Erro do Postgres de tabela que não existe. */
+function isMissingTable(error: unknown): boolean {
+  return (
+    typeof error === "object" && error !== null && (error as { code?: string }).code === "42P01"
+  );
 }
