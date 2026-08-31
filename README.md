@@ -121,7 +121,12 @@ perfil: nome, troca de e-mail e senha.
 #Integração com o Google Agenda
 A conexão é por pessoa: cada uma autoriza o app na própria conta, pelo perfil.
 A tarefa vira compromisso na agenda de quem é **responsável** por ela — sem
-responsável ou sem conta conectada, não há evento.
+responsável, sem data ou sem conta conectada, não há o que agendar e nenhum
+evento é criado.
+
+Ao conectar a conta, as tarefas com prazo que já existiam sobem para a agenda
+(as dos próximos seis meses que ainda não foram concluídas); depois disso cada
+rodada de sincronização recolhe o que tiver ficado para trás.
 
 - Tarefa criada, editada ou excluída → compromisso criado, editado ou excluído;
 - Compromisso apagado na agenda → a tarefa perde as datas, mas **não** é

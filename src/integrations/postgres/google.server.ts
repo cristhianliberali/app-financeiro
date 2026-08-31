@@ -16,6 +16,7 @@
  * onde se descobre depois por que uma data sumiu.
  */
 import { query, queryOne } from "./client.server";
+import { getGoogleSettings } from "./config.server";
 import { decryptToken, encryptToken } from "../google/crypto.server";
 import { refreshAccessToken, type GoogleTokens } from "../google/oauth.server";
 import {
@@ -344,6 +345,8 @@ export type SyncResult = {
   cleared: number;
   /** Eventos lidos nesta rodada. */
   read: number;
+  /** Tarefas que ainda não tinham compromisso e foram para a agenda agora. */
+  pushed: number;
 };
 
 /**
@@ -353,7 +356,7 @@ export type SyncResult = {
  */
 export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
   const connection = await getConnection(userId);
-  if (!connection) return { cleared: 0, read: 0 };
+  if (!connection) return { cleared: 0, read: 0, pushed: 0 };
 
   const accessToken = await accessTokenFor(connection);
   const janela = () => {
@@ -402,7 +405,7 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
     [userId, page.nextSyncToken ?? connection.sync_token],
   );
 
-  return { cleared, read: page.events.length };
+  return { cleared, read: page.events.length, pushed: 0 };
 }
 
 /** Compromissos da agenda numa janela, para o calendário do painel. */
@@ -435,7 +438,63 @@ export async function listCalendarEvents(
 
 /** Sincronização completa de um usuário: puxa a agenda e devolve o resumo. */
 export async function syncUser(userId: string): Promise<SyncResult> {
-  return pullCalendarChanges(userId);
+  const pushed = await pushPendingTasks(userId);
+  const result = await pullCalendarChanges(userId);
+  return { ...result, pushed };
+}
+
+/**
+ * Sobe para a agenda as tarefas que ainda não têm compromisso.
+ *
+ * É o que faz a agenda começar cheia em vez de vazia: quem conecta a conta já
+ * tem tarefas com prazo marcadas há semanas, e elas nunca passaram pelo
+ * `saveTask` depois da conexão. Roda ao conectar, no botão "sincronizar agora"
+ * e em toda rodada automática — daí também cobrir a tarefa cujo compromisso
+ * falhou por uma indisponibilidade passageira do Google.
+ *
+ * Olha só para a frente (e uns dias para trás): encher a agenda de quem
+ * conectou com o arquivo morto de tarefas antigas não ajudaria ninguém.
+ */
+export async function pushPendingTasks(userId: string): Promise<number> {
+  const { maxEventsPerSync } = getGoogleSettings();
+
+  let pending: Array<{ id: string }>;
+  try {
+    pending = await query<{ id: string }>(
+      `SELECT t.id
+         FROM tasks t
+         JOIN board_statuses s ON s.id = t.status_id
+        WHERE t.responsible_user_id = $1
+          AND (t.start_date IS NOT NULL OR t.due_date IS NOT NULL)
+          AND coalesce(s.polarity, '') <> 'SUCCESS'
+          AND COALESCE(t.due_date, t.start_date) BETWEEN now() - interval '7 days'
+                                                     AND now() + interval '180 days'
+          AND NOT EXISTS (
+            SELECT 1 FROM task_calendar_events e
+             WHERE e.task_id = t.id AND e.user_id = $1
+          )
+        ORDER BY COALESCE(t.due_date, t.start_date)
+        LIMIT $2`,
+      [userId, maxEventsPerSync],
+    );
+  } catch (error) {
+    if (isMissingTable(error)) return 0;
+    throw error;
+  }
+
+  let pushed = 0;
+  for (const task of pending) {
+    await syncTaskToCalendar(task.id);
+    // `syncTaskToCalendar` engole os erros do Google para não derrubar o
+    // salvamento; aqui a prova de que deu certo é o vínculo ter aparecido.
+    const link = await queryOne<{ event_id: string }>(
+      `SELECT event_id FROM task_calendar_events WHERE task_id = $1 AND user_id = $2`,
+      [task.id, userId],
+    );
+    if (link) pushed += 1;
+    else break; // Google fora do ar ou token vencido: o resto espera a próxima.
+  }
+  return pushed;
 }
 
 /** Quem está conectado e já passou do intervalo — usado pelo agendador. */

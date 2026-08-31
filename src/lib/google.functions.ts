@@ -74,7 +74,7 @@ export const disconnectGoogle = createServerFn({ method: "POST" })
 /** Botão "sincronizar agora" do painel. */
 export const syncGoogleNow = createServerFn({ method: "POST" })
   .middleware([requireAuth])
-  .handler(async ({ context }): Promise<{ cleared: number; read: number }> => {
+  .handler(async ({ context }): Promise<{ cleared: number; read: number; pushed: number }> => {
     const { syncUser } = await import("@/integrations/postgres/google.server");
     return syncUser(context.user.id);
   });
