@@ -9,19 +9,19 @@ export const POLARITIES: Array<{ value: Polarity; label: string; hint: string; c
     value: "IN_PROGRESS",
     label: "Em andamento",
     hint: "Tarefa ainda ativa no fluxo de trabalho",
-    color: "#737373",
+    color: "#3B82F6",
   },
   {
     value: "SUCCESS",
     label: "Sucesso",
     hint: "Tarefa finalizada com sucesso",
-    color: "#171717",
+    color: "#10B981",
   },
   {
     value: "ARCHIVED",
     label: "Arquivado",
     hint: "Fora do fluxo ativo (arquivada, cancelada, descartada)",
-    color: "#BDBDBD",
+    color: "#94A3B8",
   },
 ];
 
@@ -46,11 +46,10 @@ export type Priority = "urgent" | "high" | "normal" | "low" | "none";
 /**
  * Prioridade da tarefa.
  *
- * É a única informação do módulo que foge do preto e branco: urgência precisa
- * saltar aos olhos num quadro cheio, e o nome por extenso mais a cor são o que
- * dá essa leitura imediata. `color` é o hex usado nos gráficos; `chip` e `dot`
- * trazem a mesma cor em classes com variante escura, para o contraste se manter
- * nos dois temas.
+ * Urgência precisa saltar aos olhos num quadro cheio, e o nome por extenso mais
+ * a cor são o que dá essa leitura imediata. `color` é o hex usado nos gráficos;
+ * `chip` e `dot` trazem a mesma cor em classes do design system, que já se
+ * viram sozinhas nos dois temas.
  */
 export const PRIORITIES: Array<{
   value: Priority;
@@ -63,24 +62,24 @@ export const PRIORITIES: Array<{
   {
     value: "urgent",
     label: "Urgente",
-    chip: "border-red-500/40 bg-red-500/10 text-red-600 dark:border-red-400/40 dark:bg-red-400/15 dark:text-red-400",
-    dot: "bg-red-500 dark:bg-red-400",
+    chip: "border-negative/35 bg-negative-soft text-negative-soft-foreground",
+    dot: "bg-negative",
     color: "#EF4444",
     weight: 4,
   },
   {
     value: "high",
     label: "Alta",
-    chip: "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:border-amber-400/40 dark:bg-amber-400/15 dark:text-amber-400",
-    dot: "bg-amber-500 dark:bg-amber-400",
+    chip: "border-warning/40 bg-warning-soft text-warning-soft-foreground",
+    dot: "bg-warning",
     color: "#F59E0B",
     weight: 3,
   },
   {
     value: "normal",
     label: "Normal",
-    chip: "border-blue-500/40 bg-blue-500/10 text-blue-600 dark:border-blue-400/40 dark:bg-blue-400/15 dark:text-blue-400",
-    dot: "bg-blue-500 dark:bg-blue-400",
+    chip: "border-info/35 bg-info-soft text-info-soft-foreground",
+    dot: "bg-info",
     color: "#3B82F6",
     weight: 2,
   },
@@ -89,7 +88,7 @@ export const PRIORITIES: Array<{
     label: "Baixa",
     chip: "border-border bg-secondary text-muted-foreground",
     dot: "bg-muted-foreground",
-    color: "#94A3B8",
+    color: "#64748B",
     weight: 1,
   },
   {
@@ -113,64 +112,57 @@ export const STATUS_PRESETS: Array<{ id: string; label: string; statuses: Status
     id: "default",
     label: "Padrão",
     statuses: [
-      { name: "Em andamento", color: "#525252", polarity: "IN_PROGRESS" },
-      { name: "Concluído", color: "#171717", polarity: "SUCCESS" },
-      { name: "Arquivado", color: "#BDBDBD", polarity: "ARCHIVED" },
+      { name: "Em andamento", color: "#3B82F6", polarity: "IN_PROGRESS" },
+      { name: "Concluído", color: "#10B981", polarity: "SUCCESS" },
+      { name: "Arquivado", color: "#94A3B8", polarity: "ARCHIVED" },
     ],
   },
   {
     id: "dev",
     label: "Desenvolvimento",
     statuses: [
-      { name: "Backlog", color: "#BDBDBD", polarity: "IN_PROGRESS" },
-      { name: "A fazer", color: "#A3A3A3", polarity: "IN_PROGRESS" },
-      { name: "Em desenvolvimento", color: "#737373", polarity: "IN_PROGRESS" },
-      { name: "Em revisão", color: "#525252", polarity: "IN_PROGRESS" },
-      { name: "Concluído", color: "#171717", polarity: "SUCCESS" },
-      { name: "Cancelado", color: "#D4D4D4", polarity: "ARCHIVED" },
+      { name: "Backlog", color: "#94A3B8", polarity: "IN_PROGRESS" },
+      { name: "A fazer", color: "#6366F1", polarity: "IN_PROGRESS" },
+      { name: "Em desenvolvimento", color: "#3B82F6", polarity: "IN_PROGRESS" },
+      { name: "Em revisão", color: "#06B6D4", polarity: "IN_PROGRESS" },
+      { name: "Concluído", color: "#10B981", polarity: "SUCCESS" },
+      { name: "Cancelado", color: "#94A3B8", polarity: "ARCHIVED" },
     ],
   },
   {
     id: "comercial",
     label: "Comercial",
     statuses: [
-      { name: "Pendente", color: "#BDBDBD", polarity: "IN_PROGRESS" },
-      { name: "Em contato", color: "#737373", polarity: "IN_PROGRESS" },
-      { name: "Aguardando cliente", color: "#525252", polarity: "IN_PROGRESS" },
-      { name: "Resolvido", color: "#171717", polarity: "SUCCESS" },
-      { name: "Arquivado", color: "#BDBDBD", polarity: "ARCHIVED" },
+      { name: "Pendente", color: "#94A3B8", polarity: "IN_PROGRESS" },
+      { name: "Em contato", color: "#6366F1", polarity: "IN_PROGRESS" },
+      { name: "Aguardando cliente", color: "#F59E0B", polarity: "IN_PROGRESS" },
+      { name: "Resolvido", color: "#10B981", polarity: "SUCCESS" },
+      { name: "Arquivado", color: "#94A3B8", polarity: "ARCHIVED" },
     ],
   },
 ];
 
-export const SPACE_ICONS = ["📁", "📣", "💼", "💻", "💰", "🎯", "🧩", "🏢", "🛠️", "🎨", "📊", "🤝"];
-
 /**
- * Paleta do sistema: uma escala de cinzas, do quase-preto ao quase-branco.
- * É o que dá aos espaços, quadros, status e avatares uma identidade própria
- * sem quebrar o tema preto e branco.
+ * Paleta do sistema: dez matizes vivos, espaçados no círculo cromático e todos
+ * no mesmo nível de saturação. É o que dá a espaços, quadros, status, etiquetas
+ * e avatares uma identidade própria — dois itens vizinhos nunca caem no mesmo
+ * tom, e nenhum deles briga com o violeta da marca.
  */
 export const PALETTE = [
-  "#171717",
-  "#404040",
-  "#525252",
-  "#737373",
-  "#8A8A8A",
-  "#A3A3A3",
-  "#BDBDBD",
-  "#D4D4D4",
+  "#6366F1",
+  "#8B5CF6",
+  "#EC4899",
+  "#EF4444",
+  "#F97316",
+  "#F59E0B",
+  "#84CC16",
+  "#10B981",
+  "#06B6D4",
+  "#3B82F6",
 ];
 
-/** Tons usados nas etiquetas — a mesma escala, começando um pouco mais clara. */
-export const LABEL_PALETTE = [
-  "#171717",
-  "#404040",
-  "#525252",
-  "#737373",
-  "#8A8A8A",
-  "#A3A3A3",
-  "#BDBDBD",
-];
+/** Tons das etiquetas — a mesma paleta, que já se distingue no meio do texto. */
+export const LABEL_PALETTE = PALETTE;
 
 // ---------------------------------------------------------------------------
 // Tempo
@@ -349,20 +341,73 @@ export const avatarColor = (seed: string) => {
 };
 
 /**
- * Espelha um tom da paleta na escala de cinza (#171717 ↔ #E8E8E8).
+ * Clareia um tom para o tema escuro, mantendo o matiz.
  *
  * As cores de espaços, quadros, status e etiquetas ficam gravadas no banco como
- * hexadecimal fixo. No tema escuro um tom escuro desapareceria contra o fundo,
- * então invertemos: como a paleta é cinza, inverter cada canal devolve
- * exatamente o tom oposto, preservando a distinção entre um item e outro.
+ * hexadecimal fixo, escolhidas contra um fundo claro. No escuro, um tom fechado
+ * — e os cinzas escuros que as contas antigas guardaram — desapareceria contra
+ * o fundo. Então mexemos só na luminosidade: o matiz e a saturação seguem
+ * intactos, e um espaço "azul" continua azul nos dois temas, apenas mais claro
+ * onde precisa ser. Tom já claro demais desce um pouco, pelo mesmo motivo ao
+ * contrário.
  */
-export function invertTone(hex: string): string {
+export function toneForDark(hex: string): string {
   const value = hex.replace("#", "");
   if (value.length !== 6) return hex;
-  const flipped = [0, 2, 4]
-    .map((i) => (255 - parseInt(value.slice(i, i + 2), 16)).toString(16).padStart(2, "0"))
-    .join("");
-  return `#${flipped.toUpperCase()}`;
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(value.slice(i, i + 2), 16) / 255) as [
+    number,
+    number,
+    number,
+  ];
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const lightness = (max + min) / 2;
+  const delta = max - min;
+
+  // Cinza puro não tem matiz para preservar: espelha, como antes.
+  if (delta < 0.02) {
+    const mirrored = Math.round((1 - lightness * 0.82) * 255);
+    const channel = mirrored.toString(16).padStart(2, "0");
+    return `#${(channel + channel + channel).toUpperCase()}`;
+  }
+
+  const target = lightness < 0.62 ? 0.68 : lightness > 0.85 ? 0.78 : lightness;
+  if (target === lightness) return hex.toUpperCase();
+
+  // HSL de volta para RGB, com a mesma saturação e o mesmo matiz.
+  const saturation = delta / (1 - Math.abs(2 * lightness - 1));
+  const hue =
+    max === r
+      ? ((g - b) / delta + (g < b ? 6 : 0)) * 60
+      : max === g
+        ? ((b - r) / delta + 2) * 60
+        : ((r - g) / delta + 4) * 60;
+
+  const c = (1 - Math.abs(2 * target - 1)) * Math.min(saturation, 0.92);
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = target - c / 2;
+  const [rr, gg, bb] =
+    hue < 60
+      ? [c, x, 0]
+      : hue < 120
+        ? [x, c, 0]
+        : hue < 180
+          ? [0, c, x]
+          : hue < 240
+            ? [0, x, c]
+            : hue < 300
+              ? [x, 0, c]
+              : [c, 0, x];
+
+  return `#${[rr, gg, bb]
+    .map((v) =>
+      Math.round(Math.min(1, Math.max(0, v + m)) * 255)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")
+    .toUpperCase()}`;
 }
 
 /**

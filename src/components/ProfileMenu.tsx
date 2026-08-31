@@ -44,18 +44,18 @@ export function ProfileMenu({
         <DropdownMenuTrigger
           // `min-w-0` é o que deixa o botão encolher: sem ele, um e-mail longo
           // empurra o seletor de tema para fora da lateral, por cima do conteúdo.
-          className={`flex min-w-0 items-center gap-2 rounded-lg text-left transition-colors hover:bg-secondary ${
+          className={`flex min-w-0 items-center gap-2.5 rounded-xl text-left transition-colors hover:bg-accent ${
             collapsed ? "shrink-0 justify-center p-1" : "w-full p-1.5"
           }`}
           aria-label="Meu perfil"
           title={user.name ?? user.email}
         >
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+          <span className="brand-gradient flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-xs">
             {initials(user.name, user.email)}
           </span>
           {!collapsed && (
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">
+              <span className="block truncate text-sm font-semibold">
                 {user.name?.trim() || "Meu perfil"}
               </span>
               <span className="block truncate text-[11px] text-muted-foreground">{user.email}</span>

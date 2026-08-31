@@ -14,6 +14,7 @@ import {
   Plus,
   Trash2,
   UserCheck,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTone } from "@/hooks/use-tone";
@@ -45,6 +46,7 @@ import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { NotificationBell } from "./NotificationBell";
 import { SpaceDialog } from "./SpaceDialog";
 import { TasksBreadcrumb } from "./TasksBreadcrumb";
+import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
 
 const SIDEBAR_STORAGE_KEY = "aura.tasks.sidebarCollapsed";
 const EXPANDED_STORAGE_KEY = "aura.tasks.expandedSpaces";
@@ -172,8 +174,9 @@ export function TasksShell({
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Carregando…
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3">
+        <span className="size-9 animate-spin rounded-full border-2 border-border border-t-primary" />
+        <p className="text-sm text-muted-foreground">Carregando…</p>
       </div>
     );
   }
@@ -191,15 +194,20 @@ export function TasksShell({
         }`}
       >
         {!collapsed && (
-          <Link to="/tarefas" className="flex min-w-0 items-center gap-2">
-            <div className="size-7 shrink-0 rounded-lg bg-primary" />
-            <span className="truncate text-base font-bold tracking-tight">AURA</span>
+          <Link to="/tarefas" className="flex min-w-0 items-center gap-2.5">
+            <span className="brand-gradient flex size-8 shrink-0 items-center justify-center rounded-xl shadow-glow">
+              <Sparkles className="size-4" strokeWidth={2.5} />
+            </span>
+            <span className="flex min-w-0 flex-col leading-none">
+              <span className="truncate text-base font-extrabold tracking-tight">AURA</span>
+              <span className="label-caps truncate text-[0.6rem]">Projetos</span>
+            </span>
           </Link>
         )}
         {!mobile && (
           <button
             onClick={toggleSidebar}
-            className={`rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground ${
+            className={`rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${
               collapsed ? "" : "ml-auto"
             }`}
             aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
@@ -222,15 +230,15 @@ export function TasksShell({
               key={item.to}
               to={item.to}
               title={item.label}
-              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
+              className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-all ${
                 collapsed ? "justify-center" : ""
               } ${
                 active
-                  ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-                  : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
+                  ? "bg-primary-soft text-primary-soft-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >
-              <item.icon className="size-4 shrink-0" />
+              <item.icon className={`size-4 shrink-0 ${active ? "text-primary" : ""}`} />
               {!collapsed && <span className="truncate">{item.label}</span>}
             </Link>
           );
@@ -246,11 +254,18 @@ export function TasksShell({
                 to="/tarefas/espacos/$spaceId"
                 params={{ spaceId: space.id }}
                 title={space.name}
-                className={`flex size-10 items-center justify-center rounded-lg text-base transition-colors ${
-                  space.id === spaceId ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/60"
+                className={`flex size-10 items-center justify-center rounded-xl transition-colors ${
+                  space.id === spaceId
+                    ? "bg-primary-soft ring-1 ring-primary/25"
+                    : "hover:bg-accent"
                 }`}
               >
-                <span aria-hidden>{space.icon}</span>
+                <IconBadge
+                  name={space.icon}
+                  color={tone(space.color)}
+                  size="sm"
+                  fallback={DEFAULT_SPACE_ICON}
+                />
                 <span className="sr-only">{space.name}</span>
               </Link>
             ))}
@@ -261,7 +276,7 @@ export function TasksShell({
               <span className="label-caps">Espaços e quadros</span>
               <button
                 onClick={() => setSpaceDialog({ open: true, space: null })}
-                className="rounded p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-primary-soft hover:text-primary"
                 aria-label="Novo espaço"
                 title="Novo espaço"
               >
@@ -279,10 +294,10 @@ export function TasksShell({
                 return (
                   <div key={space.id}>
                     <div
-                      className={`group flex items-center gap-1 rounded-lg pr-1 transition-colors ${
+                      className={`group flex items-center gap-1 rounded-xl pr-1 transition-colors ${
                         isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "hover:bg-sidebar-accent/60"
+                          ? "bg-primary-soft text-primary-soft-foreground"
+                          : "hover:bg-accent"
                       }`}
                     >
                       <button
@@ -302,13 +317,18 @@ export function TasksShell({
                         params={{ spaceId: space.id }}
                         className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-sm"
                       >
-                        <span aria-hidden>{space.icon}</span>
-                        <span className={`truncate ${isActive ? "font-medium" : ""}`}>
+                        <IconBadge
+                          name={space.icon}
+                          color={tone(space.color)}
+                          size="sm"
+                          fallback={DEFAULT_SPACE_ICON}
+                        />
+                        <span className={`truncate ${isActive ? "font-semibold" : "font-medium"}`}>
                           {space.name}
                         </span>
                       </Link>
                       {pending > 0 && (
-                        <span className="shrink-0 font-mono text-[10px] text-muted-foreground group-hover:hidden">
+                        <span className="shrink-0 rounded-full bg-secondary px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground group-hover:hidden">
                           {pending}
                         </span>
                       )}
@@ -343,8 +363,8 @@ export function TasksShell({
                               key={board.id}
                               className={`group flex items-center gap-1 rounded-lg pr-1 transition-colors ${
                                 boardActive
-                                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                                  : "hover:bg-sidebar-accent/60"
+                                  ? "bg-primary-soft text-primary-soft-foreground"
+                                  : "hover:bg-accent"
                               }`}
                             >
                               <Link
@@ -354,17 +374,17 @@ export function TasksShell({
                                 className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-xs"
                               >
                                 <span
-                                  className="size-2 shrink-0 rounded-full ring-1 ring-border"
+                                  className="size-2 shrink-0 rounded-full"
                                   style={{ backgroundColor: tone(board.color) }}
                                 />
                                 <span
-                                  className={`truncate ${boardActive ? "font-medium" : "text-muted-foreground"}`}
+                                  className={`truncate ${boardActive ? "font-semibold" : "text-muted-foreground"}`}
                                 >
                                   {board.name}
                                 </span>
                               </Link>
                               {boardPending > 0 && (
-                                <span className="shrink-0 font-mono text-[10px] text-muted-foreground group-hover:hidden">
+                                <span className="shrink-0 rounded-full bg-secondary px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground group-hover:hidden">
                                   {boardPending}
                                 </span>
                               )}
@@ -453,11 +473,11 @@ export function TasksShell({
       </Sheet>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-border bg-card/80 px-4 py-2 backdrop-blur-md lg:px-6">
+        <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-background/85 px-4 py-2.5 backdrop-blur-xl lg:px-6">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <button
               onClick={() => setMenuOpen(true)}
-              className="rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:hidden"
+              className="rounded-xl border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:hidden"
               aria-label="Abrir menu"
             >
               <Menu className="size-4" />
@@ -471,10 +491,10 @@ export function TasksShell({
           <div className="flex flex-wrap items-center gap-2">
             <ActiveTimerBar />
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-secondary">
+              <DropdownMenuTrigger className="flex items-center gap-2 rounded-xl border border-border bg-card px-2.5 py-2 text-xs font-semibold shadow-xs transition-colors hover:border-border-strong hover:bg-accent">
                 <span
-                  className="size-2 rounded-full"
-                  style={{ backgroundColor: currentAccount?.color ?? "var(--foreground)" }}
+                  className="size-2.5 rounded-full"
+                  style={{ backgroundColor: currentAccount?.color ?? "var(--color-primary)" }}
                 />
                 <span className="max-w-32 truncate">{currentAccount?.name ?? "Conta"}</span>
                 <ChevronDown className="size-3 opacity-50" />
@@ -596,7 +616,7 @@ function ItemMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
+        className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         aria-label={label}
       >
         <MoreVertical className="size-3" />

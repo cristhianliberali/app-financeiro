@@ -22,7 +22,9 @@ import {
   useTasks,
   type Space,
 } from "@/lib/tasks";
-import { PALETTE, SPACE_ICONS } from "@/lib/tasks-analytics";
+import { PALETTE } from "@/lib/tasks-analytics";
+import { DEFAULT_SPACE_ICON } from "@/lib/icons";
+import { IconPicker } from "@/components/IconPicker";
 import { formatDateBR } from "@/lib/format";
 import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { UserMultiSelect } from "./UserPicker";
@@ -53,7 +55,7 @@ export function SpaceDialog({
   const [form, setForm] = useState({
     name: "",
     description: "",
-    icon: "📁",
+    icon: DEFAULT_SPACE_ICON,
     color: PALETTE[0]!,
     archived: false,
   });
@@ -65,7 +67,7 @@ export function SpaceDialog({
     setForm({
       name: space?.name ?? "",
       description: space?.description ?? "",
-      icon: space?.icon ?? "📁",
+      icon: space?.icon ?? DEFAULT_SPACE_ICON,
       color: space?.color ?? PALETTE[0]!,
       archived: !!space?.archived_at,
     });
@@ -125,26 +127,19 @@ export function SpaceDialog({
               rows={2}
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full resize-y rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+              className="w-full resize-y rounded-xl border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25"
               placeholder="Para que serve este espaço?"
             />
           </div>
 
           <div className="space-y-1.5">
             <Label>Ícone</Label>
-            <div className="flex flex-wrap gap-1">
-              {SPACE_ICONS.map((icon) => (
-                <button
-                  key={icon}
-                  onClick={() => setForm({ ...form, icon })}
-                  className={`size-9 rounded-lg border text-lg transition-colors ${
-                    form.icon === icon ? "border-primary bg-primary/10" : "border-border"
-                  }`}
-                >
-                  {icon}
-                </button>
-              ))}
-            </div>
+            <IconPicker
+              value={form.icon}
+              color={form.color}
+              fallback={DEFAULT_SPACE_ICON}
+              onChange={(icon) => setForm({ ...form, icon })}
+            />
           </div>
 
           <div className="space-y-1.5">
@@ -154,8 +149,10 @@ export function SpaceDialog({
                 <button
                   key={color}
                   onClick={() => setForm({ ...form, color })}
-                  className={`size-7 rounded-full border-2 transition-transform ${
-                    form.color === color ? "scale-110 border-foreground" : "border-transparent"
+                  className={`size-8 rounded-full border-2 transition-transform ${
+                    form.color === color
+                      ? "scale-110 border-foreground shadow-md"
+                      : "border-transparent hover:scale-105"
                   }`}
                   style={{ backgroundColor: color }}
                   aria-label={`Cor ${color}`}
@@ -172,7 +169,7 @@ export function SpaceDialog({
             </p>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-border p-3">
+          <div className="flex items-center justify-between rounded-xl border border-border bg-surface/60 p-3.5">
             <div>
               <p className="text-sm font-medium">Arquivar espaço</p>
               <p className="text-[11px] text-muted-foreground">

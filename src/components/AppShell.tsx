@@ -9,6 +9,8 @@ import {
   Users,
   ChevronDown,
   Menu,
+  Plus,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppState } from "@/lib/app-state";
@@ -74,8 +76,9 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        Carregando…
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3">
+        <span className="size-9 animate-spin rounded-full border-2 border-border border-t-primary" />
+        <p className="text-sm text-muted-foreground">Carregando…</p>
       </div>
     );
   }
@@ -86,38 +89,58 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
    */
   const sidebar = (
     <>
-      <div className="mb-6 flex items-center gap-2">
-        <div className="size-8 rounded-lg bg-primary" />
-        <span className="text-xl font-bold tracking-tight">AURA</span>
+      <div className="mb-6 flex items-center gap-2.5">
+        <span className="brand-gradient flex size-9 items-center justify-center rounded-xl shadow-glow">
+          <Sparkles className="size-4" strokeWidth={2.5} />
+        </span>
+        <span className="flex flex-col leading-none">
+          <span className="text-lg font-extrabold tracking-tight">AURA</span>
+          <span className="label-caps text-[0.6rem]">Finanças</span>
+        </span>
       </div>
       <div className="mb-6">
         <ModuleSwitcher />
       </div>
-      <nav className="space-y-1">
+      <nav className="space-y-0.5">
+        <p className="label-caps mb-2 px-3">Navegação</p>
         {nav.map((item) => {
           const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
           return (
             <Link
               key={item.to}
               to={item.to}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+              className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                 active
-                  ? "bg-secondary font-medium text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-primary-soft text-primary-soft-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >
-              <item.icon className="size-4" />
+              {/* Marca do item ativo: um traço da marca colado na borda. */}
+              <span
+                className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary transition-opacity ${
+                  active ? "opacity-100" : "opacity-0"
+                }`}
+              />
+              <item.icon
+                className={`size-4 shrink-0 transition-colors ${active ? "text-primary" : ""}`}
+              />
               {item.label}
             </Link>
           );
         })}
       </nav>
-      <div className="mt-auto space-y-4 pt-6">
-        <div className="rounded-xl border border-border bg-secondary/50 p-4">
-          <p className="label-caps mb-2">Perfil ativo</p>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Os lançamentos, categorias e metas exibidos pertencem ao perfil{" "}
-            <span className="font-semibold text-foreground">{current?.name ?? "—"}</span>.
+      <div className="mt-auto space-y-3 pt-6">
+        <div className="brand-sheen rounded-xl border border-primary/15 p-3.5">
+          <p className="label-caps mb-1.5">Perfil ativo</p>
+          <p className="flex items-center gap-2 text-sm font-semibold">
+            <span
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: current?.color ?? "var(--color-primary)" }}
+            />
+            <span className="truncate">{current?.name ?? "—"}</span>
+          </p>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+            Lançamentos, categorias e metas exibidos pertencem a este perfil.
           </p>
         </div>
         <div className="flex min-w-0 items-center gap-2">
@@ -132,82 +155,86 @@ export function AppShell({ children, actions }: { children: ReactNode; actions?:
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <aside className="fixed left-0 top-0 z-10 hidden h-full w-64 flex-col border-r border-border bg-card p-6 lg:flex">
+      <aside className="fixed left-0 top-0 z-10 hidden h-full w-64 flex-col border-r border-sidebar-border bg-sidebar p-5 lg:flex">
         {sidebar}
       </aside>
 
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-        <SheetContent side="left" className="flex w-72 flex-col overflow-y-auto p-6 lg:hidden">
+        <SheetContent side="left" className="flex w-72 flex-col overflow-y-auto p-5 lg:hidden">
           <SheetTitle className="sr-only">Menu</SheetTitle>
           {sidebar}
         </SheetContent>
       </Sheet>
 
       <main className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-card/80 px-4 py-3 backdrop-blur-md lg:px-8">
-          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+        <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-background/85 px-4 py-3 backdrop-blur-xl lg:px-8">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <button
               onClick={() => setMenuOpen(true)}
-              className="rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:hidden"
+              className="rounded-xl border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:hidden"
               aria-label="Abrir menu"
             >
               <Menu className="size-4" />
             </button>
+
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-border bg-secondary/60 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary">
+              <DropdownMenuTrigger className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold shadow-xs transition-colors hover:border-border-strong hover:bg-accent">
                 <span
-                  className="size-2 rounded-full"
-                  style={{ backgroundColor: currentAccount?.color ?? "var(--foreground)" }}
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: currentAccount?.color ?? "var(--color-primary)" }}
                 />
                 <span className="max-w-28 truncate sm:max-w-none">
                   {currentAccount?.name ?? "Conta"}
                 </span>
-                <ChevronDown className="size-3 shrink-0 opacity-50" />
+                <ChevronDown className="size-3.5 shrink-0 opacity-50" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
+              <DropdownMenuContent align="start" className="w-60">
                 {accounts?.map((a) => (
                   <DropdownMenuItem key={a.id} onClick={() => setAccountId(a.id)}>
                     <span
-                      className="mr-2 size-2 rounded-full"
+                      className="size-2.5 shrink-0 rounded-full"
                       style={{ backgroundColor: a.color }}
                     />
-                    {a.name}
-                    <span className="ml-2 text-xs text-muted-foreground">
+                    <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                    <span className="label-caps text-[0.6rem]">
                       {a.role === "owner" ? "dono" : a.role === "editor" ? "editor" : "leitor"}
                     </span>
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuItem onClick={() => navigate({ to: "/conta" })}>
-                  + Gerenciar contas
+                  <Plus className="size-4" /> Gerenciar contas
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <div className="hidden h-4 w-px bg-border sm:block" />
+
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-secondary">
+              <DropdownMenuTrigger className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold shadow-xs transition-colors hover:border-border-strong hover:bg-accent">
                 <span
-                  className="size-2 rounded-full"
-                  style={{ backgroundColor: current?.color ?? "var(--foreground)" }}
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: current?.color ?? "var(--color-primary)" }}
                 />
                 <span className="max-w-28 truncate sm:max-w-none">
-                  <span className="hidden sm:inline">Perfil: </span>
+                  <span className="hidden font-normal text-muted-foreground sm:inline">
+                    Perfil:{" "}
+                  </span>
                   {current?.name ?? "—"}
                 </span>
-                <ChevronDown className="size-3 shrink-0 opacity-50" />
+                <ChevronDown className="size-3.5 shrink-0 opacity-50" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
+              <DropdownMenuContent align="start" className="w-52">
                 {profiles?.map((p) => (
                   <DropdownMenuItem key={p.id} onClick={() => setProfileId(p.id)}>
                     <span
-                      className="mr-2 size-2 rounded-full"
+                      className="size-2.5 shrink-0 rounded-full"
                       style={{ backgroundColor: p.color }}
                     />
-                    {p.name}
+                    <span className="truncate">{p.name}</span>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <div className="hidden h-4 w-px bg-border sm:block" />
+
+            <div className="hidden h-5 w-px bg-border sm:block" />
             <PeriodControls />
           </div>
           <div className="flex items-center gap-2">
