@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -18,23 +18,56 @@ import {
   monthChipLabel,
   monthKeyOf,
   monthRange,
+  monthsBetween,
   monthTitle,
   shiftMonthKey,
   toISODate,
 } from "@/lib/format";
 
-/** Quantos meses a faixa cobre para cada lado do mês em foco. */
-const BACK = 5;
-const FORWARD = 6;
+/**
+ * Quantos meses a faixa cobre para cada lado do seu centro.
+ *
+ * A faixa é uma janela fixa de meses, e não um recorte em volta do mês em foco.
+ * Essa é a diferença entre trocar de mês e ver o cartão deslizar até o meio, ou
+ * ver a faixa inteira ser reconstruída embaixo do deslize: se a lista mudasse a
+ * cada clique, todo cartão saltaria uma largura antes de a animação começar, e
+ * a consulta trocaria de chave a cada mês — os valores piscariam em zero
+ * enquanto o servidor respondia.
+ */
+const HALF = 9;
 
 /**
- * Um mês a mais na frente da faixa, que não vira cartão.
+ * A que distância da borda a janela se recentra no mês em foco.
+ *
+ * Navegando de mês em mês dá para andar `HALF - EDGE` cartões antes de a faixa
+ * se refazer, e quando ela se refaz o salto é seco de propósito: não há para
+ * onde deslizar quando a régua inteira é outra.
+ */
+const EDGE = 3;
+
+/**
+ * Um mês a mais atrás da faixa, que não vira cartão.
  *
  * O rodapé de cada cartão compara o mês com o anterior, e o primeiro cartão da
  * faixa também precisa de com quem se comparar. Este mês entra na conta e sai
  * da tela.
  */
 const ANCHOR = 1;
+
+/**
+ * Quanto dura o deslize da faixa, em ms.
+ *
+ * Curto de propósito: isto é navegação, não é cena. Tempo suficiente para o
+ * olho acompanhar de onde o cartão veio, curto o bastante para quem clica três
+ * meses seguidos não ficar esperando a faixa.
+ */
+const SLIDE_MS = 340;
+
+/** Sai rápido e chega macio — é o que dá a sensação de resposta imediata. */
+const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
+
+const wantsReducedMotion = () =>
+  typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** Em que ponto do calendário o mês está — é o que o selo do cartão diz. */
 type MonthState = "closed" | "current" | "forecast";
@@ -98,12 +131,19 @@ export function MonthTimeline({
   const thisMonth = monthKeyOf(toISODate(new Date()));
   const currentYear = new Date().getFullYear();
 
+  // O centro da janela só se mexe quando o foco encosta na borda. O ajuste é
+  // feito na renderização, e não num efeito, para que React refaça a
+  // renderização antes de tocar no DOM: a faixa nunca chega a ser pintada com a
+  // janela velha e o mês novo.
+  const [center, setCenter] = useState(focus);
+  if (Math.abs(monthsBetween(center, focus)) > HALF - EDGE) setCenter(focus);
+
   const months = useMemo(
     () =>
-      Array.from({ length: ANCHOR + BACK + FORWARD + 1 }, (_, i) =>
-        shiftMonthKey(focus, i - BACK - ANCHOR),
+      Array.from({ length: ANCHOR + HALF * 2 + 1 }, (_, i) =>
+        shiftMonthKey(center, i - HALF - ANCHOR),
       ),
-    [focus],
+    [center],
   );
 
   // Uma consulta cobrindo a faixa inteira; o cálculo reparte por mês.
@@ -131,15 +171,69 @@ export function MonthTimeline({
   /** O mês em foco é o do período atual — desde que o período seja mensal. */
   const selected = monthKeyOf(from) === monthKeyOf(to) ? monthKeyOf(from) : null;
 
+  // ---- Deslize da faixa -----------------------------------------------------
+  // A rolagem é animada à mão, e não por `scrollIntoView({ behavior: "smooth" })`,
+  // porque a duração do deslize nativo é do navegador: ele estica com a
+  // distância e fica lento justo quando se pula vários meses de uma vez. Aqui o
+  // tempo é sempre o mesmo, venha o cartão de um mês ou de meio ano.
+  const animation = useRef(0);
+
+  function stopGlide() {
+    cancelAnimationFrame(animation.current);
+    animation.current = 0;
+  }
+
+  /** Leva a faixa até `to`, em `duration` ms. Duração zero salta direto. */
+  function glide(el: HTMLElement, to: number, duration: number) {
+    stopGlide();
+    const target = Math.max(0, Math.min(el.scrollWidth - el.clientWidth, to));
+    const from = el.scrollLeft;
+    const distance = target - from;
+
+    if (duration === 0 || Math.abs(distance) < 1 || wantsReducedMotion()) {
+      el.scrollLeft = target;
+      return;
+    }
+
+    const start = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      el.scrollLeft = from + distance * easeOutCubic(t);
+      animation.current = t < 1 ? requestAnimationFrame(step) : 0;
+    };
+    animation.current = requestAnimationFrame(step);
+  }
+
+  useEffect(() => stopGlide, []);
+
+  /** A distância de um cartão ao seguinte, medida na própria faixa. */
+  function stride(el: HTMLElement) {
+    const cards = el.querySelectorAll<HTMLElement>("[data-month]");
+    return cards.length > 1 ? cards[1]!.offsetLeft - cards[0]!.offsetLeft : el.clientWidth / 3;
+  }
+
   // O mês em foco entra na tela sozinho: trocar o período pela barra de cima ou
   // pelas setas de mês não deveria exigir rolar a faixa atrás dele.
+  //
+  // `painted` guarda em que janela a faixa foi desenhada da última vez. Começa
+  // vazio para a primeira pintura já nascer no lugar, sem deslizar do zero, e
+  // denuncia a janela recentrada, em que o deslize não faria sentido.
+  const painted = useRef<string | null>(null);
+
   useEffect(() => {
-    const card = strip.current?.querySelector<HTMLElement>('[data-focus="true"]');
-    card?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-  }, [focus]);
+    const el = strip.current;
+    const card = el?.querySelector<HTMLElement>('[data-focus="true"]');
+    if (!el || !card) return;
+
+    const rebuilt = painted.current !== center;
+    painted.current = center;
+    glide(el, card.offsetLeft - (el.clientWidth - card.offsetWidth) / 2, rebuilt ? 0 : SLIDE_MS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus, center]);
 
   function scrollBy(direction: number) {
-    strip.current?.scrollBy({ left: direction * 320, behavior: "smooth" });
+    const el = strip.current;
+    if (el) glide(el, el.scrollLeft + direction * stride(el) * 2, SLIDE_MS);
   }
 
   // ---- Arrasto da faixa -----------------------------------------------------
@@ -151,6 +245,9 @@ export function MonthTimeline({
   function onPointerDown(event: React.PointerEvent) {
     // No toque o navegador já rola sozinho, e melhor: com inércia.
     if (event.pointerType === "touch" || !strip.current) return;
+    // A mão manda mais que a animação: pegar a faixa no meio de um deslize a
+    // entrega imediatamente, em vez de disputar o `scrollLeft` com ela.
+    stopGlide();
     drag.current = {
       active: true,
       startX: event.clientX,
@@ -257,19 +354,24 @@ export function MonthTimeline({
                 setRange(range.from, range.to);
               }}
               aria-pressed={isFocus}
+              data-month={point.key}
               data-focus={isFocus || undefined}
               title={monthTitle(point.key)}
-              className={`relative flex w-56 shrink-0 flex-col gap-3 rounded-xl border p-4 text-left transition-all ${
+              className={`relative flex w-56 shrink-0 flex-col gap-3 rounded-xl border p-4 text-left transition-[color,background-color,border-color,box-shadow] duration-200 ease-out ${
                 isFocus
                   ? "border-primary bg-primary-soft glow-strong"
                   : "border-border bg-card hover:border-border-strong hover:bg-accent/50"
               }`}
             >
               {/* A aba no topo é o que amarra o cartão em foco ao painel: ela
-                  diz "é este que o resto da tela está mostrando". */}
-              {isFocus && (
-                <span className="absolute -top-0.5 left-1/2 h-1 w-12 -translate-x-1/2 rounded-full bg-primary" />
-              )}
+                  diz "é este que o resto da tela está mostrando". Ela fica
+                  sempre no DOM e cresce do meio para os lados — aparecer de uma
+                  vez, junto com o cartão deslizando, seria um pisca a mais. */}
+              <span
+                className={`absolute -top-0.5 left-1/2 h-1 -translate-x-1/2 rounded-full bg-primary transition-[width,opacity] duration-300 ease-out motion-reduce:transition-none ${
+                  isFocus ? "w-12 opacity-100" : "w-0 opacity-0"
+                }`}
+              />
 
               <span className="flex items-center justify-between gap-2">
                 <span

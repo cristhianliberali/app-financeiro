@@ -80,6 +80,13 @@ export function shiftMonthKey(key: string, months: number): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** Quantos meses vão de uma chave `YYYY-MM` até outra — negativo se ela recua. */
+export function monthsBetween(from: string, to: string): number {
+  const [fromYear, fromMonth] = from.split("-").map(Number);
+  const [toYear, toMonth] = to.split("-").map(Number);
+  return (toYear! - fromYear!) * 12 + (toMonth! - fromMonth!);
+}
+
 /**
  * O intervalo cobre exatamente um mês inteiro?
  *
