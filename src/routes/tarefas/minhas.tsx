@@ -64,10 +64,10 @@ function MyTasksPage() {
 
   return (
     <TasksShell breadcrumbCurrent="Minhas tarefas">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0">
           <h1 className="title-xl">Minhas tarefas</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="truncate text-xs text-muted-foreground">
             Tarefas de todos os quadros em que você é responsável ou participante.
           </p>
         </div>

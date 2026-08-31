@@ -521,7 +521,12 @@ export function TasksShell({
         </header>
 
         <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-[1600px] space-y-6 p-4 lg:p-6">{children}</div>
+          {/*
+            Ritmo mais apertado que o do Finanças: as telas daqui terminam num
+            Kanban ou num calendário que ocupam o resto da janela, e cada folga
+            a mais aqui em cima é altura que sai deles.
+          */}
+          <div className="mx-auto max-w-[1600px] space-y-4 p-4 lg:px-6 lg:py-5">{children}</div>
         </div>
       </main>
 

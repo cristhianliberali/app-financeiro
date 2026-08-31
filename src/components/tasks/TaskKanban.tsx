@@ -13,7 +13,7 @@ export type KanbanColumn = {
 };
 
 /** Folga entre o fim do quadro e a borda de baixo da janela. */
-const BOTTOM_GAP = 20;
+const BOTTOM_GAP = 12;
 /** Altura mínima, para o quadro não sumir numa janela baixa. */
 const MIN_HEIGHT = 320;
 
