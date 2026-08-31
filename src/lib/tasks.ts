@@ -21,6 +21,7 @@ import {
   fetchDueReminders,
   fetchLabels,
   fetchSpaceMembers,
+  fetchSpaceStatuses,
   fetchSpaces,
   fetchTaskActivity,
   fetchTasks,
@@ -391,6 +392,16 @@ export function useBoardStatuses(boardId: string | null) {
     enabled: !!boardId,
     queryFn: async (): Promise<BoardStatus[]> =>
       (await fetchBoardStatuses({ data: { boardId: boardId! } })) as BoardStatus[],
+  });
+}
+
+/** Status de todos os quadros do espaço — base do Kanban do espaço. */
+export function useSpaceStatuses(spaceId: string | null) {
+  return useQuery({
+    queryKey: [KEY, "space-statuses", spaceId],
+    enabled: !!spaceId,
+    queryFn: async (): Promise<BoardStatus[]> =>
+      (await fetchSpaceStatuses({ data: { spaceId: spaceId! } })) as BoardStatus[],
   });
 }
 

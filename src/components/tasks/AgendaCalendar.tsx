@@ -1,33 +1,25 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CalendarClock, ChevronLeft, ChevronRight, ExternalLink, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTone } from "@/hooks/use-tone";
 import { useAgendaEvents, useGoogleStatus, useSyncGoogleNow } from "@/lib/google";
-import type { Task } from "@/lib/tasks";
+import { useSaveTask, type Task } from "@/lib/tasks";
 import { formatDateBR, toISODate } from "@/lib/format";
 import { WEEKDAY_LABELS, monthMatrix, todayKey, weekDays } from "@/lib/tasks-analytics";
+import { buildCalendarEntries, type EntryMeta } from "./calendar-entries";
+import { TimeGrid, type GridEntry } from "./TimeGrid";
 
 /**
  * Calendário do painel: tarefas do app e compromissos da agenda no mesmo lugar.
  *
- * A semana é o padrão porque é a janela em que se trabalha; o mês serve para
- * enxergar carga. Compromisso que nasceu de uma tarefa aparece uma vez só — o
- * evento carrega o id da tarefa, então dá para reconhecer e não duplicar.
+ * A semana é o padrão porque é a janela em que se trabalha, e ela abre na grade
+ * de horários — com o dia como régua, dá para ver o que se atropela e arrastar
+ * a tarefa para outro horário. O mês continua sendo uma lista por dia: numa
+ * célula de 4cm, uma régua de 24 horas não caberia legível.
  */
 
 type Mode = "week" | "month";
-
-type Entry = {
-  id: string;
-  day: string;
-  at: string | null;
-  title: string;
-  color: string;
-  source: "task" | "agenda";
-  task?: Task;
-  link?: string | undefined;
-};
 
 /** Dia local do timestamp — o usuário pensa no fuso dele, não em UTC. */
 function localDay(iso: string): string {
@@ -61,15 +53,16 @@ export function AgendaCalendar({
   const tone = useTone();
   const { data: status } = useGoogleStatus();
   const sync = useSyncGoogleNow();
+  const save = useSaveTask();
 
   const [mode, setMode] = useState<Mode>("week");
   const [reference, setReference] = useState(() => new Date());
 
-  // Os dois helpers devolvem `Date`; o calendário trabalha com a chave do dia.
-  const days = useMemo(
-    () => (mode === "week" ? weekDays(reference) : monthMatrix(reference)).map(toISODate),
+  const dayList = useMemo(
+    () => (mode === "week" ? weekDays(reference) : monthMatrix(reference)),
     [mode, reference],
   );
+  const days = useMemo(() => dayList.map(toISODate), [dayList]);
   const range = useMemo(
     () => ({ from: days[0] ?? todayKey(), to: days[days.length - 1] ?? todayKey() }),
     [days],
@@ -77,46 +70,72 @@ export function AgendaCalendar({
 
   const { data: agenda = [], isFetching } = useAgendaEvents(status?.connected ? range : null);
 
-  const entries = useMemo(() => {
-    const list: Entry[] = [];
+  const { entries, meta } = useMemo(() => buildCalendarEntries(tasks, agenda), [tasks, agenda]);
 
-    for (const task of tasks) {
-      const at = task.due_date ?? task.start_date;
-      if (!at) continue;
-      list.push({
-        id: `task-${task.id}`,
-        day: localDay(at),
-        at,
-        title: task.title,
-        color: task.status?.color ?? task.board.color,
-        source: "task",
-        task,
-      });
+  const openEntry = useCallback(
+    (entry: GridEntry) => {
+      if (entry.source === "agenda") {
+        if (entry.link) window.open(entry.link, "_blank", "noreferrer");
+        return;
+      }
+      const found = meta.get(entry.id);
+      if (found) onOpenTask(found.task);
+    },
+    [meta, onOpenTask],
+  );
+
+  const persist = useCallback(
+    async (found: EntryMeta, start: Date, end: Date) => {
+      const { task, write } = found;
+      const dates =
+        write === "both"
+          ? { start_date: start.toISOString(), due_date: end.toISOString() }
+          : write === "due"
+            ? { due_date: start.toISOString() }
+            : { start_date: start.toISOString() };
+
+      try {
+        await save.mutateAsync({
+          id: task.id,
+          board_id: task.board_id,
+          status_id: task.status_id,
+          title: task.title,
+          ...dates,
+        });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Não foi possível mover a tarefa");
+      }
+    },
+    [save],
+  );
+
+  const handleMove = useCallback(
+    (entry: GridEntry, start: Date, end: Date) => {
+      const found = meta.get(entry.id);
+      if (found) void persist(found, start, end);
+    },
+    [meta, persist],
+  );
+
+  const handleResize = useCallback(
+    (entry: GridEntry, end: Date) => {
+      const found = meta.get(entry.id);
+      if (found) void persist(found, entry.start, end);
+    },
+    [meta, persist],
+  );
+
+  /** Chips do mês: a visão mensal continua sendo lista, não régua. */
+  const monthByDay = useMemo(() => {
+    if (mode !== "month") return new Map<string, GridEntry[]>();
+    const map = new Map<string, GridEntry[]>();
+    for (const entry of entries) {
+      const key = localDay(entry.start.toISOString());
+      map.set(key, [...(map.get(key) ?? []), entry]);
     }
-
-    const taskIds = new Set(tasks.map((task) => task.id));
-    for (const event of agenda) {
-      // O compromisso da tarefa já está na lista acima.
-      if (event.taskId && taskIds.has(event.taskId)) continue;
-      list.push({
-        id: `agenda-${event.id}`,
-        day: localDay(event.start),
-        at: event.start,
-        title: event.title,
-        color: "#8A8A8A",
-        source: "agenda",
-        link: event.link,
-      });
-    }
-
-    return list.sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
-  }, [tasks, agenda]);
-
-  const byDay = useMemo(() => {
-    const map = new Map<string, Entry[]>();
-    for (const entry of entries) map.set(entry.day, [...(map.get(entry.day) ?? []), entry]);
+    for (const [, list] of map) list.sort((a, b) => a.start.getTime() - b.start.getTime());
     return map;
-  }, [entries]);
+  }, [mode, entries]);
 
   const title =
     mode === "week" && days.length > 0
@@ -152,6 +171,11 @@ export function AgendaCalendar({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {mode === "week" && (
+            <p className="hidden text-[11px] text-muted-foreground lg:block">
+              Arraste para mover · puxe a borda de baixo para mudar a duração
+            </p>
+          )}
           <div className="flex rounded-xl border border-border bg-secondary p-0.5">
             {(
               [
@@ -213,80 +237,97 @@ export function AgendaCalendar({
       )}
 
       {status?.connected && status.lastError && (
-        <p className="rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-xs text-foreground">
+        <p className="rounded-xl border border-negative/35 bg-negative-soft p-3 text-xs text-negative-soft-foreground">
           <span className="font-semibold">A última conversa com o Google falhou:</span>{" "}
           {status.lastError}
         </p>
       )}
 
-      <div
-        className={`grid gap-2 ${mode === "week" ? "sm:grid-cols-7" : "grid-cols-7"}`}
-        role="grid"
-      >
-        {mode === "month" &&
-          WEEKDAY_LABELS.map((label) => (
-            <div key={label} className="text-center text-[11px] uppercase text-muted-foreground">
-              {label}
-            </div>
-          ))}
-
-        {days.map((day) => {
-          const items = byDay.get(day) ?? [];
-          const isToday = day === today;
-          return (
-            <div
-              key={day}
-              className={`min-h-24 rounded-xl border p-2 transition-colors ${
-                isToday ? "border-primary bg-primary-soft ring-1 ring-primary/20" : "border-border"
-              } ${mode === "month" ? "min-h-20" : ""}`}
-            >
-              <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-                {mode === "week" && `${WEEKDAY_LABELS[new Date(`${day}T12:00:00`).getDay()]} `}
-                {Number(day.slice(8, 10))}
-              </p>
-
-              <div className="space-y-1">
-                {items.slice(0, mode === "week" ? 8 : 4).map((entry) =>
-                  entry.source === "task" ? (
-                    <button
-                      key={entry.id}
-                      onClick={() => entry.task && onOpenTask(entry.task)}
-                      className="flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-[11px] font-medium transition-colors hover:bg-accent"
-                    >
-                      <span
-                        className="size-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: tone(entry.color) }}
-                      />
-                      <span className="min-w-0 flex-1 truncate">{entry.title}</span>
-                      <span className="font-mono text-[10px] text-muted-foreground">
-                        {hourLabel(entry.at)}
-                      </span>
-                    </button>
-                  ) : (
-                    <a
-                      key={entry.id}
-                      href={entry.link ?? "#"}
-                      target={entry.link ? "_blank" : undefined}
-                      rel="noreferrer"
-                      className="flex w-full items-center gap-1.5 rounded-md border border-dashed border-border px-1.5 py-1 text-[11px] transition-colors hover:bg-accent"
-                      title="Compromisso da agenda"
-                    >
-                      <CalendarClock className="size-3 shrink-0 text-muted-foreground" />
-                      <span className="min-w-0 flex-1 truncate">{entry.title}</span>
-                      {entry.link && <ExternalLink className="size-2.5 shrink-0 opacity-60" />}
-                    </a>
-                  ),
-                )}
-                {items.length > (mode === "week" ? 8 : 4) && (
-                  <p className="px-1 text-[10px] text-muted-foreground">
-                    +{items.length - (mode === "week" ? 8 : 4)}
-                  </p>
-                )}
+      {mode === "week" ? (
+        <TimeGrid
+          days={dayList}
+          entries={entries}
+          onOpen={openEntry}
+          onMove={handleMove}
+          onResize={handleResize}
+        />
+      ) : (
+        <div className="panel overflow-hidden">
+          <div className="grid grid-cols-7 border-b border-border bg-surface text-center">
+            {WEEKDAY_LABELS.map((label) => (
+              <div key={label} className="label-caps py-2.5">
+                {label}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {days.map((day) => {
+              const items = monthByDay.get(day) ?? [];
+              const isToday = day === today;
+              const otherMonth = Number(day.slice(5, 7)) - 1 !== reference.getMonth();
+              return (
+                <div
+                  key={day}
+                  className={`min-h-28 space-y-0.5 border-b border-r border-border p-1.5 last:border-r-0 ${
+                    otherMonth ? "bg-surface/60" : ""
+                  }`}
+                >
+                  <p
+                    className={`mb-1 text-[11px] ${
+                      isToday
+                        ? "inline-flex size-6 items-center justify-center rounded-full bg-primary font-bold text-primary-foreground shadow-glow"
+                        : otherMonth
+                          ? "text-muted-foreground/60"
+                          : "text-muted-foreground"
+                    }`}
+                  >
+                    {Number(day.slice(8, 10))}
+                  </p>
+
+                  {items.slice(0, 4).map((entry) =>
+                    entry.source === "task" ? (
+                      <button
+                        key={entry.id}
+                        onClick={() => openEntry(entry)}
+                        className="flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-[11px] font-medium transition-colors hover:bg-accent"
+                      >
+                        <span
+                          className="size-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: tone(entry.color) }}
+                        />
+                        <span
+                          className={`min-w-0 flex-1 truncate ${entry.done ? "done-text" : ""}`}
+                        >
+                          {entry.title}
+                        </span>
+                        <span className="font-mono text-[10px] text-muted-foreground">
+                          {hourLabel(entry.allDay ? null : entry.start.toISOString())}
+                        </span>
+                      </button>
+                    ) : (
+                      <a
+                        key={entry.id}
+                        href={entry.link ?? "#"}
+                        target={entry.link ? "_blank" : undefined}
+                        rel="noreferrer"
+                        className="flex w-full items-center gap-1.5 rounded-md border border-dashed border-warning/40 bg-warning-soft px-1.5 py-1 text-[11px] text-warning-soft-foreground transition-colors hover:border-warning"
+                        title="Compromisso da agenda"
+                      >
+                        <CalendarClock className="size-2.5 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate">{entry.title}</span>
+                        {entry.link && <ExternalLink className="size-2.5 shrink-0 opacity-60" />}
+                      </a>
+                    ),
+                  )}
+                  {items.length > 4 && (
+                    <p className="px-1 text-[10px] text-muted-foreground">+{items.length - 4}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
