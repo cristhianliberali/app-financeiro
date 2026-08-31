@@ -124,7 +124,7 @@ function Indicator({
   tone?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5">
+    <div className="panel p-5">
       <div className="flex items-center gap-2 text-muted-foreground">
         <Icon className={`size-4 ${tone}`} />
         <p className="text-xs uppercase tracking-wider">{label}</p>
@@ -137,7 +137,7 @@ function Indicator({
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5">
+    <div className="panel p-5">
       <h4 className="mb-4 font-bold">{title}</h4>
       {children}
     </div>
@@ -381,7 +381,7 @@ function TasksDashboard() {
       }
     >
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Projetos e Tarefas</h1>
+        <h1 className="title-xl">Projetos e Tarefas</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Visão consolidada de todos os espaços e quadros aos quais você tem acesso.
         </p>

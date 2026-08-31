@@ -96,14 +96,19 @@ export function assertDataTable(table: string): asserts table is DataTable {
   }
 }
 
+/*
+ * Categorias que toda conta nova recebe. `emoji` guarda o nome do ícone do
+ * banco de ícones (src/lib/icons.tsx) — a coluna manteve o nome antigo para
+ * não quebrar o histórico de quem já tinha categorias com emoji gravado.
+ */
 const DEFAULT_CATEGORIES = [
-  { name: "Moradia", kind: "expense", color: "#3B82F6", emoji: "🏠", monthly_cap: 3000 },
-  { name: "Alimentação", kind: "expense", color: "#F97316", emoji: "🍕", monthly_cap: 1500 },
-  { name: "Transporte", kind: "expense", color: "#8B5CF6", emoji: "🚗", monthly_cap: 800 },
-  { name: "Lazer", kind: "expense", color: "#EC4899", emoji: "🎬", monthly_cap: 600 },
-  { name: "Saúde", kind: "expense", color: "#14B8A6", emoji: "💊", monthly_cap: 500 },
-  { name: "Salário", kind: "income", color: "#10B981", emoji: "💼", monthly_cap: null },
-  { name: "Freelance", kind: "income", color: "#22C55E", emoji: "🧾", monthly_cap: null },
+  { name: "Moradia", kind: "expense", color: "#6366F1", emoji: "home", monthly_cap: 3000 },
+  { name: "Alimentação", kind: "expense", color: "#F97316", emoji: "utensils", monthly_cap: 1500 },
+  { name: "Transporte", kind: "expense", color: "#8B5CF6", emoji: "car", monthly_cap: 800 },
+  { name: "Lazer", kind: "expense", color: "#EC4899", emoji: "clapperboard", monthly_cap: 600 },
+  { name: "Saúde", kind: "expense", color: "#06B6D4", emoji: "pill", monthly_cap: 500 },
+  { name: "Salário", kind: "income", color: "#10B981", emoji: "briefcase", monthly_cap: null },
+  { name: "Freelance", kind: "income", color: "#84CC16", emoji: "hand-coins", monthly_cap: null },
 ] as const;
 
 // ─────────────────────────────── leitura ────────────────────────────────

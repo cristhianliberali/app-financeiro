@@ -156,7 +156,7 @@ export function MyDay({
       {PERIODS.map((period) => {
         const ofPeriod = items.filter((item) => periodOf(item.at) === period.key);
         return (
-          <div key={period.key} className="rounded-2xl border border-border bg-card p-4">
+          <div key={period.key} className="panel p-4">
             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
               <period.icon className="size-4 text-muted-foreground" />
               {period.label}

@@ -148,7 +148,7 @@ export function TaskCalendar({
       </div>
 
       {mode === "day" ? (
-        <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="panel p-4">
           <p className="mb-3 text-sm font-semibold capitalize">
             {anchor.toLocaleDateString("pt-BR", { weekday: "long" })}
           </p>

@@ -99,7 +99,7 @@ function StatusSelect({
     <select
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value)}
-      className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+      className="h-11 w-full rounded-xl border border-input bg-card px-3 text-sm font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25"
     >
       <option value="" disabled>
         Selecione um status
@@ -514,7 +514,7 @@ export function TaskDialog({
         </div>
 
         {!isNew && (
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-secondary/30 p-3">
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-3">
             <Clock className="size-4 text-muted-foreground" />
             <div>
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground">

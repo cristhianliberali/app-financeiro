@@ -205,7 +205,7 @@ export function AgendaCalendar({
       </div>
 
       {status && !status.connected && (
-        <p className="rounded-lg border border-border bg-secondary/40 p-2.5 text-xs text-muted-foreground">
+        <p className="rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
           {status.configured
             ? "Conecte o Google Agenda no seu perfil para ver os compromissos aqui junto das tarefas."
             : "A integração com o Google Agenda não está configurada neste servidor."}

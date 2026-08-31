@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Plus, TrendingDown, TrendingUp, Trash2 } from "lucide-react";
+import { StatusPill } from "@/components/ui/status";
 import {
   Bar,
   BarChart,
@@ -113,14 +114,14 @@ function InvestmentsPage() {
             setOpen(true);
           }}
         >
-          + Novo investimento
+          <Plus /> Novo investimento
         </Button>
       }
     >
-      <h1 className="text-2xl font-bold tracking-tight">Investimentos e planejamento</h1>
+      <h1 className="title-xl">Investimentos e planejamento</h1>
 
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <h2 className="mb-6 font-bold">Rendimento estimado x real</h2>
+      <div className="panel p-6">
+        <h2 className="mb-6 text-base font-bold tracking-tight">Rendimento estimado x real</h2>
         {chart.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Cadastre um investimento para ver o gráfico.
@@ -137,13 +138,14 @@ function InvestmentsPage() {
                   contentStyle={{
                     borderRadius: 12,
                     border: "1px solid var(--color-border)",
-                    background: "var(--color-card)",
+                    background: "var(--color-popover)",
+                    boxShadow: "var(--elevation-lg)",
                     fontSize: 12,
                   }}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="estimado" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="real" fill="var(--color-positive)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="estimado" fill="var(--color-chart-1)" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="real" fill="var(--color-chart-3)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -154,7 +156,10 @@ function InvestmentsPage() {
         {investments.map((i) => {
           const real = i.current_amount - i.invested_amount;
           return (
-            <div key={i.id} className="rounded-2xl border border-border bg-card p-6">
+            <div
+              key={i.id}
+              className={`panel-interactive state-bar p-6 ${real >= 0 ? "state-done" : "state-late"}`}
+            >
               <div className="flex items-start justify-between">
                 <button
                   className="text-left"
@@ -172,46 +177,56 @@ function InvestmentsPage() {
                   }}
                 >
                   <p className="label-caps">{i.type}</p>
-                  <h3 className="text-lg font-bold">{i.name}</h3>
+                  <h3 className="text-lg font-bold tracking-tight">{i.name}</h3>
                 </button>
                 <button
                   onClick={() => remove.mutate(i.id)}
-                  className="text-muted-foreground transition-colors hover:text-destructive"
+                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-negative-soft hover:text-destructive"
                   aria-label={`Excluir ${i.name}`}
                 >
                   <Trash2 className="size-4" />
                 </button>
               </div>
-              <p className="mt-4 font-mono text-xl font-bold">{brl(i.current_amount)}</p>
+              <p className="stat-figure mt-4">{brl(i.current_amount)}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Aplicado {brl(i.invested_amount)} · estimado {brl(estimated(i))}
               </p>
-              <p
-                className={`mt-2 text-xs font-semibold ${real >= 0 ? "text-positive" : "text-negative"}`}
-              >
-                Resultado real {real >= 0 ? "+" : ""}
-                {brl(real)}
+              <p className="mt-3">
+                <StatusPill
+                  tone={real >= 0 ? "done" : "late"}
+                  icon={real >= 0 ? TrendingUp : TrendingDown}
+                >
+                  Resultado real {real >= 0 ? "+" : ""}
+                  {brl(real)}
+                </StatusPill>
               </p>
             </div>
           );
         })}
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <h2 className="mb-4 font-bold">Metas de investimento e economia</h2>
+      <div className="panel p-6">
+        <h2 className="mb-4 text-base font-bold tracking-tight">
+          Metas de investimento e economia
+        </h2>
         <div className="space-y-5">
           {planGoals.map((g) => {
             const pct = g.target_amount ? (g.current_amount / g.target_amount) * 100 : 0;
             return (
               <div key={g.id}>
                 <div className="mb-2 flex justify-between text-xs">
-                  <span className="font-medium">{g.title}</span>
+                  <span className="font-semibold">{g.title}</span>
                   <span className="font-mono text-muted-foreground">
                     {brl(g.current_amount)} / {brl(g.target_amount)}
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-secondary">
-                  <div className="h-full bg-primary" style={{ width: `${Math.min(100, pct)}%` }} />
+                  <div
+                    className={`h-full rounded-full transition-[width] duration-500 ${
+                      pct >= 100 ? "bg-positive" : "brand-gradient"
+                    }`}
+                    style={{ width: `${Math.min(100, pct)}%` }}
+                  />
                 </div>
               </div>
             );

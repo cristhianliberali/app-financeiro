@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Repeat, Search, Sparkles, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { DEFAULT_CATEGORY_ICON, IconBadge } from "@/lib/icons";
+import { StatusPill } from "@/components/ui/status";
 import { PaginationBar, usePagination } from "@/components/PaginationBar";
 import { TransactionDialog } from "@/components/TransactionDialog";
 import { AiImportDialog } from "@/components/AiImportDialog";
@@ -109,9 +111,9 @@ function TransactionsPage() {
         </div>
       }
     >
-      <h1 className="text-2xl font-bold tracking-tight">Centro de transações</h1>
+      <h1 className="title-xl">Centro de transações</h1>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 md:flex-row md:items-center">
+      <div className="panel flex flex-col gap-3 p-4 md:flex-row md:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -124,37 +126,37 @@ function TransactionsPage() {
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="h-9 rounded-md border border-input bg-card px-3 text-sm md:w-56"
+          className="h-11 rounded-xl border border-input bg-card px-3 text-sm font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25 md:w-56"
         >
           <option value="">Todas as categorias</option>
           {/* Arquivadas continuam aqui: elas ainda têm lançamentos para filtrar. */}
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.emoji} {c.name}
+              {c.name}
               {c.archived_at ? " (arquivada)" : ""}
             </option>
           ))}
         </select>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-card p-5">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="panel state-bar state-done p-5">
           <p className="label-caps">Entradas no filtro</p>
-          <p className="mt-2 font-mono text-xl font-bold text-positive">{brl(totals.income)}</p>
+          <p className="stat-figure mt-2 text-positive">{brl(totals.income)}</p>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-5">
+        <div className="panel state-bar state-late p-5">
           <p className="label-caps">Saídas no filtro</p>
-          <p className="mt-2 font-mono text-xl font-bold text-negative">{brl(totals.expense)}</p>
+          <p className="stat-figure mt-2 text-negative">{brl(totals.expense)}</p>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-5">
+        <div className="panel state-bar state-pending p-5">
           <p className="label-caps">Resultado</p>
-          <p className="mt-2 font-mono text-xl font-bold">{brl(totals.income - totals.expense)}</p>
+          <p className="stat-figure mt-2">{brl(totals.income - totals.expense)}</p>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="panel overflow-hidden">
         <div className="border-b border-border px-6 py-4">
-          <h2 className="font-bold">
+          <h2 className="text-base font-bold tracking-tight">
             {filtered.length} lançamento{filtered.length === 1 ? "" : "s"}
           </h2>
           <p className="text-xs text-muted-foreground">
@@ -166,13 +168,17 @@ function TransactionsPage() {
           {pagination.visible.map((t) => {
             const cat = t.category_id ? catMap[t.category_id] : undefined;
             return (
-              <div key={t.id} className="flex items-center gap-4 px-6 py-3">
-                <span
-                  className="flex size-9 shrink-0 items-center justify-center rounded-lg text-sm"
-                  style={{ backgroundColor: `${cat?.color ?? "#94A3B8"}20` }}
-                >
-                  {cat?.emoji ?? (t.kind === "income" ? "💰" : "💸")}
-                </span>
+              <div
+                key={t.id}
+                className={`state-bar flex items-center gap-4 px-6 py-3 transition-colors hover:bg-accent/40 ${
+                  t.status === "paid" ? "state-done" : "state-pending"
+                }`}
+              >
+                <IconBadge
+                  name={cat?.emoji}
+                  color={cat?.color}
+                  fallback={t.kind === "income" ? "banknote" : DEFAULT_CATEGORY_ICON}
+                />
                 <button
                   className="min-w-0 flex-1 text-left"
                   onClick={() => {
@@ -180,13 +186,15 @@ function TransactionsPage() {
                     setDialog(t.kind);
                   }}
                 >
-                  <p className="truncate text-sm font-medium">
+                  <p
+                    className={`truncate text-sm font-semibold ${t.status === "paid" ? "text-muted-foreground" : ""}`}
+                  >
                     {t.description}
                     {/* O selo só aparece quando o nome não traz a parcela: o padrão
                         "DESCRIÇÃO k/n" já diz isso, e repetir polui a linha. */}
                     {t.installment_total &&
                     !t.description.trim().endsWith(`${t.installment_no}/${t.installment_total}`) ? (
-                      <span className="ml-2 rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px]">
+                      <span className="ml-2 rounded-md bg-secondary px-1.5 py-0.5 font-mono text-[10px] font-semibold">
                         {t.installment_no}/{t.installment_total}
                       </span>
                     ) : null}
@@ -196,11 +204,13 @@ function TransactionsPage() {
                     vence {formatDateBR(t.due_date)}
                   </p>
                 </button>
-                <span className="hidden text-[11px] text-muted-foreground sm:block">
-                  {t.status === "paid" ? "Pago" : "Pendente"}
+                <span className="hidden sm:block">
+                  <StatusPill tone={t.status === "paid" ? "done" : "pending"}>
+                    {t.status === "paid" ? "Pago" : "Pendente"}
+                  </StatusPill>
                 </span>
                 <span
-                  className={`flex items-center gap-1 font-mono text-sm font-semibold ${
+                  className={`flex items-center gap-1 font-mono text-sm font-bold ${
                     t.kind === "income" ? "text-positive" : "text-negative"
                   }`}
                 >
@@ -213,7 +223,7 @@ function TransactionsPage() {
                 </span>
                 <button
                   onClick={() => remove.mutate(t.id)}
-                  className="text-muted-foreground transition-colors hover:text-destructive"
+                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-negative-soft hover:text-destructive"
                   aria-label="Excluir lançamento"
                 >
                   <Trash2 className="size-4" />

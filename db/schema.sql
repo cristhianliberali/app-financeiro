@@ -181,8 +181,11 @@ CREATE TABLE IF NOT EXISTS categories (
   profile_id  uuid NOT NULL REFERENCES budget_profiles(id) ON DELETE CASCADE,
   name        text NOT NULL,
   kind        text NOT NULL DEFAULT 'expense' CHECK (kind IN ('income','expense')),
-  color       text NOT NULL DEFAULT '#3B82F6',
-  emoji       text NOT NULL DEFAULT '💸',
+  color       text NOT NULL DEFAULT '#6366F1',
+  -- Nome do ícone no banco de ícones do app (src/lib/icons.tsx). A coluna
+  -- nasceu guardando emoji e manteve o nome; a leitura converte os emojis
+  -- antigos para o ícone equivalente, então nada precisa ser reescrito aqui.
+  emoji       text NOT NULL DEFAULT 'receipt',
   monthly_cap numeric(14,2),
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
@@ -201,6 +204,11 @@ ALTER TABLE categories ADD COLUMN IF NOT EXISTS description text;
 -- continua aparecendo no que já foi lançado, e a categoria só some das listas
 -- de escolha de lançamento novo.
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS archived_at timestamptz;
+
+-- O padrão da marca da categoria passou de emoji para o nome do ícone. Só o
+-- DEFAULT muda: as linhas já gravadas continuam com o emoji, que a leitura
+-- converte para o ícone equivalente.
+ALTER TABLE categories ALTER COLUMN emoji SET DEFAULT 'receipt';
 
 CREATE TABLE IF NOT EXISTS transactions (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -292,14 +300,19 @@ CREATE TABLE IF NOT EXISTS spaces (
   account_id  uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   name        text NOT NULL,
   description text,
-  icon        text NOT NULL DEFAULT '📁',
-  color       text NOT NULL DEFAULT '#3B82F6',
+  -- Nome do ícone no banco de ícones do app (src/lib/icons.tsx).
+  icon        text NOT NULL DEFAULT 'folder',
+  color       text NOT NULL DEFAULT '#6366F1',
   created_by  uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now(),
   archived_at timestamptz
 );
 CREATE INDEX IF NOT EXISTS spaces_account_idx ON spaces(account_id);
+
+-- Mesmo caso da categoria: o padrão virou nome de ícone, e os espaços que já
+-- existiam seguem com o emoji, traduzido na leitura.
+ALTER TABLE spaces ALTER COLUMN icon SET DEFAULT 'folder';
 
 -- Sem nenhuma linha aqui, o espaço é visível para todos os membros da conta.
 -- Ao adicionar linhas, o acesso passa a ser restrito a quem está na lista.

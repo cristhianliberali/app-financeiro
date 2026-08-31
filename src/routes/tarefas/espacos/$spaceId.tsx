@@ -60,7 +60,7 @@ function SpacePage() {
           {space?.icon ?? "📁"}
         </span>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{space?.name ?? "Espaço"}</h1>
+          <h1 className="title-xl">{space?.name ?? "Espaço"}</h1>
           {space?.description && (
             <p className="text-sm text-muted-foreground">{space.description}</p>
           )}

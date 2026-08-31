@@ -38,7 +38,7 @@ import { ConfirmDeleteDialog } from "@/components/ConfirmDeleteDialog";
 import { UserMultiSelect, UserSelect } from "./UserPicker";
 
 const SELECT_CLASS =
-  "h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus:ring-1 focus:ring-ring";
+  "h-11 w-full rounded-xl border border-input bg-card px-3 text-sm font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25";
 
 export function BoardDialog({
   open,
@@ -207,7 +207,7 @@ export function BoardDialog({
               rows={2}
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full resize-y rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+              className="w-full resize-y rounded-xl border border-input bg-card px-3 py-2 text-sm shadow-xs outline-none transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25"
             />
           </div>
 

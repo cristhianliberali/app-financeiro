@@ -104,7 +104,7 @@ function SpacesPage() {
       }
     >
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Espaços</h1>
+        <h1 className="title-xl">Espaços</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           O espaço é o nível mais alto da organização: agrupa departamentos, áreas ou grandes
           contextos, e cada espaço contém seus próprios quadros.

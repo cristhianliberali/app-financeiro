@@ -40,7 +40,7 @@ export function NotificationBell({ enabled = true }: { enabled?: boolean }) {
         <p className="text-sm font-semibold">Lembretes</p>
 
         {needsPermission && (
-          <div className="mt-2 rounded-lg border border-border bg-secondary/40 p-3">
+          <div className="mt-2 rounded-xl border border-border bg-surface p-3">
             <p className="text-xs text-muted-foreground">
               Ative as notificações do navegador para receber os lembretes das tarefas mesmo com o
               app em outra aba.
@@ -52,7 +52,7 @@ export function NotificationBell({ enabled = true }: { enabled?: boolean }) {
         )}
 
         {permission === "denied" && (
-          <p className="mt-2 rounded-lg border border-border bg-secondary/40 p-3 text-xs text-muted-foreground">
+          <p className="mt-2 rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
             As notificações estão bloqueadas para este site. Libere nas configurações do navegador —
             até lá, os lembretes aparecem aqui e como aviso na tela.
           </p>

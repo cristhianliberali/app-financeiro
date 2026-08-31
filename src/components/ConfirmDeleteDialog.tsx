@@ -92,7 +92,7 @@ export function ConfirmDeleteDialog({
           </p>
 
           {consequences && consequences.length > 0 && (
-            <ul className="space-y-1 rounded-lg border border-border bg-secondary/40 p-3 text-xs text-muted-foreground">
+            <ul className="space-y-1 rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
               {consequences.map((line) => (
                 <li key={line} className="flex gap-2">
                   <span aria-hidden>•</span>

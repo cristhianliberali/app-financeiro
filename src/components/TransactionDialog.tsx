@@ -191,12 +191,12 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
               id="tx-categoria"
               value={form.category_id}
               onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-              className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+              className="h-11 w-full rounded-xl border border-input bg-card px-3 text-sm font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25"
             >
               <option value="">Sem categoria</option>
               {options.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.emoji} {c.name}
+                  {c.name}
                 </option>
               ))}
             </select>
@@ -302,7 +302,7 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
               id="tx-status"
               value={form.status}
               onChange={(e) => setForm({ ...form, status: e.target.value as "paid" | "pending" })}
-              className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+              className="h-11 w-full rounded-xl border border-input bg-card px-3 text-sm font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25"
             >
               <option value="pending">Agendado</option>
               <option value="paid">{kind === "income" ? "Recebido" : "Pago"}</option>
