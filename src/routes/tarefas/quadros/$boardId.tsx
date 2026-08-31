@@ -108,6 +108,20 @@ function BoardPage() {
     return { estimated, tracked: hoursOf(tracked) };
   }, [tasks]);
 
+  // Descrição e dados do quadro numa linha só: são contexto, não o assunto.
+  const subtitle = [
+    board?.description,
+    board?.owner_id
+      ? `Responsável: ${users.find((u) => u.user_id === board.owner_id)?.name ?? "—"}`
+      : "Sem responsável",
+    board?.start_date && `Início ${formatDateTimeBR(board.start_date, false)}`,
+    board?.due_date && `Previsão ${formatDateTimeBR(board.due_date, false)}`,
+    totals.estimated > 0 &&
+      `${formatHours(totals.tracked)} de ${formatHours(totals.estimated)} estimadas`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   function closeTaskDialog() {
     setTaskDialog({ open: false, task: null });
     if (taskParam) {
@@ -137,49 +151,48 @@ function BoardPage() {
         </>
       }
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="title-xl">{board?.name ?? "Quadro"}</h1>
-          {board?.description && (
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{board.description}</p>
-          )}
-          <p className="mt-1 text-xs text-muted-foreground">
-            {board?.owner_id
-              ? `Responsável: ${users.find((u) => u.user_id === board.owner_id)?.name ?? "—"}`
-              : "Sem responsável"}
-            {board?.start_date && ` · Início ${formatDateTimeBR(board.start_date, false)}`}
-            {board?.due_date && ` · Previsão ${formatDateTimeBR(board.due_date, false)}`}
-            {totals.estimated > 0 &&
-              ` · ${formatHours(totals.tracked)} de ${formatHours(totals.estimated)} estimadas`}
+      {/*
+        Título, filtros e seletor de visão numa linha só. Cada faixa a mais
+        aqui em cima é altura que sai da coluna do Kanban.
+      */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+        {/* Piso de largura: abaixo disso o título vira reticência, e aí é melhor
+            os filtros descerem para a linha de baixo. */}
+        <div className="min-w-48 flex-1">
+          <h1 className="title-xl truncate">{board?.name ?? "Quadro"}</h1>
+          <p className="truncate text-xs text-muted-foreground" title={subtitle}>
+            {subtitle}
           </p>
         </div>
-        <div className="flex rounded-lg border border-border p-0.5">
-          {BOARD_VIEWS.map((v) => (
-            <button
-              key={v.value}
-              onClick={() => setView(v.value)}
-              className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
-                view === v.value
-                  ? "bg-secondary font-medium text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {v.label}
-            </button>
-          ))}
+
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {view !== "list" && (
+            <TaskFilterBar
+              value={filters}
+              onChange={setFilters}
+              labels={labels}
+              users={users}
+              shown={tasks.length}
+              total={allTasks.length}
+            />
+          )}
+          <div className="flex rounded-lg border border-border p-0.5">
+            {BOARD_VIEWS.map((v) => (
+              <button
+                key={v.value}
+                onClick={() => setView(v.value)}
+                className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
+                  view === v.value
+                    ? "bg-secondary font-medium text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-
-      {view !== "list" && (
-        <TaskFilterBar
-          value={filters}
-          onChange={setFilters}
-          labels={labels}
-          users={users}
-          shown={tasks.length}
-          total={allTasks.length}
-        />
-      )}
 
       {view === "kanban" && (
         <TaskKanban

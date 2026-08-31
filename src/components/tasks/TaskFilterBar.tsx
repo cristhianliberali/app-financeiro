@@ -8,9 +8,15 @@ import { PRIORITIES } from "@/lib/tasks-analytics";
  * Filtros do Kanban e do calendário.
  *
  * A lista tem os filtros dela, embutidos no cabeçalho da tabela; o Kanban e o
- * calendário não têm onde pendurá-los, então ficam aqui em cima. Quadro e
- * espaço usam a mesma barra — a diferença é que no espaço as tarefas vêm de
- * vários quadros, e aí entra o seletor de quadro.
+ * calendário não têm onde pendurá-los, então ficam ao lado do título da tela.
+ * Ao lado, e não numa linha própria: uma faixa inteira só para três seletores
+ * custava uns sessenta pixels de altura, que no Kanban são a diferença entre
+ * ver a última tarefa da coluna e ter de rolar atrás dela.
+ *
+ * Daí os controles serem baixos e estreitos — eles dividem a linha com o
+ * título, não mandam nela. Quadro e espaço usam a mesma barra; a diferença é
+ * que no espaço as tarefas vêm de vários quadros, e aí entra o seletor de
+ * quadro.
  */
 export type TaskFilterState = {
   term: string;
@@ -52,7 +58,7 @@ export function filterTasks(tasks: Task[], f: TaskFilterState): Task[] {
 }
 
 const SELECT_CLASS =
-  "h-9 rounded-md border border-input bg-card px-2 text-sm outline-none focus:ring-1 focus:ring-ring";
+  "h-9 max-w-44 rounded-lg border border-input bg-card px-2 text-xs outline-none focus:ring-1 focus:ring-ring";
 
 export function TaskFilterBar({
   value,
@@ -77,13 +83,13 @@ export function TaskFilterBar({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="relative min-w-48 flex-1 sm:max-w-72">
+      <div className="relative w-full sm:w-56">
         <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={value.term}
           onChange={(e) => set("term", e.target.value)}
-          placeholder="Pesquisar tarefas ou etiquetas…"
-          className="pl-8"
+          placeholder="Pesquisar tarefas…"
+          className="h-9 rounded-lg pl-8 text-xs"
         />
       </div>
 
@@ -94,7 +100,7 @@ export function TaskFilterBar({
           onChange={(e) => set("boardId", e.target.value)}
           aria-label="Filtrar por quadro"
         >
-          <option value="">Todos os quadros</option>
+          <option value="">Quadro: todos</option>
           {boards.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
@@ -109,7 +115,7 @@ export function TaskFilterBar({
         onChange={(e) => set("priority", e.target.value)}
         aria-label="Filtrar por prioridade"
       >
-        <option value="">Todas as prioridades</option>
+        <option value="">Prioridade: todas</option>
         {PRIORITIES.map((p) => (
           <option key={p.value} value={p.value}>
             {p.label}
@@ -125,7 +131,7 @@ export function TaskFilterBar({
         onChange={(e) => set("responsible", e.target.value)}
         aria-label="Filtrar por responsável"
       >
-        <option value="">Todos os responsáveis</option>
+        <option value="">Responsável: todos</option>
         {users.map((u) => (
           <option key={u.user_id} value={u.user_id}>
             {u.name}
@@ -138,7 +144,7 @@ export function TaskFilterBar({
           onClick={() => onChange(EMPTY_FILTERS)}
           className="inline-flex h-9 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
-          <X className="size-3.5" /> Limpar filtros ({shown}/{total})
+          <X className="size-3.5" /> Limpar ({shown}/{total})
         </button>
       )}
     </div>

@@ -134,6 +134,10 @@ function SpacePage() {
     }
   }
 
+  const subtitle =
+    space?.description ??
+    `Tarefas dos ${boards.length} quadro(s) deste espaço, com os status iguais reunidos numa coluna só.`;
+
   // Mantém o diálogo sincronizado com os dados recarregados.
   const openTask = taskDialog.task
     ? (allTasks.find((t) => t.id === taskDialog.task!.id) ?? taskDialog.task)
@@ -158,38 +162,50 @@ function SpacePage() {
         é de onde se escolhe um — repeti-los aqui em cartões era um índice a
         mais para atravessar antes de chegar no trabalho.
       */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+        <div className="flex min-w-56 flex-1 items-center gap-3">
           <IconBadge
             name={space?.icon}
             color={space?.color}
             size="lg"
             fallback={DEFAULT_SPACE_ICON}
           />
-          <div>
-            <h1 className="title-xl">{space?.name ?? "Espaço"}</h1>
-            <p className="text-sm text-muted-foreground">
-              {space?.description ??
-                `Tarefas dos ${boards.length} quadro(s) deste espaço, com os status iguais reunidos numa coluna só.`}
+          <div className="min-w-0">
+            <h1 className="title-xl truncate">{space?.name ?? "Espaço"}</h1>
+            <p className="truncate text-xs text-muted-foreground" title={subtitle}>
+              {subtitle}
             </p>
           </div>
         </div>
 
         {boards.length > 0 && (
-          <div className="flex rounded-lg border border-border p-0.5">
-            {BOARD_VIEWS.map((v) => (
-              <button
-                key={v.value}
-                onClick={() => setView(v.value)}
-                className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
-                  view === v.value
-                    ? "bg-secondary font-medium text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {v.label}
-              </button>
-            ))}
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {view !== "list" && (
+              <TaskFilterBar
+                value={filters}
+                onChange={setFilters}
+                labels={labels}
+                users={users}
+                boards={boards}
+                shown={tasks.length}
+                total={spaceTasks.length}
+              />
+            )}
+            <div className="flex rounded-lg border border-border p-0.5">
+              {BOARD_VIEWS.map((v) => (
+                <button
+                  key={v.value}
+                  onClick={() => setView(v.value)}
+                  className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
+                    view === v.value
+                      ? "bg-secondary font-medium text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -206,18 +222,6 @@ function SpacePage() {
         </div>
       ) : (
         <>
-          {view !== "list" && (
-            <TaskFilterBar
-              value={filters}
-              onChange={setFilters}
-              labels={labels}
-              users={users}
-              boards={boards}
-              shown={tasks.length}
-              total={spaceTasks.length}
-            />
-          )}
-
           {view === "kanban" && (
             <TaskKanban
               columns={columns}
