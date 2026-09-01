@@ -16,7 +16,12 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AUTH_QUERY_KEY, useAuth } from "@/hooks/useAuth";
 import { MIN_PASSWORD, changePassword } from "@/lib/auth.functions";
-import { useConnectGoogle, useDisconnectGoogle, useGoogleStatus } from "@/lib/google";
+import {
+  useConnectGoogle,
+  useDiagnoseCalendar,
+  useDisconnectGoogle,
+  useGoogleStatus,
+} from "@/lib/google";
 import {
   cancelEmailChange,
   confirmEmailChange,
@@ -68,6 +73,9 @@ export function ProfileDialog({
   const { data: google } = useGoogleStatus();
   const connectGoogle = useConnectGoogle();
   const disconnectGoogle = useDisconnectGoogle();
+  const diagnose = useDiagnoseCalendar();
+  /** Relatório do último diagnóstico, em texto, pronto para copiar. */
+  const [relatorio, setRelatorio] = useState<string | null>(null);
 
   const [name, setName] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -321,17 +329,83 @@ export function ProfileDialog({
                     Última sincronização falhou: {google.lastError}
                   </p>
                 )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={disconnectGoogle.isPending}
-                  onClick={async () => {
-                    await disconnectGoogle.mutateAsync();
-                    toast.success("Google Agenda desconectado");
-                  }}
-                >
-                  Desconectar
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={diagnose.isPending}
+                    onClick={async () => {
+                      setRelatorio(null);
+                      try {
+                        const d = await diagnose.mutateAsync();
+                        setRelatorio(
+                          [
+                            `conectado: ${d.conectado ? d.email : "não"}`,
+                            `agenda: ${d.calendarId ?? "—"}`,
+                            `marcador incremental: ${d.temMarcador ? "sim" : "não"}`,
+                            `última sincronização: ${d.ultimaSync ?? "nunca"}`,
+                            `último erro: ${d.ultimoErro ?? "nenhum"}`,
+                            `vínculos no banco: ${d.vinculos}`,
+                            `eventos lidos: ${d.eventosLidos}`,
+                            `com marca de tarefa: ${d.comMarcaDeTarefa}`,
+                            `com vínculo reconhecido: ${d.comVinculo}`,
+                            ...(d.erro ? [`ERRO NA LEITURA: ${d.erro}`] : []),
+                            "",
+                            ...d.amostra.flatMap((a) => [
+                              `• ${a.titulo}`,
+                              `   google: ${a.googleInicio ?? "—"} → ${a.googleFim ?? "—"} (alterado ${a.googleAlterado ?? "—"})`,
+                              `   tarefa: início ${a.tarefaInicio ?? "—"} · prazo ${a.tarefaPrazo ?? "—"}`,
+                              `   ${a.veredito}`,
+                            ]),
+                          ].join("\n"),
+                        );
+                      } catch (error) {
+                        setRelatorio(
+                          `Falhou ao diagnosticar: ${
+                            error instanceof Error ? error.message : String(error)
+                          }`,
+                        );
+                      }
+                    }}
+                  >
+                    {diagnose.isPending ? "Consultando o Google…" : "Diagnosticar sincronização"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={disconnectGoogle.isPending}
+                    onClick={async () => {
+                      await disconnectGoogle.mutateAsync();
+                      toast.success("Google Agenda desconectado");
+                    }}
+                  >
+                    Desconectar
+                  </Button>
+                </div>
+
+                {/*
+                  O relatório sai como texto de propósito: o caminho dele é ser
+                  copiado e colado para quem for investigar.
+                */}
+                {relatorio && (
+                  <div className="space-y-2">
+                    <pre className="max-h-64 overflow-auto rounded-xl border border-border bg-surface p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
+                      {relatorio}
+                    </pre>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        void navigator.clipboard
+                          .writeText(relatorio)
+                          .then(() => toast.success("Relatório copiado"))
+                          .catch(() => toast.error("Não foi possível copiar"));
+                      }}
+                    >
+                      Copiar relatório
+                    </Button>
+                  </div>
+                )}
               </>
             ) : (
               <>

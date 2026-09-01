@@ -122,6 +122,22 @@ function cenario({ comToken }: { comToken: boolean }) {
 
 const datasGravadas = () => written.find((w) => w.sql.includes("UPDATE tasks SET start_date"));
 
+describe("syncUser", () => {
+  test("lê a agenda antes de enviar, para não duplicar o compromisso órfão", async () => {
+    cenario({ comToken: true });
+    // O compromisso existe na agenda com a nossa marca, mas sem vínculo — é o
+    // que sobra de desconectar e reconectar. Enviando primeiro, a tarefa
+    // ganharia um compromisso novo e a edição desta seria descartada.
+    links = [];
+    googleEvents = [evento("2026-09-11T16:00:00", "2026-09-11T17:00:00", "2026-09-10T09:00:00")];
+
+    const resultado = await googleServer.syncUser(USER);
+
+    expect(resultado.updated).toBe(1);
+    expect(datasGravadas()!.params[2]).toEqual(new Date("2026-09-11T16:00:00"));
+  });
+});
+
 describe("pullCalendarChanges", () => {
   test("compromisso movido no Google grava a data nova na tarefa", async () => {
     cenario({ comToken: true });

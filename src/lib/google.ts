@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { TASKS_QUERY_KEY } from "./tasks";
 import {
+  diagnoseCalendarSync,
   disconnectGoogle,
   fetchAgendaEvents,
   getGoogleStatus,
@@ -53,6 +54,11 @@ export function useDisconnectGoogle() {
       qc.invalidateQueries({ queryKey: ["agenda-events"] });
     },
   });
+}
+
+/** Retrato do que o Google devolve agora — o botão de diagnóstico do perfil. */
+export function useDiagnoseCalendar() {
+  return useMutation({ mutationFn: () => diagnoseCalendarSync() });
 }
 
 /** Botão de sincronizar na hora, sem esperar a rodada automática. */

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireAuth } from "@/integrations/postgres/auth-middleware";
+import type { CalendarDiagnostic } from "@/integrations/postgres/google.server";
 
 export type GoogleStatus = {
   /** O servidor tem credenciais do Google Cloud configuradas? */
@@ -88,6 +89,20 @@ export const syncGoogleNow = createServerFn({ method: "POST" })
       return syncUser(context.user.id);
     },
   );
+
+/**
+ * Diagnóstico da sincronização: o que o Google devolve para esta pessoa agora.
+ *
+ * Só leitura, e sempre completa — ignora o marcador incremental de propósito,
+ * porque o que se quer ver é a agenda como ela está, não o que mudou desde a
+ * última rodada.
+ */
+export const diagnoseCalendarSync = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .handler(async ({ context }): Promise<CalendarDiagnostic> => {
+    const { diagnoseCalendar } = await import("@/integrations/postgres/google.server");
+    return diagnoseCalendar(context.user.id);
+  });
 
 /** Compromissos da agenda numa janela de datas, para o calendário do painel. */
 export const fetchAgendaEvents = createServerFn({ method: "GET" })
