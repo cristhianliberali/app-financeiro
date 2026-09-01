@@ -203,27 +203,49 @@ export function AgendaCalendar({
               variant="outline"
               disabled={sync.isPending || isFetching}
               onClick={async () => {
-                const result = await sync.mutateAsync();
-                if (result.error) {
-                  // O Google recusou: dizer o motivo é melhor do que um
-                  // "sincronizada" que não sincronizou nada.
-                  toast.error(`O Google recusou: ${result.error}`, { duration: 15000 });
-                  return;
+                /*
+                 * O `try` não é zelo: sem ele, uma falha ao falar com o Google
+                 * (token revogado, cota, rede) rejeitava a promessa e o clique
+                 * não produzia aviso nenhum — a tela ficava idêntica, como se o
+                 * botão simplesmente não funcionasse.
+                 */
+                try {
+                  const result = await sync.mutateAsync();
+                  const notas = [
+                    result.pushed > 0 ? `${result.pushed} tarefa(s) enviadas` : null,
+                    result.updated > 0 ? `${result.updated} com as datas atualizadas` : null,
+                    result.cleared > 0 ? `${result.cleared} com as datas limpas` : null,
+                  ].filter(Boolean);
+
+                  if (result.error) {
+                    // O envio falhou, mas a leitura seguiu: contar as duas
+                    // coisas evita concluir que nada aconteceu.
+                    toast.error(`O Google recusou o envio: ${result.error}`, {
+                      duration: 15000,
+                      ...(notas.length > 0
+                        ? { description: `A leitura seguiu: ${notas.join(" · ")}` }
+                        : {}),
+                    });
+                    return;
+                  }
+
+                  toast.success(
+                    notas.length > 0
+                      ? `Agenda sincronizada · ${notas.join(" · ")}`
+                      : // Sem isto, "sincronizada" tanto podia significar "conferi
+                        // e não mudou nada" quanto "não consegui ler nada" — e são
+                        // problemas bem diferentes de investigar.
+                        `Agenda sincronizada · nada mudou desde a última leitura ` +
+                          `(${result.read} compromisso(s) conferido(s))`,
+                  );
+                } catch (error) {
+                  toast.error(
+                    error instanceof Error
+                      ? `Não foi possível sincronizar: ${error.message}`
+                      : "Não foi possível sincronizar com o Google",
+                    { duration: 15000 },
+                  );
                 }
-                const notas = [
-                  result.pushed > 0 ? `${result.pushed} tarefa(s) enviadas` : null,
-                  result.updated > 0 ? `${result.updated} com as datas atualizadas` : null,
-                  result.cleared > 0 ? `${result.cleared} com as datas limpas` : null,
-                ].filter(Boolean);
-                toast.success(
-                  notas.length > 0
-                    ? `Agenda sincronizada · ${notas.join(" · ")}`
-                    : // Sem isto, "sincronizada" tanto podia significar "conferi e
-                      // não mudou nada" quanto "não consegui ler nada" — e são
-                      // problemas bem diferentes de investigar.
-                      `Agenda sincronizada · nada mudou desde a última leitura ` +
-                        `(${result.read} compromisso(s) conferido(s))`,
-                );
               }}
             >
               <RefreshCw className={`mr-1 size-3.5 ${sync.isPending ? "animate-spin" : ""}`} />
