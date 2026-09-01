@@ -9,9 +9,11 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
+    "test": "bun test",
     "typecheck": "tsc --noEmit",
     "db:migrate": "bun run scripts/db-migrate.ts",
     "db:check": "bun run scripts/db-check.ts",
+    "extrair": "bun run scripts/extrair.ts",
     "format": "prettier --write ."
   },
   "overrides": {
