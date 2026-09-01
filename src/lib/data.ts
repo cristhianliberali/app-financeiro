@@ -6,7 +6,10 @@ import {
   fetchInvestments,
   fetchProfiles,
   fetchRecurring,
+  fetchRecurringImpact,
   fetchTransactions,
+  removeRecurring,
+  saveRecurring,
   removeRow,
   upsertRows,
   type DataTableName,
@@ -57,6 +60,8 @@ export type Transaction = {
   installment_total: number | null;
   installment_group: string | null;
   notes: string | null;
+  /** Preenchido quando o lançamento nasceu de uma recorrência. */
+  recurring_rule_id: string | null;
 };
 
 export type RecurringRule = {
@@ -136,6 +141,41 @@ export function useRecurring(profileId: string | null) {
     enabled: !!profileId,
     queryFn: async (): Promise<RecurringRule[]> =>
       (await fetchRecurring({ data: { profileId: profileId! } })) as RecurringRule[],
+  });
+}
+
+/**
+ * Salva a recorrência e cria a série dela.
+ *
+ * Invalida também as transações: a gravação acabou de criar dezenas delas, e a
+ * lista atrás do diálogo estaria mentindo sem isso.
+ */
+export function useSaveRecurring() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof saveRecurring>[0]["data"]) =>
+      saveRecurring({ data: input }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["recurring"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+    },
+  });
+}
+
+/** Quantos lançamentos a regra tem — lido ao abrir a confirmação de exclusão. */
+export function useRecurringImpact() {
+  return useMutation({ mutationFn: (id: string) => fetchRecurringImpact({ data: { id } }) });
+}
+
+export function useRemoveRecurring() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; scope: "all" | "future" | "keep" }) =>
+      removeRecurring({ data: input }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["recurring"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+    },
   });
 }
 

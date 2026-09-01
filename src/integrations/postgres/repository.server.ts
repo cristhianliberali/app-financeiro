@@ -81,7 +81,7 @@ const CATEGORY_COLUMNS =
   `to_char(archived_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS archived_at`;
 const TRANSACTION_COLUMNS =
   "id, profile_id, category_id, description, amount, kind, transaction_date, due_date, status, " +
-  "installment_no, installment_total, installment_group, notes";
+  "installment_no, installment_total, installment_group, notes, recurring_rule_id";
 const RECURRING_COLUMNS =
   "id, profile_id, category_id, description, amount, kind, frequency, day_of_month, start_date, " +
   "end_date, active";
@@ -171,6 +171,19 @@ export async function listTransactions(
   opts: { profileId: string; from?: string; to?: string; basis: "transaction_date" | "due_date" },
 ) {
   await requireProfileAccess(userId, opts.profileId, "viewer");
+
+  /*
+   * O horizonte das recorrências é conferido aqui, na leitura, e não por uma
+   * rotina de fundo: é o que faz a série seguir para a frente sozinha sem o app
+   * precisar de um processo próprio. Quase sempre não há nada a criar, e a
+   * função sai no primeiro SELECT.
+   */
+  const { ensureRecurringMaterialized } = await import("./recurring.server");
+  await ensureRecurringMaterialized(userId, opts.profileId).catch((error) =>
+    // Falhar em completar a série não pode impedir a tela de mostrar o que já
+    // existe — o extrato é mais importante que a projeção.
+    console.error("[recorrência] não foi possível completar a série:", error),
+  );
 
   // `basis` só pode ser uma das duas colunas de data — validado no
   // inputValidator da server function antes de chegar aqui.

@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import { MAX_RECURRING_BACKFILL, occurrencesUntil } from "@/lib/recurring";
+import {
+  MAX_RECURRING_BACKFILL,
+  RECURRING_HORIZON_MONTHS,
+  occurrencesUntil,
+  recurringHorizon,
+} from "@/lib/recurring";
 
 describe("occurrencesUntil", () => {
   test("mensal retroativo lista uma cobrança por mês até hoje", () => {
@@ -88,5 +93,44 @@ describe("occurrencesUntil", () => {
       "2026-09-01",
     );
     expect(dates).toHaveLength(MAX_RECURRING_BACKFILL);
+  });
+});
+
+describe("recurringHorizon", () => {
+  test("alcança dois anos à frente e para no fim do mês", () => {
+    // Fim do mês de propósito: assim o horizonte muda uma vez por mês, e a
+    // rotina que completa a série quase sempre não tem o que fazer.
+    expect(recurringHorizon(new Date("2026-09-15T12:00:00"))).toBe("2028-09-30");
+    expect(recurringHorizon(new Date("2026-01-31T12:00:00"))).toBe("2028-01-31");
+  });
+
+  test("qualquer dia do mesmo mês devolve o mesmo horizonte", () => {
+    const inicio = recurringHorizon(new Date("2026-09-01T12:00:00"));
+    const fim = recurringHorizon(new Date("2026-09-30T12:00:00"));
+    expect(inicio).toBe(fim);
+  });
+
+  test("a série cobre o horizonte inteiro de uma regra mensal", () => {
+    const hoje = new Date("2026-09-15T12:00:00");
+    const dates = occurrencesUntil(
+      { frequency: "monthly", day_of_month: 5, start_date: "2026-09-05" },
+      recurringHorizon(hoje),
+      600,
+    );
+    // Do mês de início até o horizonte: 24 meses à frente, mais o corrente.
+    expect(dates.length).toBe(RECURRING_HORIZON_MONTHS + 1);
+    expect(dates[0]).toBe("2026-09-05");
+    expect(dates[dates.length - 1]).toBe("2028-09-05");
+  });
+
+  test("completar a partir de onde parou não recria o que já existe", () => {
+    // É o que a rotina faz a cada mês: recomeça do `materialized_until`.
+    const jaCriadoAte = "2028-09-30";
+    const dates = occurrencesUntil(
+      { frequency: "monthly", day_of_month: 5, start_date: jaCriadoAte },
+      "2028-10-31",
+      600,
+    );
+    expect(dates).toEqual(["2028-10-05"]);
   });
 });

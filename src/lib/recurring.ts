@@ -27,6 +27,21 @@ export type RecurringSchedule = {
  */
 export const MAX_RECURRING_BACKFILL = 240;
 
+/**
+ * Até onde a série é criada à frente.
+ *
+ * "Para sempre" não existe num banco: o que existe é um horizonte que anda
+ * sozinho. Dois anos cobrem qualquer projeção que as telas mostram, e a data
+ * cai no fim do mês de propósito — assim o horizonte muda uma vez por mês, e
+ * não a cada dia, e a rotina que o completa quase sempre não tem o que fazer.
+ */
+export const RECURRING_HORIZON_MONTHS = 24;
+
+export function recurringHorizon(today: Date = new Date()): string {
+  const end = new Date(today.getFullYear(), today.getMonth() + RECURRING_HORIZON_MONTHS + 1, 0);
+  return toISODate(end);
+}
+
 /** Último dia do mês, para não inventar 31 de fevereiro. */
 function daysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
@@ -39,7 +54,11 @@ function daysInMonth(year: number, month: number): number {
  * cobrança no dia 5 estreia no mês seguinte, não retroage dentro do próprio mês
  * de início.
  */
-export function occurrencesUntil(rule: RecurringSchedule, until: string): string[] {
+export function occurrencesUntil(
+  rule: RecurringSchedule,
+  until: string,
+  max: number = MAX_RECURRING_BACKFILL,
+): string[] {
   const start = parseISODate(rule.start_date);
   const limit = parseISODate(until);
   const end = rule.end_date ? parseISODate(rule.end_date) : null;
@@ -53,7 +72,7 @@ export function occurrencesUntil(rule: RecurringSchedule, until: string): string
   if (rule.frequency === "weekly") {
     for (
       const cursor = new Date(start);
-      cursor <= stop && dates.length < MAX_RECURRING_BACKFILL;
+      cursor <= stop && dates.length < max;
       cursor.setDate(cursor.getDate() + 7)
     ) {
       dates.push(toISODate(cursor));
@@ -62,7 +81,7 @@ export function occurrencesUntil(rule: RecurringSchedule, until: string): string
   }
 
   if (rule.frequency === "yearly") {
-    for (let year = start.getFullYear(); dates.length < MAX_RECURRING_BACKFILL; year = year + 1) {
+    for (let year = start.getFullYear(); dates.length < max; year = year + 1) {
       const day = Math.min(start.getDate(), daysInMonth(year, start.getMonth()));
       const occurrence = new Date(year, start.getMonth(), day);
       if (occurrence > stop) break;
@@ -75,7 +94,7 @@ export function occurrencesUntil(rule: RecurringSchedule, until: string): string
   const wanted = Math.min(31, Math.max(1, Math.trunc(rule.day_of_month) || 1));
   for (
     let cursor = new Date(start.getFullYear(), start.getMonth(), 1);
-    dates.length < MAX_RECURRING_BACKFILL;
+    dates.length < max;
     cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)
   ) {
     const day = Math.min(wanted, daysInMonth(cursor.getFullYear(), cursor.getMonth()));
