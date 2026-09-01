@@ -125,3 +125,40 @@ describe("extração para a tela — sem IA nenhuma", () => {
     expect(doArquivo.transacoes).toEqual(doTexto.transacoes);
   });
 });
+
+describe("extração para a tela — extrato bancário em PDF/texto", () => {
+  test("com marcas D/C o sinal é do banco, e crédito não vira estorno", async () => {
+    const extracao = await extrair(
+      [
+        "EXTRATO DE CONTA CORRENTE",
+        "Período: 05/07 a 04/08",
+        "VENCIMENTO 11/08/2026",
+        "10/07/2026  PIX RECEBIDO JOAO      1.234,56 C",
+        "11/07/2026  BOLETO ENERGIA          200,00 D",
+        "12/07/2026  COMPRA CARTAO SUPERM     89,90 D",
+      ].join("\n"),
+    );
+
+    expect(extracao.transacoes).toHaveLength(3);
+    expect(extracao.transacoes[0]).toMatchObject({ valor: 1234.56, kind: "income" });
+    expect(extracao.transacoes[1]).toMatchObject({ valor: 200, kind: "expense" });
+    expect(extracao.transacoes[2]).toMatchObject({ valor: 89.9, kind: "expense" });
+    // Extrato não anuncia estorno: crédito ali é só crédito.
+    expect(extracao.transacoes.every((t) => !t.estorno)).toBe(true);
+  });
+
+  test("no OFX o crédito também não carrega a marca de estorno", async () => {
+    const ofx = [
+      "OFXHEADER:100",
+      "<OFX><BANKTRANLIST><DTSTART>20260105</DTSTART><DTEND>20260204</DTEND>",
+      "<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20260110<TRNAMT>-45.00",
+      "<NAME>PADARIA CENTRAL</STMTTRN>",
+      "<STMTTRN><TRNTYPE>CREDIT<DTPOSTED>20260115<TRNAMT>1200.00",
+      "<NAME>SALARIO</STMTTRN>",
+      "</BANKTRANLIST></OFX>",
+    ].join("\n");
+    const extracao = await extrair(ofx);
+
+    expect(extracao.transacoes.every((t) => !t.estorno)).toBe(true);
+  });
+});

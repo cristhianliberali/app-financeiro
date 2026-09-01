@@ -396,3 +396,37 @@ describe("camada 2 — período com rótulos e datas por extenso", () => {
     );
   });
 });
+
+describe("camada 2 — extrato bancário com letras D/C", () => {
+  test("a letra marca o sinal: D é débito, C é crédito", () => {
+    expect(valoresDaLinha("10/07  PIX RECEBIDO JOAO   1.234,56 C", "br")).toEqual([1234.56]);
+    expect(valoresDaLinha("11/07  BOLETO ENERGIA        200,00 D", "br")).toEqual([-200]);
+    // "D" de "DE" ou de palavra qualquer não é marcador de débito.
+    expect(valoresDaLinha("11/07  TAXA 200,00 DEBITADA EM CONTA", "br")).toEqual([200]);
+  });
+
+  test("o documento marcado com D/C é reconhecido; a fatura comum, não", async () => {
+    const { usaMarcadorDC } = await import("@/integrations/ai/pipeline/typing");
+
+    const extrato = await tiparTexto(
+      [
+        "EXTRATO DE CONTA CORRENTE",
+        "Período: 05/07 a 04/08",
+        "10/07/2026  PIX RECEBIDO JOAO      1.234,56 C",
+        "11/07/2026  BOLETO ENERGIA          200,00 D",
+        "12/07/2026  COMPRA CARTAO SUPERM     89,90 D",
+      ].join("\n"),
+    );
+    expect(usaMarcadorDC(extrato)).toBe(true);
+
+    const fatura = await tiparTexto(await Bun.file("test/fixtures/fatura-sicoob.txt").text());
+    expect(usaMarcadorDC(fatura)).toBe(false);
+  });
+
+  test("período numérico sem ano é resolvido contra o fechamento", () => {
+    const periodo = detectarPeriodo(["VENCIMENTO 11/08/2026", "Período: 05/07 a 04/08"], HOJE);
+    expect(periodo.inicio).toBe("2026-07-05");
+    expect(periodo.fim).toBe("2026-08-04");
+    expect(periodo.vencimento).toBe("2026-08-11");
+  });
+});

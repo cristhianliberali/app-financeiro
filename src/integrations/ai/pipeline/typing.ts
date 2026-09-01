@@ -210,6 +210,11 @@ function sinalNegativo(bruto: string): boolean {
   return /^[-(]/.test(texto) || /[-)]$/.test(texto);
 }
 
+/** A letra de débito dos extratos: "D" isolada logo após o valor. */
+const MARCADOR_DEBITO = /^\s{0,3}D(?![\wÀ-ÿ.])/;
+/** Valor seguido de "D" ou "C" isolados — a marca de sentido dos extratos. */
+const VALOR_COM_LETRA = /\d[.,]\d{2}\s{0,3}[DC](?![\wÀ-ÿ.])/;
+
 /**
  * Valores monetários da linha, com sinal, na ordem em que aparecem.
  *
@@ -226,13 +231,15 @@ export function valoresDaLinha(texto: string, convencao: ConvencaoNumerica): num
     const depois = texto.slice(fim);
 
     // O sinal pode estar dentro do trecho casado ("R$ -29,90"), antes dele
-    // ("-R$ 29,90", "(29,90"), ou logo depois, como em "29,90-".
+    // ("-R$ 29,90", "(29,90"), logo depois ("29,90-") — ou na letra com que
+    // extrato bancário marca o sentido: "1.234,56 D" é débito, "C" é crédito.
     const bruto = encontro[0];
     const negativo =
       bruto.slice(0, bruto.search(/\d/)).includes("-") ||
       /-\s*(?:R\$\s*)?$/.test(antes) ||
       /\(\s*(?:R\$\s*)?$/.test(antes) ||
-      /^\s*[-)]/.test(depois);
+      /^\s*[-)]/.test(depois) ||
+      MARCADOR_DEBITO.test(depois);
 
     const valor = lerValor(bruto, convencao);
     if (valor === null) continue;
@@ -467,6 +474,26 @@ export function detectarPeriodo(textos: readonly string[], hoje: Date): PeriodoR
       fim = completas[completas.length - 1]!;
       break;
     }
+    // "Período: 05/07 a 04/08" — o intervalo numérico sem ano, resolvido
+    // contra o fechamento como qualquer data de lançamento.
+    const numerica = /(\d{1,2})[/.](\d{1,2})\s+A[TÉE]*\s+(\d{1,2})[/.](\d{1,2})(?![\d/])/i.exec(
+      texto,
+    );
+    if (numerica) {
+      const [, diaInicio, mesInicio, diaFim, mesFim] = numerica.map(Number) as unknown as [
+        number,
+        number,
+        number,
+        number,
+        number,
+      ];
+      if (valida(diaInicio, mesInicio) && valida(diaFim, mesFim)) {
+        inicio = iso(resolverAno(mesInicio, fechamento), mesInicio, diaInicio);
+        fim = iso(resolverAno(mesFim, fechamento), mesFim, diaFim);
+        break;
+      }
+    }
+
     const extensa = REFERENCIA_EXTENSA.exec(texto);
     if (extensa) {
       const [, diaInicio, mesInicio, diaFim, mesFim] = extensa as unknown as [
@@ -987,4 +1014,23 @@ export function paresDeEstorno(documento: DocumentoTipado): Array<[LinhaTipada, 
   }
 
   return pares;
+}
+
+/**
+ * O documento marca o sentido dos valores com letra, como extrato bancário
+ * ("1.234,56 D" / "1.234,56 C")? Quando marca, o sinal é do banco — débito é
+ * gasto, crédito é entrada — e a leitura de fatura (negativo = estorno) não se
+ * aplica. Exige recorrência: uma letra solta num rodapé não muda a semântica
+ * do documento inteiro.
+ */
+export function usaMarcadorDC(documento: DocumentoTipado): boolean {
+  const entradas = lancamentos(documento);
+  if (entradas.length === 0) return false;
+  const completas = (linha: LinhaTipada): string =>
+    [
+      linha.texto,
+      ...linha.absorve.map((id) => documento.linhas.find((l) => l.id === id)?.texto ?? ""),
+    ].join(" ");
+  const marcadas = entradas.filter((linha) => VALOR_COM_LETRA.test(completas(linha))).length;
+  return marcadas >= 2 && marcadas >= entradas.length * 0.3;
 }

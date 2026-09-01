@@ -244,6 +244,17 @@ Da fatura real de referência (7 páginas, layout Sicoob 2026):
     dívida futura são declarações, não somas das linhas; só rótulos de TOTAL
     (fora desses contextos) entram no veredito da conferência.
 
+14. **Extrato marca sentido com letra** — "1.234,56 D" / "1.234,56 C". Quando
+    o documento usa as letras com recorrência, o sinal é do banco (débito é
+    gasto) e a leitura de fatura (negativo = estorno) não se aplica.
+15. **Período numérico sem ano** — "Período: 05/07 a 04/08", resolvido contra o
+    fechamento como qualquer data de lançamento.
+
+Para testar a fatura de um banco novo: `bun run extrair caminho/arquivo.pdf`
+imprime no terminal exatamente o que a tela mostraria — transações, conferência
+e linhas não interpretadas. O que sair errado vira fixture anonimizada e
+correção genérica, nunca código de banco.
+
 Da fatura sintética original:
 
 1. Separadores invertidos — `R$ 6,598.58` em documento brasileiro

@@ -13,7 +13,14 @@
 import { extractText as converterLegado, MAX_FILE_BYTES } from "../extract.server";
 import { canonizar, type OrigemLinha } from "./canonical.server";
 import { reconciliar, type ViaDeFechamento } from "./reconcile";
-import { lancamentos, tipar, TipoLinha, type ConvencaoNumerica, type Parcela } from "./typing";
+import {
+  lancamentos,
+  tipar,
+  TipoLinha,
+  usaMarcadorDC,
+  type ConvencaoNumerica,
+  type Parcela,
+} from "./typing";
 
 export type ArquivoEnviado = {
   name: string;
@@ -99,14 +106,16 @@ function bytesDe(input: { text?: string; file?: ArquivoEnviado }): {
 }
 
 /**
- * Sentido do valor, sem adivinhação de semântica além do que a origem garante.
+ * Sentido do valor, sem adivinhação de semântica além do que o documento
+ * garante.
  *
- * No OFX o sinal é do banco: `TRNAMT` negativo é débito, positivo é crédito.
- * Nos demais documentos vale a convenção de fatura: valor positivo é gasto, e o
+ * Em extrato o sinal é do banco — débito é gasto, crédito é entrada. É o caso
+ * do OFX (`TRNAMT` negativo) e do PDF que marca os valores com letra
+ * ("1.234,56 D"). Nos demais vale a convenção de fatura: positivo é gasto, e o
  * negativo é estorno ou crédito. A tela deixa corrigir o que fugir disso.
  */
-function sentidoDe(valor: number, origem: OrigemLinha): "income" | "expense" {
-  if (origem === "ofx") return valor < 0 ? "expense" : "income";
+function sentidoDe(valor: number, semanticaBancaria: boolean): "income" | "expense" {
+  if (semanticaBancaria) return valor < 0 ? "expense" : "income";
   return valor < 0 ? "income" : "expense";
 }
 
@@ -143,6 +152,10 @@ export async function extrairParaTela(
   const rotuloDoGrupo = (grupo: number | null): string | null =>
     grupo === null ? null : (porId.get(grupo)?.texto.trim() ?? null);
 
+  // Extrato tem semântica de banco; fatura, de fatura. E extrato não anuncia
+  // estorno: todo crédito ali é só crédito, então a marca fica de fora.
+  const semanticaBancaria = canonico.origem === "ofx" || usaMarcadorDC(tipado);
+
   const temTotais = relatorio.totais.some((fechamento) => fechamento.total.conferivel);
   // "Fora dos totais" só é sinal quando o documento enumera as linhas em
   // subtotais por bloco e sobra pouca coisa. Quando a maioria ficaria órfã, o
@@ -165,8 +178,8 @@ export async function extrairParaTela(
       linhaId: linha.id,
       descricao: linha.descricao,
       valor: Math.abs(linha.valor),
-      kind: sentidoDe(linha.valor, canonico.origem),
-      estorno: linha.estorno,
+      kind: sentidoDe(linha.valor, semanticaBancaria),
+      estorno: semanticaBancaria ? false : linha.estorno,
       dataIso: linha.dataIso,
       dataRaw: linha.dataRaw,
       parcela: linha.parcela,
