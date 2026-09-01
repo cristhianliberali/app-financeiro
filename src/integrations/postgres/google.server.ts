@@ -417,6 +417,12 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
   };
 
   let page;
+  /**
+   * Leitura incremental: o Google devolve só o que mudou desde o marcador, e
+   * portanto tudo o que vem nela mudou de verdade. A completa devolve a janela
+   * inteira, mudada ou não — e é só lá que é preciso separar uma da outra.
+   */
+  let incremental = !!connection.sync_token;
   try {
     page = await listEvents(accessToken, connection.calendar_id, {
       syncToken: connection.sync_token ?? undefined,
@@ -426,6 +432,7 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
     if (error instanceof SyncTokenExpiredError) {
       // Marcador vencido: o Google manda recomeçar sem ele.
       page = await listEvents(accessToken, connection.calendar_id, janela());
+      incremental = false;
     } else {
       const message = error instanceof Error ? error.message : String(error);
       await markError(userId, message);
@@ -471,19 +478,39 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
      * carrega a marca herdada da original.
      */
     if (!link) continue;
+
     /*
-     * E só o compromisso que mudou depois da nossa última escrita nele.
+     * Na leitura completa, e só nela, também é preciso descartar o que é velho:
+     * a janela inteira volta, inclusive o evento que ficou para trás porque o
+     * Google recusou a nossa última atualização, e ele desfaria a data mais
+     * nova que está na tarefa.
      *
-     * Sem esta comparação, uma releitura completa (marcador vencido) traria de
-     * volta a agenda inteira da janela — inclusive o evento que ficou para trás
-     * porque o Google recusou a nossa última atualização — e ele desfaria a
-     * data mais nova que está na tarefa. Com ela, o que é velho é ignorado.
+     * Na incremental esta comparação seria um tiro no pé. `synced_at` vem do
+     * relógio do Postgres e `updated` vem do relógio do Google: com o servidor
+     * alguns minutos adiantado, toda edição feita logo depois de uma escrita
+     * nossa seria engolida em silêncio. Ali o Google já garantiu que o evento
+     * mudou, e o eco da nossa própria escrita quem barra é a comparação de
+     * datas dentro de `applyEventDates`.
      */
-    const modificadoNoGoogle = event.updated ? new Date(event.updated) : null;
-    if (modificadoNoGoogle && modificadoNoGoogle <= link.syncedAt) continue;
+    if (!incremental) {
+      const modificadoNoGoogle = event.updated ? new Date(event.updated) : null;
+      if (modificadoNoGoogle && modificadoNoGoogle <= link.syncedAt) continue;
+    }
 
     if (await applyEventDates(link.taskId, userId, event)) updated += 1;
   }
+
+  /*
+   * Uma linha por rodada, com o que a leitura de fato viu. É pouco barulho (uma
+   * a cada dez minutos por pessoa) e é o que responde, quando alguém diz que a
+   * agenda não está chegando, se a rodada rodou, quantos compromissos ela
+   * conferiu e quantos deles o app reconhece como espelho de uma tarefa.
+   */
+  console.info(
+    `[agenda] usuário ${userId}: leitura ${incremental ? "incremental" : "completa"} — ` +
+      `${page.events.length} evento(s) lido(s), ${linkByEvent.size} vinculado(s) a tarefas, ` +
+      `${updated} data(s) atualizada(s), ${cleared} limpa(s)`,
+  );
 
   // O erro registrado pela escrita não é apagado aqui: ler a agenda com
   // sucesso não desfaz um evento que o Google recusou a criar. Quem limpa é a

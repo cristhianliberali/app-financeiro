@@ -218,7 +218,11 @@ export function AgendaCalendar({
                 toast.success(
                   notas.length > 0
                     ? `Agenda sincronizada · ${notas.join(" · ")}`
-                    : "Agenda sincronizada",
+                    : // Sem isto, "sincronizada" tanto podia significar "conferi e
+                      // não mudou nada" quanto "não consegui ler nada" — e são
+                      // problemas bem diferentes de investigar.
+                      `Agenda sincronizada · nada mudou desde a última leitura ` +
+                        `(${result.read} compromisso(s) conferido(s))`,
                 );
               }}
             >
