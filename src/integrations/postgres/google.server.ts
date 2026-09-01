@@ -456,8 +456,12 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
     });
   }
 
+  /** Tarefas que já têm um compromisso vivo — trava contra adotar uma cópia. */
+  const tarefasComVinculo = new Set([...linkByEvent.values()].map((link) => link.taskId));
+
   let cleared = 0;
   let updated = 0;
+  let adotados = 0;
   for (const event of page.events) {
     const link = linkByEvent.get(event.id);
 
@@ -472,12 +476,35 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
     }
 
     /*
-     * Mudança de data só vem do compromisso que o app reconhece como espelho de
-     * uma tarefa. Um evento qualquer da agenda — uma reunião, uma cópia que
-     * alguém duplicou — não tem por que mexer em tarefa nenhuma, mesmo quando
-     * carrega a marca herdada da original.
+     * Compromisso nosso que perdeu o vínculo no banco.
+     *
+     * Isso acontece de verdade: desconectar a conta apaga os vínculos e deixa
+     * os compromissos na agenda, então quem desconecta e reconecta fica com
+     * eventos órfãos que o app criou e não reconhece mais. Ignorá-los deixaria
+     * a sincronização calada para sempre justamente nos compromissos mais
+     * antigos — os que a pessoa mais mexe.
+     *
+     * A marca `auraTaskId` só é escrita por nós, então ela basta para readotar.
+     * A trava é uma só: se a tarefa já tem outro compromisso vivo, esta é uma
+     * cópia que alguém duplicou, e duas cópias brigando pela mesma tarefa é
+     * pior do que uma ignorada.
      */
-    if (!link) continue;
+    if (!link) {
+      const marcada = taskIdOf(event);
+      if (!marcada || tarefasComVinculo.has(marcada)) continue;
+
+      await query(
+        `INSERT INTO task_calendar_events (task_id, user_id, event_id, calendar_id)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (task_id, user_id)
+         DO UPDATE SET event_id = EXCLUDED.event_id, synced_at = now()`,
+        [marcada, userId, event.id, connection.calendar_id],
+      );
+      tarefasComVinculo.add(marcada);
+      adotados += 1;
+      if (await applyEventDates(marcada, userId, event)) updated += 1;
+      continue;
+    }
 
     /*
      * Na leitura completa, e só nela, também é preciso descartar o que é velho:
@@ -509,7 +536,7 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
   console.info(
     `[agenda] usuário ${userId}: leitura ${incremental ? "incremental" : "completa"} — ` +
       `${page.events.length} evento(s) lido(s), ${linkByEvent.size} vinculado(s) a tarefas, ` +
-      `${updated} data(s) atualizada(s), ${cleared} limpa(s)`,
+      `${adotados} readotado(s), ${updated} data(s) atualizada(s), ${cleared} limpa(s)`,
   );
 
   // O erro registrado pela escrita não é apagado aqui: ler a agenda com
