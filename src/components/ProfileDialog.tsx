@@ -311,8 +311,9 @@ export function ProfileDialog({
                   )}
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  As tarefas em que você é responsável viram compromissos na sua agenda. Apagar o
-                  compromisso lá limpa as datas da tarefa aqui — a tarefa em si não é excluída.
+                  As tarefas em que você é responsável viram compromissos na sua agenda, e o que
+                  você mexe lá volta para cá: mover ou esticar o compromisso atualiza as datas da
+                  tarefa, e apagá-lo limpa essas datas — a tarefa em si nunca é excluída.
                 </p>
                 {google.lastError && (
                   <p className="flex items-start gap-2 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-xs">

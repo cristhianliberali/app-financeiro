@@ -85,6 +85,13 @@ const ACTIVITY_TEXT: Record<string, string> = {
   task_archived: "arquivou a tarefa",
   priority_changed: "alterou a prioridade",
   reminder_created: "agendou um lembrete",
+  // Escritas pela sincronização com o Google Agenda. Aparecem aqui porque é
+  // nesta lista que se descobre depois por que uma data mudou sozinha.
+  calendar_event_created: "criou o compromisso na agenda",
+  calendar_event_updated: "atualizou o compromisso na agenda",
+  calendar_event_deleted: "removeu o compromisso da agenda",
+  calendar_dates_updated: "atualizou as datas pelo Google Agenda",
+  calendar_dates_cleared: "limpou as datas (compromisso apagado na agenda)",
 };
 
 function StatusSelect({

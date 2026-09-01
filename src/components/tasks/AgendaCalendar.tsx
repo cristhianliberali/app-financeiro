@@ -212,6 +212,7 @@ export function AgendaCalendar({
                 }
                 const notas = [
                   result.pushed > 0 ? `${result.pushed} tarefa(s) enviadas` : null,
+                  result.updated > 0 ? `${result.updated} com as datas atualizadas` : null,
                   result.cleared > 0 ? `${result.cleared} com as datas limpas` : null,
                 ].filter(Boolean);
                 toast.success(
