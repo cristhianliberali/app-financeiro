@@ -29,10 +29,10 @@ async function runRound(): Promise<void> {
     for (const userId of users) {
       try {
         const result = await syncUser(userId);
-        if (result.cleared > 0) {
+        if (result.cleared > 0 || result.updated > 0) {
           console.info(
-            `[agenda] usuário ${userId}: ${result.cleared} compromisso(s) apagado(s) na agenda ` +
-              `limparam as datas da tarefa`,
+            `[agenda] usuário ${userId}: ${result.updated} compromisso(s) movido(s) na agenda ` +
+              `atualizaram as datas da tarefa, ${result.cleared} apagado(s) as limparam`,
           );
         }
       } catch (error) {

@@ -29,6 +29,8 @@ export type CalendarEvent = {
   summary?: string;
   description?: string;
   htmlLink?: string;
+  /** Quando o Google registrou a última alteração do evento (ISO). */
+  updated?: string;
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
   extendedProperties?: { private?: Record<string, string> };

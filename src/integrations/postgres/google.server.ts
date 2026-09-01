@@ -9,8 +9,9 @@
  * Nos dois sentidos, mas não simétricos, porque as pontas não são iguais:
  *
  *   app → agenda: criar, editar e excluir a tarefa mexem no evento;
- *   agenda → app: apagar o compromisso limpa as datas da tarefa, sem apagá-la.
- *     A tarefa é o registro de trabalho; a agenda é só onde ele aparece no dia.
+ *   agenda → app: mover ou esticar o compromisso atualiza as datas da tarefa, e
+ *     apagá-lo limpa essas datas — sem apagar a tarefa. A tarefa é o registro
+ *     de trabalho; a agenda é só onde ele aparece no dia.
  *
  * Toda mudança feita por aqui fica na trilha da tarefa (`task_activity`), que é
  * onde se descobre depois por que uma data sumiu.
@@ -29,6 +30,7 @@ import {
   updateEvent,
   type CalendarEvent,
 } from "../google/calendar.server";
+import { taskDatesFromEvent, windowFromTask } from "../google/event-dates";
 
 export type GoogleConnection = {
   user_id: string;
@@ -41,9 +43,6 @@ export type GoogleConnection = {
   last_sync_at: Date | null;
   last_error: string | null;
 };
-
-/** Duração padrão de um compromisso quando a tarefa tem só uma data. */
-const DEFAULT_EVENT_MINUTES = 60;
 
 // ───────────────────────────── conexão ──────────────────────────────────
 
@@ -176,19 +175,16 @@ async function logCalendar(
   ).catch((error) => console.error("[agenda] não foi possível registrar a atividade:", error));
 }
 
-/** Janela do compromisso a partir das datas da tarefa. */
+/**
+ * Janela do compromisso a partir das datas da tarefa.
+ *
+ * A conta em si mora em `event-dates.ts`, junto da conversão inversa: as duas
+ * pontas da sincronização precisam concordar sobre o que "uma tarefa só com
+ * prazo" vira na agenda, senão cada leitura desfaz a escrita anterior.
+ */
 function windowOf(task: TaskRow): { start: string; end: string } | null {
-  const start = task.start_date ?? task.due_date;
-  if (!start) return null;
-
-  const startAt = new Date(start);
-  const endCandidate = task.due_date ? new Date(task.due_date) : null;
-  const endAt =
-    endCandidate && endCandidate.getTime() > startAt.getTime()
-      ? endCandidate
-      : new Date(startAt.getTime() + DEFAULT_EVENT_MINUTES * 60_000);
-
-  return { start: startAt.toISOString(), end: endAt.toISOString() };
+  const window = windowFromTask(task);
+  return window ? { start: window.start.toISOString(), end: window.end.toISOString() } : null;
 }
 
 async function loadTask(taskId: string): Promise<TaskRow | null> {
@@ -326,6 +322,8 @@ export async function linksOfTask(taskId: string): Promise<LinkRow[]> {
 
 // ─────────────────────────── agenda → app ───────────────────────────────
 
+type TaskDatesRow = { start_date: Date | null; due_date: Date | null };
+
 /** Compromisso apagado na agenda: a tarefa perde as datas, mas continua. */
 async function clearTaskDates(taskId: string, userId: string, eventId: string): Promise<void> {
   const cleared = await queryOne<{ id: string }>(
@@ -343,6 +341,46 @@ async function clearTaskDates(taskId: string, userId: string, eventId: string): 
   }
 }
 
+/**
+ * Compromisso movido ou esticado na agenda: a tarefa segue as datas novas.
+ *
+ * A gravação é direta no banco, e não pelo `saveTask` do módulo de tarefas, de
+ * propósito: `saveTask` dispara a escrita de volta na agenda, e escrever de
+ * volta o que a agenda acabou de mandar é uma volta inteira de rede para não
+ * mudar nada — além de gastar cota do Google a cada sincronização.
+ */
+async function applyEventDates(
+  taskId: string,
+  userId: string,
+  event: CalendarEvent,
+): Promise<boolean> {
+  const task = await queryOne<TaskDatesRow>(
+    `SELECT start_date, due_date FROM tasks WHERE id = $1`,
+    [taskId],
+  );
+  if (!task) return false;
+
+  const next = taskDatesFromEvent(task, event);
+  // `null` aqui é o caso comum: o evento lido é o espelho do que o app escreveu.
+  if (!next) return false;
+
+  await query(`UPDATE tasks SET start_date = $2, due_date = $3 WHERE id = $1`, [
+    taskId,
+    next.start_date,
+    next.due_date,
+  ]);
+  await query(
+    `UPDATE task_calendar_events SET synced_at = now() WHERE task_id = $1 AND user_id = $2`,
+    [taskId, userId],
+  );
+  await logCalendar(taskId, userId, "calendar_dates_updated", {
+    event_id: event.id,
+    start_date: next.start_date?.toISOString() ?? null,
+    due_date: next.due_date?.toISOString() ?? null,
+  });
+  return true;
+}
+
 function taskIdOf(event: CalendarEvent): string | undefined {
   return event.extendedProperties?.private?.[TASK_ID_PROPERTY];
 }
@@ -350,6 +388,8 @@ function taskIdOf(event: CalendarEvent): string | undefined {
 export type SyncResult = {
   /** Compromissos apagados na agenda que limparam datas de tarefas. */
   cleared: number;
+  /** Compromissos movidos ou esticados na agenda que atualizaram datas de tarefas. */
+  updated: number;
   /** Eventos lidos nesta rodada. */
   read: number;
   /** Tarefas que ainda não tinham compromisso e foram para a agenda agora. */
@@ -365,7 +405,7 @@ export type SyncResult = {
  */
 export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
   const connection = await getConnection(userId);
-  if (!connection) return { cleared: 0, read: 0, pushed: 0 };
+  if (!connection) return { cleared: 0, updated: 0, read: 0, pushed: 0 };
 
   const accessToken = await accessTokenFor(connection);
   const janela = () => {
@@ -393,19 +433,56 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
     }
   }
 
+  /*
+   * Os vínculos de uma vez só, e não um SELECT por evento: a leitura completa
+   * (primeira sincronização, ou marcador vencido) traz a agenda inteira da
+   * janela, e uma consulta por compromisso viraria centenas por rodada.
+   */
+  const linkByEvent = new Map<string, { taskId: string; syncedAt: Date }>();
+  for (const link of await query<{ task_id: string; event_id: string; synced_at: Date }>(
+    `SELECT task_id, event_id, synced_at FROM task_calendar_events WHERE user_id = $1`,
+    [userId],
+  )) {
+    linkByEvent.set(link.event_id, {
+      taskId: link.task_id,
+      syncedAt: new Date(link.synced_at),
+    });
+  }
+
   let cleared = 0;
+  let updated = 0;
   for (const event of page.events) {
-    if (event.status !== "cancelled") continue;
+    const link = linkByEvent.get(event.id);
 
-    const link = await queryOne<{ task_id: string }>(
-      `SELECT task_id FROM task_calendar_events WHERE event_id = $1 AND user_id = $2`,
-      [event.id, userId],
-    );
-    const taskId = link?.task_id ?? taskIdOf(event);
-    if (!taskId) continue;
+    if (event.status === "cancelled") {
+      // Apagado: vale também o evento que carrega a marca da tarefa sem vínculo
+      // no banco — é como uma exclusão feita antes de o vínculo existir chega.
+      const taskId = link?.taskId ?? taskIdOf(event);
+      if (!taskId) continue;
+      await clearTaskDates(taskId, userId, event.id);
+      cleared += 1;
+      continue;
+    }
 
-    await clearTaskDates(taskId, userId, event.id);
-    cleared += 1;
+    /*
+     * Mudança de data só vem do compromisso que o app reconhece como espelho de
+     * uma tarefa. Um evento qualquer da agenda — uma reunião, uma cópia que
+     * alguém duplicou — não tem por que mexer em tarefa nenhuma, mesmo quando
+     * carrega a marca herdada da original.
+     */
+    if (!link) continue;
+    /*
+     * E só o compromisso que mudou depois da nossa última escrita nele.
+     *
+     * Sem esta comparação, uma releitura completa (marcador vencido) traria de
+     * volta a agenda inteira da janela — inclusive o evento que ficou para trás
+     * porque o Google recusou a nossa última atualização — e ele desfaria a
+     * data mais nova que está na tarefa. Com ela, o que é velho é ignorado.
+     */
+    const modificadoNoGoogle = event.updated ? new Date(event.updated) : null;
+    if (modificadoNoGoogle && modificadoNoGoogle <= link.syncedAt) continue;
+
+    if (await applyEventDates(link.taskId, userId, event)) updated += 1;
   }
 
   // O erro registrado pela escrita não é apagado aqui: ler a agenda com
@@ -416,7 +493,7 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
     [userId, page.nextSyncToken ?? connection.sync_token],
   );
 
-  return { cleared, read: page.events.length, pushed: 0 };
+  return { cleared, updated, read: page.events.length, pushed: 0 };
 }
 
 /** Compromissos da agenda numa janela, para o calendário do painel. */

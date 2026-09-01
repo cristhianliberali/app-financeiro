@@ -129,14 +129,19 @@ Ao conectar a conta, as tarefas com prazo que já existiam sobem para a agenda
 rodada de sincronização recolhe o que tiver ficado para trás.
 
 - Tarefa criada, editada ou excluída → compromisso criado, editado ou excluído;
-- Compromisso apagado na agenda → a tarefa perde as datas, mas **não** é
+- Compromisso **movido ou esticado** na agenda → as datas da tarefa acompanham.
+  A tarefa que só tinha prazo continua só com prazo enquanto o compromisso
+  mantiver a duração padrão de uma hora — arrastar no dia muda o prazo, não
+  inventa um início; esticar é que a transforma num intervalo de verdade;
+- Compromisso **apagado** na agenda → a tarefa perde as datas, mas **não** é
   excluída: a tarefa é o registro do trabalho, a agenda é onde ele aparece no
   dia. Tudo isso fica na trilha de atividade da tarefa;
 - Os eventos vão para a **agenda principal** de cada pessoa (`primary`) — o app
   não cria nem exige uma agenda separada;
 - Sincronização automática a cada 10 minutos (`GOOGLE_SYNC_INTERVALO_MINUTOS`),
   com leitura incremental para caber na cota, e um botão de sincronizar na hora
-  no calendário do painel.
+  no calendário do painel. É polling, não webhook: uma mudança feita no Google
+  aparece aqui na rodada seguinte, ou na hora se a pessoa pedir a sincronização.
 
 No painel de Projetos e Tarefas há três abas:
 
