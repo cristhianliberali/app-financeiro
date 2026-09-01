@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -30,10 +31,13 @@ import { useAppState } from "@/lib/app-state";
 import { activeCategories, useCategories, useUpsert } from "@/lib/data";
 import {
   ACCEPTED_UPLOAD,
+  categorizeDocument,
   extractDocument,
+  learnMerchantLabels,
   type ExtracaoParaTela,
   type TransacaoExtraida,
 } from "@/lib/document-import.functions";
+import { getImportConfig } from "@/lib/ai-import.functions";
 import { brl, formatDateBR } from "@/lib/format";
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void };
@@ -44,6 +48,8 @@ type Draft = TransacaoExtraida & {
   category_id: string;
   /** Data editável; nasce da `dataIso` que o parser resolveu. */
   data: string;
+  /** Categoria sugerida na etapa de IA, com a confiança devolvida. */
+  ia: { confianca: number; origem: "cache" | "ia" } | null;
 };
 
 const ORIGEM_LABEL: Record<ExtracaoParaTela["origem"], string> = {
@@ -78,7 +84,16 @@ export function DocumentImportDialog({ open, onOpenChange }: Props) {
   const categories = useMemo(() => activeCategories(allCategories), [allCategories]);
   const upsert = useUpsert("transactions");
   const extract = useServerFn(extractDocument);
+  const categorize = useServerFn(categorizeDocument);
+  const learn = useServerFn(learnMerchantLabels);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  // A extração não depende de IA; só o botão de categorizar precisa dela.
+  const { data: config } = useQuery({
+    queryKey: ["ai-import-config"],
+    queryFn: () => getImportConfig(),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -87,6 +102,7 @@ export function DocumentImportDialog({ open, onOpenChange }: Props) {
   const [rows, setRows] = useState<Draft[]>([]);
   /** Vencimento único do documento, aplicado a todas as linhas ao lançar. */
   const [vencimento, setVencimento] = useState("");
+  const [categorizando, setCategorizando] = useState(false);
   const [showTotais, setShowTotais] = useState(false);
   const [showNaoInterpretadas, setShowNaoInterpretadas] = useState(false);
 
@@ -97,6 +113,7 @@ export function DocumentImportDialog({ open, onOpenChange }: Props) {
     setExtracao(null);
     setRows([]);
     setVencimento("");
+    setCategorizando(false);
     setShowTotais(false);
     setShowNaoInterpretadas(false);
   }, [open]);
@@ -120,6 +137,7 @@ export function DocumentImportDialog({ open, onOpenChange }: Props) {
           include: true,
           category_id: "",
           data: t.dataIso ?? "",
+          ia: null,
         })),
       );
       if (resultado.transacoes.length === 0) {
@@ -143,6 +161,52 @@ export function DocumentImportDialog({ open, onOpenChange }: Props) {
 
   function patch(linhaId: number, values: Partial<Draft>) {
     setRows((prev) => prev.map((r) => (r.linhaId === linhaId ? { ...r, ...values } : r)));
+  }
+
+  /**
+   * Etapa 2: envia só os descritores numerados — a OpenAI recebe as categorias
+   * disponíveis e devolve decisões (`id:codigo,confiança`). Nada do arquivo
+   * sai daqui, e escolha manual já feita não é sobrescrita.
+   */
+  async function categorizar() {
+    if (!profileId) return;
+    const itens = rows
+      .filter((r) => r.descricao.trim() !== "")
+      .map((r) => ({ linhaId: r.linhaId, descricao: r.descricao, valor: r.valor, kind: r.kind }));
+    if (itens.length === 0) {
+      toast.error("Nenhuma transação com descrição para categorizar");
+      return;
+    }
+    setCategorizando(true);
+    try {
+      const resposta = await categorize({ data: { profileId, itens } });
+      const porLinha = new Map(resposta.decisoes.map((decisao) => [decisao.linhaId, decisao]));
+
+      const novas = rows.map((r) => {
+        const decisao = porLinha.get(r.linhaId);
+        if (!decisao?.categoryId) return r;
+        // Escolha manual já feita não é sobrescrita; sugestão anterior da IA, sim.
+        if (r.category_id !== "" && r.ia === null) return r;
+        return {
+          ...r,
+          category_id: decisao.categoryId,
+          ia: { confianca: decisao.confianca, origem: decisao.origem },
+        };
+      });
+      const aplicadas = novas.filter((r, i) => r !== rows[i]).length;
+      setRows(novas);
+
+      const semCategoria = itens.length - resposta.decisoes.filter((d) => d.categoryId).length;
+      toast.success(
+        `${aplicadas} transações categorizadas` +
+          (resposta.doCache > 0 ? ` · ${resposta.doCache} do cache, sem custo` : "") +
+          (semCategoria > 0 ? ` · ${semCategoria} para escolher à mão` : ""),
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao categorizar com IA");
+    } finally {
+      setCategorizando(false);
+    }
   }
 
   async function commit() {
@@ -177,6 +241,16 @@ export function DocumentImportDialog({ open, onOpenChange }: Props) {
         installment_group: r.parcela ? crypto.randomUUID() : null,
       })),
     );
+    // Cada confirmação vira rótulo: o cache de merchants aprende com a escolha
+    // da pessoa, e a próxima fatura chega categorizada sem custo. Falha aqui
+    // não atrapalha o lançamento — é aprendizado, não requisito.
+    const rotulos = selected.flatMap((r) => {
+      const categoria = categories.find((c) => c.id === r.category_id)?.name;
+      return categoria ? [{ descricao: r.descricao, categoria }] : [];
+    });
+    if (rotulos.length > 0 && profileId) {
+      learn({ data: { profileId, rotulos } }).catch(() => {});
+    }
     toast.success(`${selected.length} transações lançadas`);
     onOpenChange(false);
   }
@@ -487,6 +561,23 @@ export function DocumentImportDialog({ open, onOpenChange }: Props) {
                             no documento: {r.dataRaw}
                           </span>
                         )}
+                        {r.ia && r.category_id !== "" && (
+                          <span
+                            className={`flex items-center gap-1 rounded px-1.5 py-0.5 ${
+                              r.ia.confianca < 0.8 ? "bg-negative/10 text-negative" : "bg-secondary"
+                            }`}
+                            title={
+                              r.ia.origem === "cache"
+                                ? "Categoria lembrada de importações anteriores"
+                                : `Categoria sugerida pela IA (confiança ${Math.round(r.ia.confianca * 100)}%)`
+                            }
+                          >
+                            <Sparkles className="size-3" />
+                            {r.ia.origem === "cache"
+                              ? "memória"
+                              : `${Math.round(r.ia.confianca * 100)}%`}
+                          </span>
+                        )}
                         {r.avisos.includes("orfao") && (
                           <span
                             className="flex items-center gap-1 text-negative"
@@ -515,7 +606,7 @@ export function DocumentImportDialog({ open, onOpenChange }: Props) {
                     <select
                       className="col-span-3 h-8 rounded-md border border-input bg-card px-2 text-xs"
                       value={r.category_id}
-                      onChange={(e) => patch(r.linhaId, { category_id: e.target.value })}
+                      onChange={(e) => patch(r.linhaId, { category_id: e.target.value, ia: null })}
                     >
                       <option value="">Sem categoria</option>
                       {categories
@@ -572,10 +663,16 @@ export function DocumentImportDialog({ open, onOpenChange }: Props) {
             <>
               <Button
                 variant="outline"
-                disabled
-                title="Próxima etapa: envia só as descrições numeradas e as categorias para a IA decidir. Em breve."
+                onClick={categorizar}
+                disabled={categorizando || loading || config?.enabled === false}
+                title={
+                  config?.enabled === false
+                    ? "Configure PROVEDOR_IA, MODELO_IA e OPENAI_API_KEY no servidor para ativar."
+                    : "Envia só as descrições numeradas e as categorias disponíveis; o arquivo nunca sai do servidor."
+                }
               >
-                <Sparkles className="size-4" /> Categorizar com IA
+                <Sparkles className="size-4" />
+                {categorizando ? "Categorizando…" : "Categorizar com IA"}
               </Button>
               <Button onClick={commit} disabled={upsert.isPending || loading}>
                 Lançar selecionadas

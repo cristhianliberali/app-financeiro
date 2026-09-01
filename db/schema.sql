@@ -695,3 +695,18 @@ BEGIN
   RETURN removed;
 END;
 $fn$;
+
+-- ─────────────────────── cache de merchants (importação) ────────────────────
+
+-- Descritor cru de fatura -> nome de categoria. Global, e não por usuário:
+-- "MERCADOLIVRE*", "APPLE.COM/BILL" e "DM *Spotify" valem para a base inteira,
+-- e é este cache que faz a categorização por IA custar cada vez menos — só
+-- descritor inédito vira requisição. Rótulo confirmado por pessoa
+-- (origem = 'usuario') nunca é sobrescrito por palpite de modelo.
+CREATE TABLE IF NOT EXISTS merchant_labels (
+  chave      text PRIMARY KEY,
+  categoria  text NOT NULL,
+  confianca  numeric(4,3) NOT NULL DEFAULT 1,
+  origem     text NOT NULL DEFAULT 'ia' CHECK (origem IN ('ia','usuario')),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);

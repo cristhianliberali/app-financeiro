@@ -29,9 +29,22 @@ A importação no app acontece em duas etapas, e a primeira não usa IA nenhuma:
    documento, agrupadas por portador/seção, a conferência de cada total
    declarado, e as linhas não interpretadas. O usuário confere, ajusta e pode
    lançar direto, com categoria manual.
-2. **Categorizar com IA** (botão no rodapé; próxima entrega) — só então a
-   camada 3 entra: as descrições numeradas e as categorias disponíveis vão para
-   o modelo, que devolve `id:categoria,confiança`. O arquivo nunca é enviado.
+2. **Categorizar com IA** (botão no rodapé) — só então a IA entra
+   (`categorize.server.ts`): as descrições numeradas e as categorias
+   disponíveis vão para o modelo, que devolve `id:codigo,confiança`. O arquivo
+   nunca é enviado. Gasto e entrada rodam separados, cada um só com as
+   categorias do próprio tipo — uma compra não tem como receber categoria de
+   receita, porque o código dela nem está no enum daquela rodada. O contrato de
+   contagem da camada 3 vale igual: id sem decisão volta sozinho, id inventado
+   é descartado, e a categorização não termina incompleta.
+
+   O cache de merchants mora na tabela `merchant_labels` (global, chave no
+   descritor cru, rótulo no **nome** da categoria — id é por perfil, nome viaja
+   entre perfis). Merchant conhecido nem vira requisição, cada decisão nova do
+   modelo alimenta o cache, e **cada lançamento confirmado pelo usuário grava
+   rótulo com peso de gente**, que a IA não sobrescreve. Requer
+   `bun run db:migrate` para criar a tabela, e `MODELO_IA`/`OPENAI_API_KEY` no
+   ambiente — sem elas o botão fica desativado e a etapa 1 segue funcionando.
 
 O diálogo antigo (`AiImportDialog`, que manda o texto inteiro para o modelo
 transcrever) continua no repositório para comparação, mas a tela de transações
