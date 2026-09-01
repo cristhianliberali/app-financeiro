@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Repeat, Search, Sparkles, Trash2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, FileScan, Repeat, Search, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { DEFAULT_CATEGORY_ICON, IconBadge } from "@/lib/icons";
 import { StatusPill } from "@/components/ui/status";
 import { PaginationBar, usePagination } from "@/components/PaginationBar";
 import { TransactionDialog } from "@/components/TransactionDialog";
-import { AiImportDialog } from "@/components/AiImportDialog";
+// A importação nova lê o documento por código e deixa a IA só para a
+// categorização; o diálogo antigo (AiImportDialog) fica guardado para comparação.
+import { DocumentImportDialog } from "@/components/DocumentImportDialog";
 import { RecurringDialog } from "@/components/RecurringDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,7 +89,7 @@ function TransactionsPage() {
             <Repeat /> Recorrentes
           </Button>
           <Button size="sm" variant="outline" onClick={() => setAiOpen(true)}>
-            <Sparkles /> Importar com IA
+            <FileScan /> Importar fatura
           </Button>
           <Button
             size="sm"
@@ -246,7 +248,7 @@ function TransactionsPage() {
         kind={dialog ?? "expense"}
         editing={editing}
       />
-      <AiImportDialog open={aiOpen} onOpenChange={setAiOpen} />
+      <DocumentImportDialog open={aiOpen} onOpenChange={setAiOpen} />
       <RecurringDialog open={recurringOpen} onOpenChange={setRecurringOpen} />
     </AppShell>
   );

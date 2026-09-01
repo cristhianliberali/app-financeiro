@@ -20,6 +20,23 @@ pipeline.server.ts    as cinco camadas em ordem
 Rodar a suíte: `bun test`. Nenhum teste chama API de LLM — a camada 3 recebe um
 cliente falso pela interface `LlmClient`.
 
+## O fluxo na tela: duas etapas
+
+A importação no app acontece em duas etapas, e a primeira não usa IA nenhuma:
+
+1. **Ler documento** — `extracao.server.ts` roda as camadas 1, 2 e 4 e a tela
+   (`DocumentImportDialog`) mostra tudo de uma vez: as transações na ordem do
+   documento, agrupadas por portador/seção, a conferência de cada total
+   declarado, e as linhas não interpretadas. O usuário confere, ajusta e pode
+   lançar direto, com categoria manual.
+2. **Categorizar com IA** (botão no rodapé; próxima entrega) — só então a
+   camada 3 entra: as descrições numeradas e as categorias disponíveis vão para
+   o modelo, que devolve `id:categoria,confiança`. O arquivo nunca é enviado.
+
+O diálogo antigo (`AiImportDialog`, que manda o texto inteiro para o modelo
+transcrever) continua no repositório para comparação, mas a tela de transações
+abre o novo.
+
 ## Princípio
 
 **O modelo de linguagem nunca carrega o dado. Ele só decide sobre o dado.**
