@@ -32,6 +32,19 @@ export const Route = createFileRoute("/transacoes")({
   component: TransactionsPage,
 });
 
+const SELECT_CLASS =
+  "h-11 rounded-xl border border-input bg-card px-3 text-sm font-medium shadow-xs outline-none " +
+  "transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25";
+
+/** Os três recortes por natureza do lançamento. */
+const KIND_FILTERS = [
+  { value: "", label: "Entradas e saídas" },
+  { value: "income", label: "Só entradas" },
+  { value: "expense", label: "Só saídas" },
+] as const;
+
+type KindFilter = (typeof KIND_FILTERS)[number]["value"];
+
 function TransactionsPage() {
   const { profileId, from, to, dateBasis } = useAppState();
   const { data: transactions = [] } = useTransactions({
@@ -47,6 +60,7 @@ function TransactionsPage() {
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [recurringOpen, setRecurringOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [kindFilter, setKindFilter] = useState<KindFilter>("");
   const [categoryFilter, setCategoryFilter] = useState("");
 
   const catMap = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c])), [categories]);
@@ -55,6 +69,7 @@ function TransactionsPage() {
     const q = query.trim().toLowerCase();
     const numeric = Number(q.replace(",", "."));
     return transactions.filter((t) => {
+      if (kindFilter && t.kind !== kindFilter) return false;
       if (categoryFilter && t.category_id !== categoryFilter) return false;
       if (!q) return true;
       if (t.description.toLowerCase().includes(q)) return true;
@@ -62,7 +77,7 @@ function TransactionsPage() {
         return true;
       return false;
     });
-  }, [transactions, query, categoryFilter]);
+  }, [transactions, query, kindFilter, categoryFilter]);
 
   // A paginação é do que sobrou dos filtros: os totais acima continuam somando
   // o período inteiro, não só a página exibida.
@@ -124,19 +139,48 @@ function TransactionsPage() {
             className="pl-9"
           />
         </div>
+        {/*
+          Entrada ou saída, antes da categoria: é o corte mais grosso e o mais
+          usado — "quanto saiu neste mês" não pede categoria nenhuma.
+        */}
+        <select
+          value={kindFilter}
+          onChange={(e) => {
+            const next = e.target.value as KindFilter;
+            setKindFilter(next);
+            // Categoria pertence a um tipo só. Manter uma de despesa escolhida
+            // com "só entradas" esvaziaria a lista sem dizer por quê.
+            if (next && categoryFilter && catMap[categoryFilter]?.kind !== next) {
+              setCategoryFilter("");
+            }
+          }}
+          className={`${SELECT_CLASS} md:w-44`}
+          aria-label="Filtrar por entrada ou saída"
+        >
+          {KIND_FILTERS.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="h-11 rounded-xl border border-input bg-card px-3 text-sm font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25 md:w-56"
+          className={`${SELECT_CLASS} md:w-56`}
+          aria-label="Filtrar por categoria"
         >
           <option value="">Todas as categorias</option>
-          {/* Arquivadas continuam aqui: elas ainda têm lançamentos para filtrar. */}
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-              {c.archived_at ? " (arquivada)" : ""}
-            </option>
-          ))}
+          {/* Arquivadas continuam aqui: elas ainda têm lançamentos para filtrar.
+              Com um tipo escolhido, só as daquele tipo — as outras não teriam o
+              que filtrar. */}
+          {categories
+            .filter((c) => !kindFilter || c.kind === kindFilter)
+            .map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+                {c.archived_at ? " (arquivada)" : ""}
+              </option>
+            ))}
         </select>
       </div>
 
