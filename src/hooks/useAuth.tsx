@@ -9,6 +9,7 @@ import {
   signUp as signUpFn,
   type AuthedUser,
 } from "@/lib/auth.functions";
+import { forgetStartRoute } from "@/lib/start-route";
 
 export type { AuthedUser };
 
@@ -56,6 +57,9 @@ export function useAuth() {
 
   const signOut = useCallback(async () => {
     await signOutFn();
+    // O próximo login precisa voltar a abrir na tela preferida — inclusive o
+    // da mesma pessoa, na mesma aba.
+    forgetStartRoute();
     qc.setQueryData(AUTH_QUERY_KEY, null);
     qc.clear();
   }, [qc]);

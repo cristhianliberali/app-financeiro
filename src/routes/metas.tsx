@@ -110,7 +110,7 @@ function GoalsPage() {
                 return (
                   <div
                     key={g.id}
-                    className={`panel-interactive state-bar p-4 ${
+                    className={`panel state-bar p-4 ${
                       g.done || pct >= 100 ? "state-done" : "state-pending"
                     }`}
                   >

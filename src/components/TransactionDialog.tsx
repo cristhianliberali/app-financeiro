@@ -95,9 +95,15 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
       toast.error("Informe descrição e valor");
       return;
     }
+    // Sem categoria o lançamento não aparece em teto, gráfico nem comparação de
+    // mês: ele viraria um valor solto no extrato. O servidor recusa igual.
+    if (!form.category_id) {
+      toast.error("Escolha uma categoria para o lançamento");
+      return;
+    }
     const base = {
       profile_id: profileId,
-      category_id: form.category_id || null,
+      category_id: form.category_id,
       kind,
       status: form.status,
       notes: form.notes || null,
@@ -193,13 +199,19 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
               onChange={(e) => setForm({ ...form, category_id: e.target.value })}
               className="h-11 w-full rounded-xl border border-input bg-card px-3 text-sm font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25"
             >
-              <option value="">Sem categoria</option>
+              <option value="">Escolha uma categoria…</option>
               {options.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
             </select>
+            {options.length === 0 && (
+              <p className="text-[11px] text-negative">
+                Nenhuma categoria de {kind === "income" ? "receita" : "despesa"} ativa. Crie uma em
+                Categorias antes de lançar.
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="tx-data">Data da transação</Label>
@@ -322,7 +334,7 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={save} disabled={upsert.isPending}>
+          <Button onClick={save} disabled={upsert.isPending || !form.category_id}>
             Salvar
           </Button>
         </DialogFooter>

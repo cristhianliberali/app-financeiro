@@ -394,7 +394,14 @@
   box-shadow: var(--elevation-sm);
 }
 
-/** Cartão que responde ao mouse — usado em listas de itens clicáveis. */
+/**
+ * Cartão que responde ao mouse — brilho e um fio de movimento no hover.
+ *
+ * Só vale no elemento que é ele mesmo clicável (um `<a>`, um `<button>`, ou um
+ * cartão inteiro com `onClick`). Cartão de relatório, indicador e qualquer
+ * bloco que só *contenha* botões usam `panel`: prometer clique onde não há
+ * clique manda o mouse ao lugar errado.
+ */
 @utility panel-interactive {
   background-color: var(--color-card);
   border: 1px solid var(--color-border);

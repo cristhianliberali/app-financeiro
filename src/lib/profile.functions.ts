@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireAuth, type AuthedUser } from "@/integrations/postgres/auth-middleware";
 import { MIN_PASSWORD } from "./auth.functions";
 import { siteUrl } from "./site-url";
+import { isStartRoute, type StartRoute } from "./start-route";
 
 function requireText(value: unknown, field: string): string {
   if (typeof value !== "string" || !value.trim()) throw new Error(`Informe ${field}`);
@@ -23,7 +24,36 @@ export const updateProfileName = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<AuthedUser> => {
     const { updateUserName } = await import("@/integrations/postgres/profile.server");
     const user = await updateUserName(context.user.id, data.name || null);
-    return { id: user.id, email: user.email, name: user.full_name };
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.full_name,
+      startRoute: user.start_route,
+    };
+  });
+
+/**
+ * Salva a tela de abertura.
+ *
+ * A validação é aqui, no servidor, e não só no `<select>`: o caminho vira
+ * destino de navegação assim que a pessoa abre o app, e ele precisa vir da
+ * lista fechada, não de quem chama a função.
+ */
+export const updateStartRoute = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((input: { startRoute: string }): { startRoute: StartRoute } => {
+    if (!isStartRoute(input?.startRoute)) throw new Error("Tela de inicialização inválida");
+    return { startRoute: input.startRoute };
+  })
+  .handler(async ({ data, context }): Promise<AuthedUser> => {
+    const { updateStartRoute: run } = await import("@/integrations/postgres/profile.server");
+    const user = await run(context.user.id, data.startRoute);
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.full_name,
+      startRoute: user.start_route,
+    };
   });
 
 /** Envia o código de confirmação para o endereço novo. */
@@ -41,7 +71,12 @@ export const confirmEmailChange = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<AuthedUser> => {
     const { confirmEmailChange: run } = await import("@/integrations/postgres/profile.server");
     const user = await run(context.user.id, data.code);
-    return { id: user.id, email: user.email, name: user.full_name };
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.full_name,
+      startRoute: user.start_route,
+    };
   });
 
 export const cancelEmailChange = createServerFn({ method: "POST" })

@@ -158,7 +158,7 @@ function InvestmentsPage() {
           return (
             <div
               key={i.id}
-              className={`panel-interactive state-bar p-6 ${real >= 0 ? "state-done" : "state-late"}`}
+              className={`panel state-bar p-6 ${real >= 0 ? "state-done" : "state-late"}`}
             >
               <div className="flex items-start justify-between">
                 <button

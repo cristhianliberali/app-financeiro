@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CategoriasRouteImport } from './routes/categorias'
 import { Route as ContaRouteImport } from './routes/conta'
 import { Route as ConviteRouteImport } from './routes/convite'
+import { Route as ImportarRouteImport } from './routes/importar'
 import { Route as InvestimentosRouteImport } from './routes/investimentos'
 import { Route as MetasRouteImport } from './routes/metas'
 import { Route as PendentesRouteImport } from './routes/pendentes'
@@ -53,6 +54,11 @@ const ContaRoute = ContaRouteImport.update({
 const ConviteRoute = ConviteRouteImport.update({
   id: '/convite',
   path: '/convite',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImportarRoute = ImportarRouteImport.update({
+  id: '/importar',
+  path: '/importar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InvestimentosRoute = InvestimentosRouteImport.update({
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/categorias': typeof CategoriasRoute
   '/conta': typeof ContaRoute
   '/convite': typeof ConviteRoute
+  '/importar': typeof ImportarRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
   '/pendentes': typeof PendentesRoute
@@ -159,6 +166,7 @@ export interface FileRoutesByTo {
   '/categorias': typeof CategoriasRoute
   '/conta': typeof ContaRoute
   '/convite': typeof ConviteRoute
+  '/importar': typeof ImportarRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
   '/pendentes': typeof PendentesRoute
@@ -182,6 +190,7 @@ export interface FileRoutesById {
   '/categorias': typeof CategoriasRoute
   '/conta': typeof ContaRoute
   '/convite': typeof ConviteRoute
+  '/importar': typeof ImportarRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
   '/pendentes': typeof PendentesRoute
@@ -206,6 +215,7 @@ export interface FileRouteTypes {
     | '/categorias'
     | '/conta'
     | '/convite'
+    | '/importar'
     | '/investimentos'
     | '/metas'
     | '/pendentes'
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | '/categorias'
     | '/conta'
     | '/convite'
+    | '/importar'
     | '/investimentos'
     | '/metas'
     | '/pendentes'
@@ -250,6 +261,7 @@ export interface FileRouteTypes {
     | '/categorias'
     | '/conta'
     | '/convite'
+    | '/importar'
     | '/investimentos'
     | '/metas'
     | '/pendentes'
@@ -273,6 +285,7 @@ export interface RootRouteChildren {
   CategoriasRoute: typeof CategoriasRoute
   ContaRoute: typeof ContaRoute
   ConviteRoute: typeof ConviteRoute
+  ImportarRoute: typeof ImportarRoute
   InvestimentosRoute: typeof InvestimentosRoute
   MetasRoute: typeof MetasRoute
   PendentesRoute: typeof PendentesRoute
@@ -325,6 +338,13 @@ declare module '@tanstack/react-router' {
       path: '/convite'
       fullPath: '/convite'
       preLoaderRoute: typeof ConviteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/importar': {
+      id: '/importar'
+      path: '/importar'
+      fullPath: '/importar'
+      preLoaderRoute: typeof ImportarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/investimentos': {
@@ -441,6 +461,7 @@ const rootRouteChildren: RootRouteChildren = {
   CategoriasRoute: CategoriasRoute,
   ContaRoute: ContaRoute,
   ConviteRoute: ConviteRoute,
+  ImportarRoute: ImportarRoute,
   InvestimentosRoute: InvestimentosRoute,
   MetasRoute: MetasRoute,
   PendentesRoute: PendentesRoute,

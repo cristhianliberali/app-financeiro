@@ -18,6 +18,7 @@ import { TransactionDialog } from "@/components/TransactionDialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/date-field";
 import { StatusPill } from "@/components/ui/status";
 import {
   AlertDialog,
@@ -63,6 +64,20 @@ const DUE_FILTERS = [
 
 type DueFilter = (typeof DUE_FILTERS)[number]["value"];
 
+/**
+ * Qual das duas datas do lançamento o intervalo recorta.
+ *
+ * As duas respondem perguntas diferentes: "o que comprei em março e ainda não
+ * paguei" olha a data da transação; "o que vence nesta quinzena" olha o
+ * vencimento. Sem a escolha, metade das perguntas ficaria sem filtro.
+ */
+const DATE_FIELDS = [
+  { value: "due_date", label: "Data de vencimento" },
+  { value: "transaction_date", label: "Data da transação" },
+] as const;
+
+type DateFieldName = (typeof DATE_FIELDS)[number]["value"];
+
 const TONE: Record<PendingState, "late" | "due" | "pending"> = {
   overdue: "late",
   today: "due",
@@ -92,6 +107,9 @@ function PendingPage() {
   const [term, setTerm] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [due, setDue] = useState<DueFilter>("all");
+  const [dateField, setDateField] = useState<DateFieldName>("due_date");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState<Transaction[] | null>(null);
   const [editing, setEditing] = useState<Transaction | null>(null);
@@ -120,6 +138,9 @@ function PendingPage() {
         .filter((t) => t.status === "pending")
         .filter((t) => !categoryId || t.category_id === categoryId)
         .filter((t) => !needle || t.description.toLowerCase().includes(needle))
+        // Intervalo aberto dos dois lados: preencher só o início já vale.
+        .filter((t) => !start || t[dateField] >= start)
+        .filter((t) => !end || t[dateField] <= end)
         .filter((t) => {
           if (due === "overdue") return t.due_date < today;
           if (due === "today") return t.due_date === today;
@@ -128,7 +149,10 @@ function PendingPage() {
         // O mais urgente primeiro: é a ordem em que se resolve a lista.
         .sort((a, b) => a.due_date.localeCompare(b.due_date))
     );
-  }, [all, categoryId, term, due, today]);
+  }, [all, categoryId, term, due, today, dateField, start, end]);
+
+  /** Intervalo de cabeça para baixo: a lista fica vazia e é preciso dizer por quê. */
+  const invertedRange = !!start && !!end && start > end;
 
   const income = pending.filter((t) => t.kind === "income");
   const expense = pending.filter((t) => t.kind === "expense");
@@ -419,6 +443,79 @@ function PendingPage() {
             </option>
           ))}
         </select>
+      </div>
+
+      {/*
+        Recorte por data, numa linha própria: qual das duas datas contar e o
+        intervalo. Fica separado dos filtros de texto porque é a pergunta que
+        muda o significado da lista, não só o tamanho dela.
+      */}
+      <div className="panel flex flex-col gap-3 p-4 md:flex-row md:flex-wrap md:items-end">
+        <div className="space-y-1.5 md:w-56">
+          <label htmlFor="pendentes-tipo-data" className="label-caps block">
+            Tipo de data
+          </label>
+          <select
+            id="pendentes-tipo-data"
+            value={dateField}
+            onChange={(e) => setDateField(e.target.value as DateFieldName)}
+            className={`${SELECT_CLASS} w-full`}
+          >
+            {DATE_FIELDS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1.5 md:w-44">
+          <label htmlFor="pendentes-inicio" className="label-caps block">
+            Início
+          </label>
+          <DateField
+            id="pendentes-inicio"
+            type="date"
+            value={start}
+            onChange={(e) => setStart(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5 md:w-44">
+          <label htmlFor="pendentes-termino" className="label-caps block">
+            Término
+          </label>
+          <DateField
+            id="pendentes-termino"
+            type="date"
+            value={end}
+            onChange={(e) => setEnd(e.target.value)}
+          />
+        </div>
+        {(start || end) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="md:mb-1"
+            onClick={() => {
+              setStart("");
+              setEnd("");
+            }}
+          >
+            <X /> Limpar intervalo
+          </Button>
+        )}
+        <p
+          className={`text-[11px] md:ml-auto md:mb-2.5 ${
+            invertedRange ? "text-negative" : "text-muted-foreground"
+          }`}
+        >
+          {invertedRange
+            ? "O término é anterior ao início — nada cabe neste intervalo."
+            : start || end
+              ? `Mostrando por ${DATE_FIELDS.find((f) => f.value === dateField)!.label.toLowerCase()}${
+                  start ? ` de ${formatDateBR(start)}` : ""
+                }${end ? ` até ${formatDateBR(end)}` : ""}.`
+              : "Sem intervalo, a lista traz toda a pendência em aberto."}
+        </p>
       </div>
 
       {/*

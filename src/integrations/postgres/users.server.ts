@@ -8,6 +8,8 @@ export type UserRow = {
   id: string;
   email: string;
   full_name: string | null;
+  /** Tela em que o app abre para esta pessoa; nulo = o padrão do app. */
+  start_route: string | null;
 };
 
 type UserWithSecret = UserRow & { password_hash: string };
@@ -18,13 +20,16 @@ export function normalizeEmail(email: string): string {
 
 export async function findUserByEmail(email: string): Promise<UserWithSecret | null> {
   return queryOne<UserWithSecret>(
-    `SELECT id, email, full_name, password_hash FROM app_users WHERE email = $1`,
+    `SELECT id, email, full_name, start_route, password_hash FROM app_users WHERE email = $1`,
     [normalizeEmail(email)],
   );
 }
 
 export async function findUserById(id: string): Promise<UserRow | null> {
-  return queryOne<UserRow>(`SELECT id, email, full_name FROM app_users WHERE id = $1`, [id]);
+  return queryOne<UserRow>(
+    `SELECT id, email, full_name, start_route FROM app_users WHERE id = $1`,
+    [id],
+  );
 }
 
 export async function createUser(input: {
@@ -39,7 +44,7 @@ export async function createUser(input: {
     `INSERT INTO app_users (email, password_hash, full_name)
      VALUES ($1, $2, $3)
      ON CONFLICT (email) DO NOTHING
-     RETURNING id, email, full_name`,
+     RETURNING id, email, full_name, start_route`,
     [email, passwordHash, input.name?.trim() || null],
   );
   if (!row) throw new Error("Já existe uma conta com este e-mail");
@@ -57,7 +62,12 @@ export async function authenticate(email: string, password: string): Promise<Use
   }
   const ok = await verifyPassword(password, user.password_hash);
   if (!ok) return null;
-  return { id: user.id, email: user.email, full_name: user.full_name };
+  return {
+    id: user.id,
+    email: user.email,
+    full_name: user.full_name,
+    start_route: user.start_route,
+  };
 }
 
 export async function updatePassword(userId: string, password: string): Promise<void> {

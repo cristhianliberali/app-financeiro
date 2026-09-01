@@ -223,6 +223,27 @@ export async function upsertRows(userId: string, table: DataTable, rows: Row[]):
   });
 }
 
+/**
+ * Lançamento sem categoria não entra.
+ *
+ * A categoria é o que faz o lançamento existir nos relatórios: sem ela o valor
+ * some do teto de orçamento, do gráfico por categoria e de qualquer leitura que
+ * não seja o extrato cru. A regra vale no servidor, e não só no formulário,
+ * porque são vários os caminhos que gravam lançamento — o diálogo, a
+ * importação, o parcelamento — e todos passam por aqui.
+ *
+ * No UPDATE a exigência só vale se a coluna vier na atualização: dar baixa numa
+ * pendência manda `status` e mais nada, e não é hora de cobrar o resto.
+ */
+function requireCategory(row: Row, isInsert: boolean): void {
+  const hasKey = row["category_id"] !== undefined;
+  if (!isInsert && !hasKey) return;
+  const categoryId = row["category_id"];
+  if (typeof categoryId !== "string" || !categoryId.trim()) {
+    throw new Error("Escolha uma categoria para o lançamento");
+  }
+}
+
 async function upsertRow(
   client: PoolClient,
   userId: string,
@@ -239,6 +260,7 @@ async function upsertRow(
 
   if (id && existing.rowCount) {
     await requireRowAccess(userId, table, id, "editor");
+    if (table === "transactions") requireCategory(row, false);
     if (columns.length === 0) return;
     const assignments = columns.map((column, index) => `${column} = $${index + 2}`);
     await client.query(`UPDATE ${table} SET ${assignments.join(", ")} WHERE id = $1`, [
@@ -249,6 +271,7 @@ async function upsertRow(
   }
 
   await authorizeInsert(userId, table, row);
+  if (table === "transactions") requireCategory(row, true);
 
   const insertColumns = ["user_id", ...columns, ...(id ? ["id"] : [])];
   const values = [userId, ...columns.map((column) => row[column]), ...(id ? [id] : [])];

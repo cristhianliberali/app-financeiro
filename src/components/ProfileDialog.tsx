@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, CalendarDays, KeyRound, Mail, MailCheck, User } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  KeyRound,
+  Mail,
+  MailCheck,
+  MonitorPlay,
+  User,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +25,14 @@ import {
   requestEmailChange,
   requestPasswordReset,
   updateProfileName,
+  updateStartRoute,
 } from "@/lib/profile.functions";
+import {
+  START_ROUTES,
+  START_ROUTE_GROUPS,
+  normalizeStartRoute,
+  type StartRoute,
+} from "@/lib/start-route";
 
 /**
  * Preferências da pessoa logada: nome, e-mail e senha.
@@ -59,7 +74,10 @@ export function ProfileDialog({
   const [code, setCode] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [busy, setBusy] = useState<null | "name" | "email" | "code" | "password" | "reset">(null);
+  const [startRoute, setStartRoute] = useState<StartRoute>("/");
+  const [busy, setBusy] = useState<
+    null | "name" | "email" | "code" | "password" | "reset" | "start"
+  >(null);
 
   useEffect(() => {
     if (!open) return;
@@ -68,6 +86,7 @@ export function ProfileDialog({
     setCode("");
     setCurrentPassword("");
     setNewPassword("");
+    setStartRoute(normalizeStartRoute(user?.startRoute));
     setBusy(null);
   }, [open, user]);
 
@@ -224,6 +243,49 @@ export function ProfileDialog({
                 </Button>
               </div>
             )}
+          </section>
+
+          {/* Tela de inicialização */}
+          <section className="space-y-3 rounded-xl border border-border bg-surface/60 p-4">
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
+              <MonitorPlay className="size-4" /> Tela de inicialização
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              É a tela que abre toda vez que você entra no sistema. Ela acompanha o seu login, não o
+              navegador: vale também no celular e em outro computador.
+            </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="profile-start-route">Abrir em</Label>
+              <select
+                id="profile-start-route"
+                value={startRoute}
+                onChange={(e) => setStartRoute(e.target.value as StartRoute)}
+                className="h-11 w-full rounded-xl border border-input bg-card px-3 text-sm font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25"
+              >
+                {START_ROUTE_GROUPS.map((group) => (
+                  <optgroup key={group} label={group}>
+                    {START_ROUTES.filter((route) => route.group === group).map((route) => (
+                      <option key={route.value} value={route.value}>
+                        {route.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+            <Button
+              size="sm"
+              disabled={busy !== null || startRoute === normalizeStartRoute(user?.startRoute)}
+              onClick={() =>
+                run("start", async () => {
+                  const updated = await updateStartRoute({ data: { startRoute } });
+                  qc.setQueryData(AUTH_QUERY_KEY, updated);
+                  toast.success("Tela de inicialização salva");
+                })
+              }
+            >
+              Salvar tela inicial
+            </Button>
           </section>
 
           {/* Google Agenda */}

@@ -57,7 +57,12 @@ export const signIn = createServerFn({ method: "POST" })
     if (!user) throw new Error("E-mail ou senha incorretos");
 
     await startSession(user.id);
-    return { id: user.id, email: user.email, name: user.full_name };
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.full_name,
+      startRoute: user.start_route,
+    };
   });
 
 export const signUp = createServerFn({ method: "POST" })
@@ -78,7 +83,12 @@ export const signUp = createServerFn({ method: "POST" })
 
     const user = await createUser({ email: data.email, password: data.password, name: data.name });
     await startSession(user.id);
-    return { id: user.id, email: user.email, name: user.full_name };
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.full_name,
+      startRoute: user.start_route,
+    };
   });
 
 export const signOut = createServerFn({ method: "POST" }).handler(async (): Promise<null> => {
