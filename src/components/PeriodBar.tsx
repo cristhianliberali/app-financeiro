@@ -142,7 +142,7 @@ export function PeriodBar() {
             <button
               key={basis}
               onClick={() => setDateBasis(basis)}
-              className={`rounded-[7px] px-2.5 py-1.5 transition-all ${
+              className={`rounded-[4px] px-2.5 py-1.5 transition-all ${
                 dateBasis === basis
                   ? "bg-card text-foreground shadow-xs ring-1 ring-border"
                   : "text-muted-foreground hover:text-foreground"
