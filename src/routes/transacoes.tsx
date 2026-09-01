@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, FileScan, Repeat, Search, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -6,9 +6,6 @@ import { DEFAULT_CATEGORY_ICON, IconBadge } from "@/lib/icons";
 import { StatusPill } from "@/components/ui/status";
 import { PaginationBar, usePagination } from "@/components/PaginationBar";
 import { TransactionDialog } from "@/components/TransactionDialog";
-// A importação nova lê o documento por código e deixa a IA só para a
-// categorização; o diálogo antigo (AiImportDialog) fica guardado para comparação.
-import { DocumentImportDialog } from "@/components/DocumentImportDialog";
 import { RecurringDialog } from "@/components/RecurringDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,7 +45,6 @@ function TransactionsPage() {
 
   const [dialog, setDialog] = useState<null | "income" | "expense">(null);
   const [editing, setEditing] = useState<Transaction | null>(null);
-  const [aiOpen, setAiOpen] = useState(false);
   const [recurringOpen, setRecurringOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -88,8 +84,11 @@ function TransactionsPage() {
           <Button size="sm" variant="outline" onClick={() => setRecurringOpen(true)}>
             <Repeat /> Recorrentes
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setAiOpen(true)}>
-            <FileScan /> Importar fatura
+          {/* A importação é tela, não janela: ela guarda a revisão em aberto. */}
+          <Button size="sm" variant="outline" asChild>
+            <Link to="/importar">
+              <FileScan /> Importar com IA
+            </Link>
           </Button>
           <Button
             size="sm"
@@ -248,7 +247,6 @@ function TransactionsPage() {
         kind={dialog ?? "expense"}
         editing={editing}
       />
-      <DocumentImportDialog open={aiOpen} onOpenChange={setAiOpen} />
       <RecurringDialog open={recurringOpen} onOpenChange={setRecurringOpen} />
     </AppShell>
   );

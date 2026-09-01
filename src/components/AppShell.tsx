@@ -6,7 +6,6 @@ import {
   Tags,
   TrendingUp,
   Target,
-  Users,
   ChevronDown,
   Clock3,
   Menu,
@@ -42,7 +41,8 @@ const nav = [
   { to: "/categorias", label: "Categorias", icon: Tags },
   { to: "/investimentos", label: "Investimentos", icon: TrendingUp },
   { to: "/metas", label: "Metas", icon: Target },
-  { to: "/conta", label: "Conta & equipe", icon: Users },
+  // "Conta & equipe" saiu daqui: é ajuste de cadastro, não navegação do dia, e
+  // vive no menu do perfil, junto das outras preferências da pessoa.
 ] as const;
 
 export function AppShell({

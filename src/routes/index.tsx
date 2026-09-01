@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   Bar,
@@ -21,12 +21,15 @@ import {
   CheckCircle2,
   CircleDollarSign,
   Clock3,
+  FileScan,
   PiggyBank,
   Plus,
+  Repeat,
   Wallet,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { TransactionDialog } from "@/components/TransactionDialog";
+import { RecurringDialog } from "@/components/RecurringDialog";
 import { Button } from "@/components/ui/button";
 import { useAppState } from "@/lib/app-state";
 import { useCategories, useGoals, useInvestments, useTransactions } from "@/lib/data";
@@ -159,6 +162,7 @@ function Panel({
 function Dashboard() {
   const { profileId, from, to, dateBasis } = useAppState();
   const [dialog, setDialog] = useState<null | "income" | "expense">(null);
+  const [recurringOpen, setRecurringOpen] = useState(false);
   const [metric, setMetric] = useState<MonthMetric>("balance");
 
   const { data: txs = [] } = useTransactions({ profileId, from, to, basis: dateBasis });
@@ -187,14 +191,27 @@ function Dashboard() {
   return (
     <AppShell
       actions={
-        <>
+        /*
+          As mesmas ações do centro de transações, aqui em cima: o dashboard é
+          onde o dia começa, e mandar alguém trocar de tela só para abrir as
+          recorrências ou importar uma fatura é um desvio sem motivo.
+        */
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => setRecurringOpen(true)}>
+            <Repeat /> Recorrentes
+          </Button>
+          <Button size="sm" variant="outline" asChild>
+            <Link to="/importar">
+              <FileScan /> Importar com IA
+            </Link>
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setDialog("income")}>
             <Plus /> Receita
           </Button>
           <Button size="sm" variant="brand" onClick={() => setDialog("expense")}>
             <Plus /> Despesa
           </Button>
-        </>
+        </div>
       }
     >
       <h1 className="sr-only">Dashboard financeiro</h1>
@@ -557,6 +574,7 @@ function Dashboard() {
         onOpenChange={(v) => setDialog(v ? dialog : null)}
         kind={dialog ?? "expense"}
       />
+      <RecurringDialog open={recurringOpen} onOpenChange={setRecurringOpen} />
     </AppShell>
   );
 }

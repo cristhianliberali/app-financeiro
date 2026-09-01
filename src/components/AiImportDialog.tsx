@@ -202,6 +202,17 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
       toast.error("Selecione ao menos um lançamento");
       return;
     }
+    // Categoria é obrigatória em qualquer caminho de lançamento — inclusive
+    // aqui, onde entram dezenas de uma vez.
+    const semCategoria = selected.filter((r) => !r.category_id);
+    if (semCategoria.length > 0) {
+      toast.error(
+        semCategoria.length === 1
+          ? "1 lançamento selecionado está sem categoria. Escolha antes de lançar."
+          : `${semCategoria.length} lançamentos selecionados estão sem categoria. Escolha antes de lançar.`,
+      );
+      return;
+    }
     await upsert.mutateAsync(
       selected.map((r) => ({
         profile_id: profileId,
@@ -211,7 +222,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
         transaction_date: r.date,
         due_date: r.due_date || r.date,
         status: "pending",
-        category_id: r.category_id || null,
+        category_id: r.category_id,
         installment_no: r.installment_no,
         installment_total: r.installment_total,
         installment_group: r.installment_group,
@@ -554,7 +565,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                     disabled={blocked}
                     onChange={(e) => patch(i, { category_id: e.target.value })}
                   >
-                    <option value="">Sem categoria</option>
+                    <option value="">Escolha…</option>
                     {categories
                       .filter((c) => c.kind === r.kind)
                       .map((c) => (

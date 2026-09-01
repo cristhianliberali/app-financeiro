@@ -9,7 +9,7 @@ import { useBoardStatuses, useTasks, type Task } from "@/lib/tasks";
 export const Route = createFileRoute("/tarefas/agenda")({
   head: () => ({
     meta: [
-      { title: "Calendário sincronizado — Projetos e Tarefas" },
+      { title: "Minha Agenda — Projetos e Tarefas" },
       {
         name: "description",
         content:
@@ -21,7 +21,7 @@ export const Route = createFileRoute("/tarefas/agenda")({
 });
 
 /**
- * Calendário sincronizado: as tarefas e a agenda conectada no mesmo lugar.
+ * Minha Agenda: as tarefas e a agenda conectada no mesmo lugar.
  *
  * É o calendário que funde as duas fontes e sabe sincronizar sozinho — por isso
  * ele é o calendário do menu. Ver o compromisso ao lado da tarefa é o ponto de
@@ -38,9 +38,9 @@ function AgendaPage() {
   const openTask = selected ? (allTasks.find((t) => t.id === selected.id) ?? selected) : null;
 
   return (
-    <TasksShell breadcrumbCurrent="Calendário sincronizado">
+    <TasksShell breadcrumbCurrent="Minha Agenda">
       <div>
-        <h1 className="title-xl">Calendário sincronizado</h1>
+        <h1 className="title-xl">Minha Agenda</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Suas tarefas e os compromissos da agenda conectada, lado a lado.
         </p>

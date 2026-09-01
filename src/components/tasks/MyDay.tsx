@@ -1,6 +1,16 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarClock, ExternalLink, Link2, Plus, Sun, Sunrise, Sunset } from "lucide-react";
+import {
+  AlarmClock,
+  CalendarClock,
+  CheckCircle2,
+  ExternalLink,
+  Link2,
+  Plus,
+  Sun,
+  Sunrise,
+  Sunset,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -16,8 +26,10 @@ import {
   type Subtask,
   type Task,
 } from "@/lib/tasks";
-import { todayKey } from "@/lib/tasks-analytics";
+import { dayKey, todayKey } from "@/lib/tasks-analytics";
+import { parseISODate } from "@/lib/format";
 import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
+import { useAgendaDone } from "./agenda-done";
 
 /**
  * "Meu dia": o que precisa acontecer hoje, num lugar só.
@@ -70,6 +82,22 @@ function hourLabel(iso: string | null): string {
   return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+/**
+ * Há quanto tempo a tarefa venceu.
+ *
+ * Na lista de atrasadas a hora não diz nada — o que pesa é o tamanho do atraso,
+ * e é isso que ordena a atenção de quem olha.
+ */
+function lateLabel(iso: string | null): string {
+  const day = dayKey(iso);
+  if (!day) return "—";
+  const days = Math.round(
+    (parseISODate(todayKey()).getTime() - parseISODate(day).getTime()) / 86400000,
+  );
+  if (days <= 0) return "hoje";
+  return days === 1 ? "1 dia" : `${days} dias`;
+}
+
 type DayItem =
   | { kind: "task"; at: string | null; task: Task; subtasks: Subtask[] }
   | { kind: "event"; at: string; id: string; title: string; link?: string | undefined };
@@ -90,6 +118,7 @@ export function MyDay({
   const { data: agenda = [] } = useAgendaEvents({ from: today, to: today });
   const complete = useMoveTaskByPolarity();
   const saveSubtask = useSaveSubtask();
+  const agendaDone = useAgendaDone(today);
 
   /** Só o que é meu: sou responsável ou participante. */
   const mine = useMemo(
@@ -100,6 +129,26 @@ export function MyDay({
           (currentUserId ? task.participants.includes(currentUserId) : false),
       ),
     [tasks, currentUserId],
+  );
+
+  /**
+   * O que venceu antes de hoje e continua em aberto.
+   *
+   * Vem antes dos períodos de propósito: uma tarefa atrasada não cabe em manhã,
+   * tarde ou noite — ela já passou —, e escondê-la abaixo do dia de hoje é
+   * como não mostrá-la. As arquivadas ficam de fora: elas saíram do fluxo.
+   */
+  const late = useMemo(
+    () =>
+      mine
+        .filter((task) => {
+          const polarity = task.status?.polarity ?? null;
+          if (polarity === "SUCCESS" || polarity === "ARCHIVED") return false;
+          const due = dayKey(task.due_date);
+          return !!due && due < today;
+        })
+        .sort((a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? "")),
+    [mine, today],
   );
 
   const items = useMemo(() => {
@@ -145,10 +194,20 @@ export function MyDay({
     return list.sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
   }, [mine, agenda, today]);
 
-  const done = items.filter(
-    (item) => item.kind === "task" && item.task.status?.polarity === "SUCCESS",
+  /** Concluir vale para os dois lados do painel: tarefa fechada e compromisso cumprido. */
+  const done = items.filter((item) =>
+    item.kind === "task" ? item.task.status?.polarity === "SUCCESS" : agendaDone.isDone(item.id),
   ).length;
   const agendaCount = items.filter((item) => item.kind === "event").length;
+
+  /** Conclui a tarefa no quadro dela, seja qual for o nome da etapa de sucesso. */
+  async function completeTask(task: Task, checked: boolean) {
+    const result = await complete.mutateAsync({
+      id: task.id,
+      polarity: checked ? "SUCCESS" : "IN_PROGRESS",
+    });
+    toast.success(result?.statusName ? `Movida para “${result.statusName}”` : "Tarefa atualizada");
+  }
 
   return (
     <div className="space-y-4">
@@ -188,6 +247,50 @@ export function MyDay({
         </p>
       )}
 
+      {/*
+        Atrasadas, acima de tudo. Sem nenhuma, a ausência vira uma linha discreta
+        em vez de um cartão vazio: dizer "está tudo em dia" é informação, ocupar
+        um bloco inteiro para dizer isso não é.
+      */}
+      {late.length === 0 ? (
+        <p className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
+          <CheckCircle2 className="size-3.5 shrink-0 text-positive" />
+          Você não possui tarefas atrasadas.
+        </p>
+      ) : (
+        <div className="panel state-bar state-late p-4">
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold tracking-tight">
+            <span className="flex size-7 items-center justify-center rounded-lg bg-negative-soft text-negative-soft-foreground">
+              <AlarmClock className="size-3.5" />
+            </span>
+            Atrasadas
+            <span className="rounded-full bg-negative-soft px-2 py-0.5 font-mono text-[10px] font-bold text-negative-soft-foreground">
+              {late.length}
+            </span>
+          </h3>
+          <div className="space-y-1.5">
+            {late.map((task) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                subtasks={[]}
+                at={task.due_date}
+                overdue
+                onOpen={onOpenTask}
+                onToggle={completeTask}
+                onToggleSubtask={(subtask, checked) =>
+                  saveSubtask.mutate({
+                    id: subtask.id,
+                    task_id: subtask.task_id,
+                    completed: checked,
+                  })
+                }
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {PERIODS.map((period) => {
         const ofPeriod = items.filter((item) => periodOf(item.at) === period.key);
         return (
@@ -208,119 +311,28 @@ export function MyDay({
               <div className="space-y-1.5">
                 {ofPeriod.map((item) =>
                   item.kind === "event" ? (
-                    /*
-                      Compromisso da agenda: borda tracejada e o selo "Google
-                      Agenda" o separam das tarefas do app, que são as únicas
-                      que se pode concluir daqui.
-                    */
-                    <div
+                    <EventRow
                       key={item.id}
-                      className="state-bar state-due flex items-center gap-3 rounded-xl border border-dashed border-border p-2.5 transition-colors hover:bg-accent/40"
-                    >
-                      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-warning-soft text-warning-soft-foreground">
-                        <CalendarClock className="size-3.5" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">{item.title}</span>
-                        <span className="label-caps text-[0.6rem]">Google Agenda</span>
-                      </span>
-                      <span className="font-mono text-[11px] text-muted-foreground">
-                        {hourLabel(item.at)}
-                      </span>
-                      {item.link && (
-                        <a
-                          href={item.link}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                          aria-label="Abrir na agenda"
-                          title="Abrir na agenda do Google"
-                        >
-                          <ExternalLink className="size-3.5" />
-                        </a>
-                      )}
-                    </div>
+                      item={item}
+                      done={agendaDone.isDone(item.id)}
+                      onToggle={() => agendaDone.toggle(item.id, today)}
+                    />
                   ) : (
-                    <div key={item.task.id} className="space-y-1">
-                      <div
-                        className={`state-bar flex items-center gap-3 rounded-xl border border-border p-2.5 transition-colors hover:bg-accent/40 ${
-                          item.task.status?.polarity === "SUCCESS" ? "state-done" : "state-pending"
-                        }`}
-                      >
-                        <Checkbox
-                          className="shrink-0"
-                          checked={item.task.status?.polarity === "SUCCESS"}
-                          aria-label={`Concluir ${item.task.title}`}
-                          onCheckedChange={async (checked) => {
-                            const result = await complete.mutateAsync({
-                              id: item.task.id,
-                              polarity: checked === true ? "SUCCESS" : "IN_PROGRESS",
-                            });
-                            toast.success(
-                              result?.statusName
-                                ? `Movida para "${result.statusName}"`
-                                : "Tarefa atualizada",
-                            );
-                          }}
-                        />
-                        <button
-                          onClick={() => onOpenTask(item.task)}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <span
-                            className={`block truncate text-sm font-semibold ${
-                              item.task.status?.polarity === "SUCCESS" ? "done-text" : ""
-                            }`}
-                          >
-                            {item.task.title}
-                          </span>
-                          <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
-                            <IconBadge
-                              name={item.task.space.icon}
-                              color={item.task.space.color}
-                              size="sm"
-                              fallback={DEFAULT_SPACE_ICON}
-                            />
-                            <span className="truncate">
-                              {item.task.space.name} › {item.task.board.name}
-                            </span>
-                          </span>
-                        </button>
-                        <span className="font-mono text-[11px] text-muted-foreground">
-                          {hourLabel(item.at)}
-                        </span>
-                      </div>
-
-                      {item.subtasks.map((subtask) => (
-                        <div
-                          key={subtask.id}
-                          className="ml-6 flex items-center gap-3 rounded-lg border border-border/60 bg-surface/60 p-2"
-                        >
-                          <Checkbox
-                            className="size-4 shrink-0"
-                            checked={subtask.completed}
-                            aria-label={`Concluir ${subtask.title}`}
-                            onCheckedChange={(checked) =>
-                              saveSubtask.mutate({
-                                id: subtask.id,
-                                task_id: subtask.task_id,
-                                completed: checked === true,
-                              })
-                            }
-                          />
-                          <span
-                            className={`min-w-0 flex-1 truncate text-xs ${
-                              subtask.completed ? "done-text" : ""
-                            }`}
-                          >
-                            {subtask.title}
-                          </span>
-                          <span className="font-mono text-[11px] text-muted-foreground">
-                            {hourLabel(subtask.due_date ?? subtask.start_date)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                    <TaskRow
+                      key={item.task.id}
+                      task={item.task}
+                      subtasks={item.subtasks}
+                      at={item.at}
+                      onOpen={onOpenTask}
+                      onToggle={completeTask}
+                      onToggleSubtask={(subtask, checked) =>
+                        saveSubtask.mutate({
+                          id: subtask.id,
+                          task_id: subtask.task_id,
+                          completed: checked,
+                        })
+                      }
+                    />
                   ),
                 )}
               </div>
@@ -328,6 +340,142 @@ export function MyDay({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * Compromisso vindo da agenda conectada.
+ *
+ * A borda tracejada e o selo "Google Agenda" o separam das tarefas do app. A
+ * caixa de marcar existe pelo mesmo motivo que existe na tarefa — fechar o dia
+ * inteiro —, mas ela não sai daqui: nada é escrito de volta no Google.
+ */
+function EventRow({
+  item,
+  done,
+  onToggle,
+}: {
+  item: Extract<DayItem, { kind: "event" }>;
+  done: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div
+      className={`state-bar flex items-center gap-3 rounded-xl border border-dashed border-border p-2.5 transition-colors hover:bg-accent/40 ${
+        done ? "state-done" : "state-due"
+      }`}
+    >
+      <Checkbox
+        className="shrink-0"
+        checked={done}
+        aria-label={`Marcar ${item.title} como cumprido`}
+        title="Marca só aqui — nada é alterado na agenda do Google"
+        onCheckedChange={onToggle}
+      />
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-warning-soft text-warning-soft-foreground">
+        <CalendarClock className="size-3.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className={`block truncate text-sm font-semibold ${done ? "done-text" : ""}`}>
+          {item.title}
+        </span>
+        <span className="label-caps text-[0.6rem]">Google Agenda</span>
+      </span>
+      <span className="font-mono text-[11px] text-muted-foreground">{hourLabel(item.at)}</span>
+      {item.link && (
+        <a
+          href={item.link}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          aria-label="Abrir na agenda"
+          title="Abrir na agenda do Google"
+        >
+          <ExternalLink className="size-3.5" />
+        </a>
+      )}
+    </div>
+  );
+}
+
+/** Tarefa do app, com as subtarefas datadas logo abaixo dela. */
+function TaskRow({
+  task,
+  subtasks,
+  at,
+  overdue = false,
+  onOpen,
+  onToggle,
+  onToggleSubtask,
+}: {
+  task: Task;
+  subtasks: Subtask[];
+  at: string | null;
+  /** Atrasada: o horário vira a data em que venceu, que é o que importa aqui. */
+  overdue?: boolean;
+  onOpen: (task: Task) => void;
+  onToggle: (task: Task, checked: boolean) => Promise<void>;
+  onToggleSubtask: (subtask: Subtask, checked: boolean) => void;
+}) {
+  const isDone = task.status?.polarity === "SUCCESS";
+  return (
+    <div className="space-y-1">
+      <div
+        className={`state-bar flex items-center gap-3 rounded-xl border border-border p-2.5 transition-colors hover:bg-accent/40 ${
+          isDone ? "state-done" : overdue ? "state-late" : "state-pending"
+        }`}
+      >
+        <Checkbox
+          className="shrink-0"
+          checked={isDone}
+          aria-label={`Concluir ${task.title}`}
+          onCheckedChange={(checked) => void onToggle(task, checked === true)}
+        />
+        <button onClick={() => onOpen(task)} className="min-w-0 flex-1 text-left">
+          <span className={`block truncate text-sm font-semibold ${isDone ? "done-text" : ""}`}>
+            {task.title}
+          </span>
+          <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+            <IconBadge
+              name={task.space.icon}
+              color={task.space.color}
+              size="sm"
+              fallback={DEFAULT_SPACE_ICON}
+            />
+            <span className="truncate">
+              {task.space.name} › {task.board.name}
+            </span>
+          </span>
+        </button>
+        <span
+          className={`font-mono text-[11px] ${overdue ? "text-negative" : "text-muted-foreground"}`}
+        >
+          {overdue ? lateLabel(at) : hourLabel(at)}
+        </span>
+      </div>
+
+      {subtasks.map((subtask) => (
+        <div
+          key={subtask.id}
+          className="ml-6 flex items-center gap-3 rounded-lg border border-border/60 bg-surface/60 p-2"
+        >
+          <Checkbox
+            className="size-4 shrink-0"
+            checked={subtask.completed}
+            aria-label={`Concluir ${subtask.title}`}
+            onCheckedChange={(checked) => onToggleSubtask(subtask, checked === true)}
+          />
+          <span
+            className={`min-w-0 flex-1 truncate text-xs ${subtask.completed ? "done-text" : ""}`}
+          >
+            {subtask.title}
+          </span>
+          <span className="font-mono text-[11px] text-muted-foreground">
+            {hourLabel(subtask.due_date ?? subtask.start_date)}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

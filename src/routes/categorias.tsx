@@ -133,7 +133,7 @@ function CategoriesPage() {
             {active
               .filter((c) => c.kind === g.kind)
               .map((c) => (
-                <div key={c.id} className="panel-interactive flex items-center justify-between p-4">
+                <div key={c.id} className="panel flex items-center justify-between p-4">
                   <button
                     onClick={() => edit(c)}
                     className="flex min-w-0 items-center gap-3 text-left"

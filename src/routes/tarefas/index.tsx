@@ -95,7 +95,7 @@ function Indicator({
   tone?: string;
 }) {
   return (
-    <div className="panel-interactive p-5">
+    <div className="panel p-5">
       <div className="mb-3 flex items-start justify-between gap-2">
         <p className="label-caps">{label}</p>
         <span
