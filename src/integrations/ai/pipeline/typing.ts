@@ -84,12 +84,22 @@ const VALOR_MONETARIO =
   /(?<![\d.,/])(?:R\$\s*)?-?\s*(?:\d{1,3}(?:[.,]\d{3})+|\d+)[.,]\d{2}(?![\d.,/])/g;
 
 /**
- * A convenção de um número isolado, pela regra que vale nos dois padrões: o
- * último separador é o decimal — a não ser que ele tenha exatamente três
- * dígitos depois e seja igual aos anteriores, e aí é separador de milhar e a
- * convenção é a oposta.
+ * O voto de um número na convenção do documento, com a força da evidência.
+ *
+ * A regra vale nos dois padrões: o último separador é o decimal — a não ser que
+ * ele tenha exatamente três dígitos depois e seja igual aos anteriores, e aí é
+ * separador de milhar e a convenção é a oposta.
+ *
+ * A força importa tanto quanto o voto. Um valor com milhar e centavos
+ * (`1.690,11`) é evidência de dinheiro; um decimal solto (`29,90`) é dinheiro
+ * provável; um número só agrupado (`14.181` — pode ser lei, pode ser milhar) é
+ * o indício mais fraco. E o que não tem exatamente dois dígitos de centavos —
+ * `2.0` de versão, `0,5` de quantidade — não é dinheiro e **não vota**: foi um
+ * "2.0" num rodapé que já derrubou a leitura de uma fatura inteira.
  */
-function convencaoDoToken(token: string): "br" | "us" | null {
+type VotoConvencao = { voto: "br" | "us"; forca: "combo" | "decimal" | "grupos" };
+
+function classificarToken(token: string): VotoConvencao | null {
   const separadores = [...token].filter((c) => c === "." || c === ",");
   if (separadores.length === 0) return null;
 
@@ -99,31 +109,71 @@ function convencaoDoToken(token: string): "br" | "us" | null {
   const todosIguais = separadores.every((c) => c === ultimo);
   if (todosIguais && cauda.length === 3) {
     // Só separadores de milhar: "1.234" é brasileiro, "1,234" é americano.
-    return ultimo === "." ? "br" : "us";
+    return { voto: ultimo === "." ? "br" : "us", forca: "grupos" };
   }
-  return ultimo === "." ? "us" : "br";
+  if (cauda.length !== 2) return null;
+
+  return {
+    voto: ultimo === "." ? "us" : "br",
+    forca: separadores.length > 1 ? "combo" : "decimal",
+  };
 }
 
 /**
- * Convenção do documento, por votação com exigência de unanimidade.
+ * Contextos em que um número não diz nada sobre a convenção do documento:
+ * `2,38%` é taxa de juros, e `US$ 25.90` é compra em moeda estrangeira — que
+ * aparece em dólar mesmo no meio de uma fatura brasileira.
+ */
+function foraDoContextoMonetario(texto: string, inicio: number, fim: number): boolean {
+  return (
+    /(?:US?\$|USD|EUR|GBP|[€£¥])\s*$/i.test(texto.slice(0, inicio)) ||
+    /^\s*%/.test(texto.slice(fim))
+  );
+}
+
+function votosDe(texto: string): Array<{ token: string } & VotoConvencao> {
+  const votos: Array<{ token: string } & VotoConvencao> = [];
+  for (const encontro of texto.matchAll(TOKEN_NUMERICO)) {
+    const inicio = encontro.index ?? 0;
+    if (foraDoContextoMonetario(texto, inicio, inicio + encontro[0].length)) continue;
+    const voto = classificarToken(encontro[0]);
+    if (voto) votos.push({ token: encontro[0], ...voto });
+  }
+  return votos;
+}
+
+/**
+ * Convenção do documento, por votação em que a evidência mais forte decide.
  *
- * Divergência entre duas linhas quaisquer levanta erro em vez de escolher a
- * maioria: um documento em que `29,90` e `29.90` convivem foi extraído errado,
- * e a maioria só esconderia isso.
+ * Dois valores com milhar em convenções opostas (`1.690,11` contra `1,690.11`)
+ * continuam sendo erro: isso é extração quebrada, e escolher a maioria só
+ * esconderia. Já um decimal solto contra a evidência forte não derruba o
+ * documento — vira alerta de sanidade na camada 4, linha a linha. E empate só
+ * entre evidências fracas não decide nada nem quebra nada: sem milhar em jogo,
+ * o último separador lê cada valor do jeito que está escrito.
  */
 export function detectarConvencao(textos: readonly string[]): ConvencaoNumerica {
-  const votos = new Map<"br" | "us", string>();
+  const niveis: Record<VotoConvencao["forca"], Map<"br" | "us", string>> = {
+    combo: new Map(),
+    decimal: new Map(),
+    grupos: new Map(),
+  };
 
   for (const texto of textos) {
-    for (const [token] of texto.matchAll(TOKEN_NUMERICO)) {
-      const voto = convencaoDoToken(token);
-      if (voto && !votos.has(voto)) votos.set(voto, token);
+    for (const { token, voto, forca } of votosDe(texto)) {
+      if (!niveis[forca].has(voto)) niveis[forca].set(voto, token);
     }
   }
 
-  if (votos.size === 2) throw new ConvencaoMistaError([votos.get("br")!, votos.get("us")!]);
-  if (votos.has("us")) return "us";
-  if (votos.has("br")) return "br";
+  if (niveis.combo.size === 2) {
+    throw new ConvencaoMistaError([niveis.combo.get("br")!, niveis.combo.get("us")!]);
+  }
+
+  for (const forca of ["combo", "decimal", "grupos"] as const) {
+    const nivel = niveis[forca];
+    if (nivel.size === 1) return [...nivel.keys()][0]!;
+    if (nivel.size === 2) return "indeterminada";
+  }
   return "indeterminada";
 }
 
@@ -133,10 +183,12 @@ export function lerValor(bruto: string, convencao: ConvencaoNumerica): number | 
   if (!/\d/.test(digitos)) return null;
 
   const decimal = convencao === "us" ? "." : convencao === "br" ? "," : null;
-  const corte =
-    decimal === null
-      ? Math.max(digitos.lastIndexOf("."), digitos.lastIndexOf(","))
-      : digitos.lastIndexOf(decimal);
+  const ultimoSeparador = Math.max(digitos.lastIndexOf("."), digitos.lastIndexOf(","));
+  // Valor escrito na outra convenção — o "25.90" de uma compra em dólar numa
+  // fatura brasileira — ainda é lido pelo último separador, em vez de virar
+  // 2590: a convenção decide empate, não reescreve o que está no papel.
+  const preferido = decimal === null ? -1 : digitos.lastIndexOf(decimal);
+  const corte = preferido !== -1 ? preferido : ultimoSeparador;
 
   let inteiro = digitos;
   let centavos = "";
@@ -199,12 +251,9 @@ export function valoresDaLinha(texto: string, convencao: ConvencaoNumerica): num
  */
 export function valoresIncompativeis(texto: string, convencao: ConvencaoNumerica): string[] {
   if (convencao === "indeterminada") return [];
-  return [...texto.matchAll(TOKEN_NUMERICO)]
-    .map(([token]) => token)
-    .filter((token) => {
-      const voto = convencaoDoToken(token);
-      return voto !== null && voto !== convencao;
-    });
+  return votosDe(texto)
+    .filter(({ voto }) => voto !== convencao)
+    .map(({ token }) => token);
 }
 
 /* ------------------------------------------------------------------ *

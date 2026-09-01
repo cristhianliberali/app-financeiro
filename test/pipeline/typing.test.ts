@@ -51,10 +51,34 @@ describe("camada 2 — convenção numérica", () => {
     expect(lerValor("29.90", "indeterminada")).toBe(29.9);
   });
 
-  test("documento com as duas convenções levanta erro em vez de escolher a maioria", () => {
-    expect(() =>
-      detectarConvencao(["TOTAL R$ 6,598.58", "TOTAL R$ 1,000.00", "04 JAN PADARIA R$ 29,90"]),
-    ).toThrow(ConvencaoMistaError);
+  test("dois valores com milhar em convenções opostas levantam erro", () => {
+    // "1.690,11" contra "1,690.11" é extração quebrada; a maioria só esconderia.
+    expect(() => detectarConvencao(["FATURA ANTERIOR R$ 1.690,11", "TOTAL R$ 1,000.00"])).toThrow(
+      ConvencaoMistaError,
+    );
+  });
+
+  test("número que não é dinheiro não vota na convenção", () => {
+    // O caso real que derrubou uma fatura: "1.690,11" no total e um "2.0"
+    // solto num rodapé. Centavos têm dois dígitos; "2.0" não é valor.
+    expect(detectarConvencao(["FATURA 1.690,11", "Mastercard 2.0"])).toBe("br");
+    // Taxa de juros e compra em moeda estrangeira também não definem convenção.
+    expect(detectarConvencao(["TOTAL 6,598.58", "juros de 2,38% a.m."])).toBe("us");
+    expect(detectarConvencao(["TOTAL 1.690,11", "US$ 25.90 CONVERTIDO"])).toBe("br");
+  });
+
+  test("decimal solto contra evidência forte não derruba o documento", () => {
+    // O documento é brasileiro pelo "1.690,11"; o "25.90" avulso vira alerta
+    // de sanidade (camada 4), não erro — e ainda é lido como está escrito.
+    expect(detectarConvencao(["TOTAL R$ 1.690,11", "COMPRA EXTERIOR 25.90"])).toBe("br");
+    expect(valoresIncompativeis("COMPRA EXTERIOR 25.90", "br")).toEqual(["25.90"]);
+    expect(lerValor("25.90", "br")).toBe(25.9);
+    expect(lerValor("29,90", "us")).toBe(29.9);
+  });
+
+  test("empate só entre decimais soltos não decide nem quebra", () => {
+    // Sem milhar em jogo, o último separador lê cada valor do jeito certo.
+    expect(detectarConvencao(["PADARIA 29,90", "AMAZON US 25.90"])).toBe("indeterminada");
   });
 
   test("CNPJ e CPF não votam na convenção", () => {

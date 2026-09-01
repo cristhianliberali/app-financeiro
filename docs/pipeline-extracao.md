@@ -100,11 +100,16 @@ mundo; esse é o nível de generalidade a manter.
 LANCAMENTO | TOTAL_DECLARADO | CABECALHO | MARCADOR_GRUPO | RUIDO | AMBIGUA
 ```
 
-- **Convenção numérica por documento**, decidida por votação sobre todos os
-  valores encontrados, com **exigência de unanimidade**. A fatura de referência é
-  brasileira e imprime `R$ 6,598.58` (padrão americano); um parser fixado em
-  pt-BR leria R$ 6,59. Convenção mista levanta erro — é sinal de erro de
-  extração, não de documento exótico.
+- **Convenção numérica por documento**, decidida por votação em que só dinheiro
+  vota e a evidência mais forte decide. A fatura de referência é brasileira e
+  imprime `R$ 6,598.58` (padrão americano); um parser fixado em pt-BR leria
+  R$ 6,59. Três níveis de evidência: valor com milhar e centavos (`1.690,11`),
+  decimal solto (`29,90`) e número só agrupado (`14.181`). Não votam: número sem
+  dois dígitos de centavos (`2.0` de rodapé — caso real que derrubava a leitura),
+  taxa (`2,38%`) e moeda estrangeira (`US$ 25.90`). Dois valores **com milhar**
+  em convenções opostas seguem levantando erro — isso é extração quebrada; um
+  decimal solto contra a evidência forte vira alerta de sanidade na camada 4, e
+  o valor ainda é lido pelo último separador, do jeito que está escrito.
 - **Resolução de ano**: mês da linha ≤ mês de fechamento → ano do fechamento;
   maior → ano anterior. `dataRaw` é sempre preservada ao lado de `dataIso`.
 - **Parcela `NN/NN`** sai da descrição por regex antes de qualquer LLM.
