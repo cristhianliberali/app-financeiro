@@ -5,6 +5,21 @@ Extração de faturas e extratos em cinco camadas, em
 importação atual (`src/integrations/ai/import.server.ts`) para poder ser medido
 contra ela antes de substituí-la.
 
+```
+canonical.server.ts   camada 1 — arquivo -> linhas numeradas com bbox
+typing.ts             camada 2 — tipagem determinística
+blocks.ts             camada 3 — divisão em blocos e paralelismo
+classify.server.ts    camada 3 — protocolo, contrato de contagem, retry
+merchants.server.ts   camada 3 — cache de merchants
+provider.server.ts    camada 3 — abstração de provedor de LLM
+reconcile.ts          camada 4 — checksums e sanidade semântica
+quarantine.ts         camada 5 — estados, gatilhos e revisão
+pipeline.server.ts    as cinco camadas em ordem
+```
+
+Rodar a suíte: `bun test`. Nenhum teste chama API de LLM — a camada 3 recebe um
+cliente falso pela interface `LlmClient`.
+
 ## Princípio
 
 **O modelo de linguagem nunca carrega o dado. Ele só decide sobre o dado.**
@@ -120,6 +135,17 @@ têm que somar nele.
    primeiro, busca genérica só depois, para não explodir a complexidade
 4. Nenhum total fecha → tipagem errada em algum lugar
 
+Cada total é procurado do sinal mais forte para o mais fraco, e a via fica no
+relatório em vez de virar um "fechou" indistinto:
+
+| Via          | O que bateu                                                                                                       |
+| ------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `grupo`      | as linhas do próprio bloco somam o subtotal dele                                                                  |
+| `subtotais`  | um subconjunto dos subtotais que já fecharam                                                                      |
+| `identidade` | uma combinação assinada dos outros totais do mesmo bloco — `anterior − pagamentos + encargos + compras = a pagar` |
+| `documento`  | a soma de todos os lançamentos                                                                                    |
+| `busca`      | um subconjunto qualquer, procurado dentro do bloco do total                                                       |
+
 Mais os validadores de sanidade semântica, plugáveis: data fora do período,
 valor fora da faixa, convenção decimal não uniforme, contagem de lançamentos
 fora da faixa histórica.
@@ -132,9 +158,18 @@ recebido → canonizado → tipado → classificado → reconciliado → confirm
                                  quarentena → confirmado
 ```
 
-Nada entra na tabela de transações antes de `confirmado`. Gatilhos: confiança
-abaixo do limiar, reconciliação que não fechou, divergência em linha de
-sobreposição, `AMBIGUA` que o LLM também não resolveu, sanidade violada.
+Nada entra na tabela de transações antes de `confirmado`: `paraPersistir` é o
+único caminho de saída, e levanta erro em qualquer outro estado. Gatilhos:
+
+- `confianca_baixa` — decisão abaixo do limiar (0,8 por padrão)
+- `reconciliacao_aberta` — total declarado que não fechou
+- `divergencia_de_fronteira` — a mesma linha julgada diferente em dois blocos
+- `ambigua_nao_resolvida` — `AMBIGUA` que o LLM também não resolveu
+- `sem_valor_deterministico` — o modelo diz que é lançamento, o parser não achou
+  valor. É aqui que fica evidente que ele não tem como inventar um número
+- `conflito_de_tipo` — o modelo contradisse a tipagem determinística
+- `sanidade_violada` — validador da camada 4 apontou a linha
+- `lancamento_orfao` — não entrou em nenhum total que fechou
 
 A revisão mostra o trecho cru ancorado no `bbox` — recorte da região do PDF, não
 texto reescrito. Cada confirmação vira rótulo: alimenta o cache de merchants e a
@@ -152,9 +187,14 @@ Totais por portador:
   110.00   (final 6567)
   435.47   (final 9661)
   6,017.11 (final 5249)
-Anuidade/encargos fora dos portadores: 36.00
+Movimentações fora dos portadores: 65.46 (anuidade 36.00 + seguro 29.46)
+Compras do período: 110.00 + 435.47 + 6,017.11 + 65.46 = 6,628.04
 Total geral declarado: 6,598.58
 ```
+
+Os nove totais da fixture fecham e nenhum lançamento fica órfão. Remover uma
+linha derruba o subtotal do portador dela pela diferença exata e deixa os
+lançamentos daquele bloco órfãos — é esse o teste que protege a refatoração.
 
 ## Armadilhas cobertas por teste
 
