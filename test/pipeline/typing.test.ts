@@ -66,6 +66,14 @@ describe("camada 2 — convenção numérica", () => {
     expect(valoresIncompativeis("04 JAN PADARIA R$ 1,234.56", "us")).toEqual([]);
   });
 
+  test("valor sem separador de milhar é valor do mesmo jeito", () => {
+    // Extrato OFX e CSV cru escrevem "1200.00", sem agrupar o milhar.
+    expect(lerValor("1200.00", "us")).toBe(1200);
+    expect(lerValor("1200,00", "br")).toBe(1200);
+    expect(valoresDaLinha("TRNAMT=1200.00 | NAME=SALARIO", "us")).toEqual([1200]);
+    expect(detectarConvencao(["PADARIA 1200,00", "POSTO 35,90"])).toBe("br");
+  });
+
   test("o sinal do estorno é lido de onde estiver", () => {
     expect(valoresDaLinha("04 JAN ESTORNO R$ -29.90", "us")).toEqual([-29.9]);
     expect(valoresDaLinha("04 JAN ESTORNO -R$ 29.90", "us")).toEqual([-29.9]);

@@ -69,16 +69,19 @@ export class ConvencaoMistaError extends Error {
 /**
  * Número com pelo menos um separador. A borda direita recusa `/` e `-` para que
  * CNPJ (`12.345.678/0001-90`) e CPF não entrem na votação da convenção; a
- * esquerda deixa o sinal passar, senão um estorno não seria contado.
+ * esquerda deixa o sinal passar, senão um estorno não seria contado. A parte
+ * inteira aceita dígitos corridos porque nem todo documento agrupa o milhar:
+ * extrato OFX escreve `1200.00`, e ele vota igual.
  */
-const TOKEN_NUMERICO = /(?<![\d.,/])\d{1,3}(?:[.,]\d{3})*[.,]\d{1,3}(?![\d.,/-])/g;
+const TOKEN_NUMERICO = /(?<![\d.,/])(?:\d{1,3}(?:[.,]\d{3})+|\d+)[.,]\d{1,3}(?![\d.,/-])/g;
 
 /**
  * Valor monetário: o que tem centavos. Aceita o `R$` e o sinal, colados ou não,
  * inclusive o `-` à direita com que alguns extratos marcam débito. CPF e CNPJ
  * não passam por aqui: eles não têm grupo de dois dígitos no fim.
  */
-const VALOR_MONETARIO = /(?<![\d.,/])(?:R\$\s*)?-?\s*\d{1,3}(?:[.,]\d{3})*[.,]\d{2}(?![\d.,/])/g;
+const VALOR_MONETARIO =
+  /(?<![\d.,/])(?:R\$\s*)?-?\s*(?:\d{1,3}(?:[.,]\d{3})+|\d+)[.,]\d{2}(?![\d.,/])/g;
 
 /**
  * A convenção de um número isolado, pela regra que vale nos dois padrões: o
