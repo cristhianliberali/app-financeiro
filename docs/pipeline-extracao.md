@@ -220,6 +220,32 @@ lançamentos daquele bloco órfãos — é esse o teste que protege a refatoraç
 
 ## Armadilhas cobertas por teste
 
+Da fatura real de referência (7 páginas, layout Sicoob 2026):
+
+8. **Duas colunas de lançamentos lado a lado** — agrupar só por altura cola a
+   data de um lançamento no valor do outro e some com metade da coluna
+   esquerda. A camada 1 procura o corredor vertical vazio e só divide quando os
+   dois lados têm lançamentos completos (data + valor); a coluna de valores de
+   uma tabela comum não passa nesse teste.
+9. **Nome do lançamento na linha de cima** — "ANUIDADE MASTERCARD" em cima,
+   "04 MAI … R$ 72,00" embaixo, "(5249) 03/12" embaixo ainda. A camada 2
+   detecta a coluna de descrição em branco (pelo alinhamento típico do
+   documento) e absorve nome e cauda; nome quebrado em conectivo ("PROTEÇÃO
+   PERDA OU" / "ROUBO") junta as duas linhas.
+10. **Sobra de parcela em linha própria** — um "01/02" solto não rouba o valor
+    do lançamento de baixo: continuação exige descrição na linha da data.
+11. **CNPJ que parece data** — "02.038.232/0001-64" na linha do boleto virava
+    lançamento do valor da fatura inteira; a data inicial agora exige fronteira
+    à direita.
+12. **Vencimento e período por extenso** — "VENCIMENTO 11 AGO 2026" e
+    "REF 1 JUL A 1 AGO" saem das linhas que os anunciam; as compras de uma
+    fatura acontecem antes das datas administrativas que ela imprime.
+13. **Total declarado ≠ total conferível** — limite, taxa, pagamento mínimo e
+    dívida futura são declarações, não somas das linhas; só rótulos de TOTAL
+    (fora desses contextos) entram no veredito da conferência.
+
+Da fatura sintética original:
+
 1. Separadores invertidos — `R$ 6,598.58` em documento brasileiro
 2. Datas sem ano — resolvidas pelo período, com regra de virada
 3. Parcela `NN/NN` colada na descrição — não é data

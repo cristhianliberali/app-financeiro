@@ -12,6 +12,7 @@
 import {
   TipoLinha,
   lancamentos,
+  valoresDaLinha,
   valoresIncompativeis,
   type DocumentoTipado,
   type LinhaTipada,
@@ -26,6 +27,15 @@ export type TotalDeclarado = {
   readonly rotulo: string;
   readonly valor: number;
   readonly grupo: number | null;
+  /**
+   * Total que a conferência **exige** fechar: o rótulo anuncia um total desta
+   * fatura ("TOTAL", "SALDO TOTAL", "TOTAL DE FULANO"). O que a fatura declara
+   * mas não é soma das linhas — limite, taxa, pagamento mínimo, dívida futura,
+   * saldo para a próxima — continua no relatório, mas não bloqueia nada: exigir
+   * que "TOTAL DA DÍVIDA A VENCER" some com as compras do mês só gera alarme
+   * falso, e alarme falso ensina a ignorar alarme.
+   */
+  readonly conferivel: boolean;
 };
 
 /**
@@ -282,13 +292,41 @@ function rotuloDe(linha: LinhaTipada): string {
     .trim();
 }
 
+/** O rótulo anuncia um total de verdade. */
+const ROTULO_TOTAL = /\b(?:sub)?tota(?:l|is)\b/i;
+
+/**
+ * Vocabulário genérico do que uma fatura declara sem que seja soma das linhas:
+ * projeções, limites, encargos e mínimos. Vale para o rótulo e para o marcador
+ * do bloco em que ele está.
+ */
+const CONTEXTO_NAO_CONFERIVEL =
+  /pr[oó]xim|a vencer|d[íi]vida|limite|dispon[íi]vel|m[íi]nimo|taxa|juro|encargo|\biof\b|\bcet\b|tarifa|futur|[úu]ltimos/i;
+
 export function totaisDeclarados(documento: DocumentoTipado): TotalDeclarado[] {
+  const porId = new Map(documento.linhas.map((linha) => [linha.id, linha]));
+
   return documento.linhas
     .filter((linha) => linha.tipo === TipoLinha.TOTAL_DECLARADO)
     .flatMap((linha) => {
-      const valor = linha.valores[linha.valores.length - 1];
+      const encontroTotal = ROTULO_TOTAL.exec(linha.texto);
+      // Num total anunciado, o valor é o que vem logo depois da palavra: numa
+      // faixa de resumo ("TOTAL R$ X ... PAGAMENTO MÍNIMO R$ Y") o último
+      // valor da linha é o mínimo, não o total.
+      const aposPalavra = encontroTotal
+        ? valoresDaLinha(linha.texto.slice(encontroTotal.index), documento.convencao)
+        : [];
+      const valor = aposPalavra[0] ?? linha.valores[linha.valores.length - 1];
       if (valor === undefined) return [];
-      return [{ id: linha.id, rotulo: rotuloDe(linha), valor, grupo: linha.grupo }];
+
+      const rotuloDoGrupo = linha.grupo === null ? "" : (porId.get(linha.grupo)?.texto ?? "");
+      const conferivel =
+        encontroTotal !== null &&
+        valor > 0 &&
+        !CONTEXTO_NAO_CONFERIVEL.test(linha.texto) &&
+        !CONTEXTO_NAO_CONFERIVEL.test(rotuloDoGrupo);
+
+      return [{ id: linha.id, rotulo: rotuloDe(linha), valor, grupo: linha.grupo, conferivel }];
     });
 }
 
@@ -401,10 +439,14 @@ export function reconciliar(
     validador.verificar({ documento, lancamentos: linhas }),
   );
 
+  // Só os conferíveis decidem o veredito. Os demais ficam no relatório com a
+  // via por onde fecharam (ou não), como informação — nunca como alarme.
+  const conferiveis = resultado.filter((fechamento) => fechamento.total.conferivel);
+
   return {
     totais: resultado,
     orfaos,
     alertas,
-    fechouTudo: resultado.length > 0 && resultado.every((fechamento) => fechamento.fechou),
+    fechouTudo: conferiveis.length > 0 && conferiveis.every((fechamento) => fechamento.fechou),
   };
 }

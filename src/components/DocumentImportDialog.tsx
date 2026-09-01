@@ -191,7 +191,11 @@ export function DocumentImportDialog({ open, onOpenChange }: Props) {
     { income: 0, expense: 0 },
   );
   const comAviso = rows.filter((r) => r.avisos.length > 0).length;
-  const totaisAbertos = extracao?.conferencia.totais.filter((t) => !t.fechou) ?? [];
+  // Só os totais conferíveis entram no veredito; limite, taxa e projeção são
+  // declarações do documento, não somas das linhas.
+  const conferiveis = extracao?.conferencia.totais.filter((t) => t.conferivel) ?? [];
+  const informativos = (extracao?.conferencia.totais.length ?? 0) - conferiveis.length;
+  const totaisAbertos = conferiveis.filter((t) => !t.fechou);
   const canStart = !!file || text.trim().length >= 10;
 
   // Agrupado como no documento: cada portador/seção vira um cabeçalho de bloco.
@@ -335,8 +339,10 @@ export function DocumentImportDialog({ open, onOpenChange }: Props) {
                   )}
                   <span className="flex-1">
                     {extracao.conferencia.fechouTudo
-                      ? `Conferência bateu: os ${extracao.conferencia.totais.length} totais declarados no documento conferem com as transações extraídas.`
-                      : `${totaisAbertos.length} de ${extracao.conferencia.totais.length} totais declarados no documento não fecharam. Confira as linhas destacadas antes de lançar.`}
+                      ? conferiveis.length === 1
+                        ? "Conferência bateu: o total declarado no documento confere com as transações extraídas."
+                        : `Conferência bateu: os ${conferiveis.length} totais declarados no documento conferem com as transações extraídas.`
+                      : `${totaisAbertos.length} de ${conferiveis.length} totais declarados no documento não fecharam. Confira as linhas destacadas antes de lançar.`}
                   </span>
                   {showTotais ? (
                     <ChevronDown className="size-3.5 shrink-0" />
@@ -346,7 +352,7 @@ export function DocumentImportDialog({ open, onOpenChange }: Props) {
                 </button>
                 {showTotais && (
                   <ul className="mt-2 space-y-1 border-t border-border/60 pt-2">
-                    {extracao.conferencia.totais.map((total) => (
+                    {conferiveis.map((total) => (
                       <li key={total.linhaId} className="flex items-center gap-2">
                         {total.fechou ? (
                           <CheckCircle2 className="size-3 shrink-0 text-positive" />
@@ -362,6 +368,13 @@ export function DocumentImportDialog({ open, onOpenChange }: Props) {
                         )}
                       </li>
                     ))}
+                    {informativos > 0 && (
+                      <li className="pt-1 text-muted-foreground">
+                        {informativos === 1
+                          ? "1 outro valor declarado (limite, taxa, mínimo ou projeção) fica fora da conferência."
+                          : `${informativos} outros valores declarados (limites, taxas, mínimos e projeções) ficam fora da conferência.`}
+                      </li>
+                    )}
                   </ul>
                 )}
               </div>

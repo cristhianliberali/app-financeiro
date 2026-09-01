@@ -227,3 +227,76 @@ describe("camada 1 — texto", () => {
     );
   });
 });
+
+describe("camada 1 — páginas com duas colunas de lançamentos", () => {
+  /** Uma linha completa de lançamento em qualquer posição da página. */
+  function entrada(x: number, y: number, data: string, nome: string, valor: string) {
+    return [
+      { x, y, text: data },
+      { x: x + 55, y, text: nome },
+      { x: x + 185, y, text: valor },
+    ] satisfies PdfTextItem[];
+  }
+
+  test("colunas lado a lado viram sequências separadas, na ordem de leitura", async () => {
+    // Duas colunas de lançamentos na mesma altura — o layout que, agrupado só
+    // por altura, cola a data de um lançamento no valor do outro.
+    const documento = await canonizar(
+      {
+        nome: "duas-colunas.pdf",
+        bytes: makePdf([
+          [
+            { x: 40, y: 790, text: "LANCAMENTOS DO CARTAO" },
+            ...entrada(40, 750, "05 JUL", "PADARIA CENTRAL", "R$ 49,90"),
+            ...entrada(310, 750, "24 JUL", "MERCADO MODELO", "R$ 29,99"),
+            ...entrada(40, 730, "06 JUL", "POSTO BANDEIRA", "R$ 91,00"),
+            ...entrada(310, 730, "25 JUL", "LIVRARIA CENTRAL", "R$ 45,00"),
+            ...entrada(40, 710, "07 JUL", "RESTAURANTE BOM", "R$ 25,00"),
+            ...entrada(310, 710, "26 JUL", "FARMACIA SAUDE", "R$ 18,50"),
+            ...entrada(40, 690, "08 JUL", "MERCADO PERTO", "R$ 62,10"),
+            ...entrada(310, 690, "27 JUL", "CAFE DA PRACA", "R$ 12,00"),
+          ],
+        ]),
+      },
+      { limiarCaracteresPorPagina: 10 },
+    );
+
+    const textos = documento.linhas.map((linha) => linha.texto);
+    // Cada lançamento inteiro na própria linha: nada de data de um com valor do outro.
+    expect(textos).toEqual([
+      "LANCAMENTOS DO CARTAO",
+      expect.stringMatching(/^05 JUL\s+PADARIA CENTRAL\s+R\$ 49,90$/),
+      expect.stringMatching(/^06 JUL\s+POSTO BANDEIRA\s+R\$ 91,00$/),
+      expect.stringMatching(/^07 JUL\s+RESTAURANTE BOM\s+R\$ 25,00$/),
+      expect.stringMatching(/^08 JUL\s+MERCADO PERTO\s+R\$ 62,10$/),
+      expect.stringMatching(/^24 JUL\s+MERCADO MODELO\s+R\$ 29,99$/),
+      expect.stringMatching(/^25 JUL\s+LIVRARIA CENTRAL\s+R\$ 45,00$/),
+      expect.stringMatching(/^26 JUL\s+FARMACIA SAUDE\s+R\$ 18,50$/),
+      expect.stringMatching(/^27 JUL\s+CAFE DA PRACA\s+R\$ 12,00$/),
+    ]);
+  });
+
+  test("tabela comum não é dividida: a coluna de valores sozinha não é coluna", async () => {
+    // Mesma cara de vão vertical, mas o lado direito só tem valores — é uma
+    // tabela de uma coluna só, e dividir aqui quebraria toda fatura simples.
+    const documento = await canonizar(
+      {
+        nome: "uma-coluna.pdf",
+        bytes: makePdf([
+          [
+            { x: 40, y: 790, text: "RESUMO DE VALORES DO MES DA FATURA" },
+            ...[780, 760, 740, 720, 700, 680, 660, 640].flatMap((y, i) => [
+              { x: 40, y, text: `0${(i % 8) + 1} JUL` },
+              { x: 100, y, text: "ESTABELECIMENTO QUALQUER" },
+              { x: 470, y, text: `R$ ${i + 1}0,00` },
+            ]),
+          ],
+        ]),
+      },
+      { limiarCaracteresPorPagina: 10 },
+    );
+
+    expect(documento.linhas).toHaveLength(9);
+    expect(documento.linhas[1]!.texto).toMatch(/^01 JUL\s+ESTABELECIMENTO QUALQUER\s+R\$ 10,00$/);
+  });
+});

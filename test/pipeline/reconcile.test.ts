@@ -198,3 +198,81 @@ describe("camada 4 — sanidade semântica", () => {
     expect(relatorio.alertas.map((alerta) => alerta.validador)).toEqual(["sempre"]);
   });
 });
+
+describe("camada 4 — o que é conferível e o que é só declaração", () => {
+  test("limite, mínimo, taxa e dívida futura não entram no veredito", async () => {
+    const documento = await tiparTexto(
+      [
+        "VENCIMENTO 11 AGO 2026",
+        "REF 1 JUL A 1 AGO",
+        "PAGAMENTO MINIMO                         R$ 1.690,11",
+        "TOTAL DA DIVIDA A VENCER                R$ 22.089,50",
+        "LIMITE DE COMPRAS                       R$ 30.000,00",
+        "05 JUL   PADARIA DA ESQUINA   MARAVILHA    R$ 12,50",
+        "28 JUL   POSTO BANDEIRA       MARAVILHA   R$ 300,00",
+        "TOTAL                                      R$ 312,50",
+      ].join("\n"),
+    );
+    const relatorio = reconciliar(documento);
+
+    const porRotulo = Object.fromEntries(
+      relatorio.totais.map((total) => [total.total.rotulo, total.total]),
+    );
+    expect(porRotulo["TOTAL"]!.conferivel).toBe(true);
+    expect(porRotulo["PAGAMENTO MINIMO"]!.conferivel).toBe(false);
+    expect(porRotulo["TOTAL DA DIVIDA A VENCER"]!.conferivel).toBe(false);
+    expect(porRotulo["LIMITE DE COMPRAS"]!.conferivel).toBe(false);
+
+    // O total conferível fecha, e as declarações soltas não derrubam o veredito.
+    expect(relatorio.fechouTudo).toBe(true);
+  });
+
+  test("numa faixa de resumo, o valor do total é o que segue a palavra", async () => {
+    const documento = await tiparTexto(
+      [
+        "VENCIMENTO 11 AGO 2026",
+        "TOTAL R$ 312,50    VENCIMENTO 11 AGO    PAGAMENTO MINIMO R$ 62,50",
+        "05 JUL   PADARIA DA ESQUINA   MARAVILHA    R$ 12,50",
+        "28 JUL   POSTO BANDEIRA       MARAVILHA   R$ 300,00",
+      ].join("\n"),
+    );
+    const faixa = reconciliar(documento).totais[0]!;
+
+    // O último valor da linha é o mínimo; o total é o que vem depois de "TOTAL".
+    expect(faixa.total.valor).toBe(312.5);
+  });
+
+  test("taxa de juros dentro de um bloco de encargos não vira total aberto", async () => {
+    const documento = await tiparTexto(
+      [
+        "VENCIMENTO 11 AGO 2026",
+        "ENCARGOS FINANCEIROS DO CARTAO",
+        "SALDO TOTAL                                    36,00",
+        "LANCAMENTOS DO CARTAO",
+        "05 JUL   PADARIA DA ESQUINA   MARAVILHA   R$ 12,50",
+        "TOTAL                                     R$ 12,50",
+      ].join("\n"),
+    );
+    const relatorio = reconciliar(documento);
+    const saldo = relatorio.totais.find((t) => t.total.rotulo === "SALDO TOTAL")!;
+
+    // "SALDO TOTAL" sob o marcador de encargos é declaração, não conferência.
+    expect(saldo.total.conferivel).toBe(false);
+    expect(relatorio.fechouTudo).toBe(true);
+  });
+
+  test("na fixture dourada, os cinco totais com a palavra TOTAL são os conferíveis", async () => {
+    const documento = await tiparTexto(await fixture());
+    const relatorio = reconciliar(documento);
+    const conferiveis = relatorio.totais.filter((t) => t.total.conferivel);
+
+    expect(conferiveis.map((t) => t.total.rotulo).sort()).toEqual([
+      "TOTAL A PAGAR",
+      "TOTAL FINAL 5249",
+      "TOTAL FINAL 6567",
+      "TOTAL FINAL 9661",
+      "TOTAL MOVIMENTACOES",
+    ]);
+    expect(conferiveis.every((t) => t.fechou)).toBe(true);
+  });
+});

@@ -247,6 +247,86 @@ function agruparEmLinhas(
   });
 }
 
+/**
+ * Fatura imprime lançamentos em duas colunas lado a lado, e agrupar por altura
+ * sobre a página inteira costura as duas: a data de um lançamento da esquerda
+ * cola no valor de um da direita, e o valor da esquerda simplesmente some.
+ *
+ * A separação procura um corredor vertical vazio no meio da página e só aceita
+ * o corte quando **os dois lados têm lançamentos completos** — linhas que
+ * começam com data e terminam com valor. É o que distingue duas colunas de
+ * verdade de uma tabela comum, em que a coluna de valores também deixa um vão,
+ * mas sozinha não tem data nenhuma.
+ */
+const COMECA_COM_DATA = /^\s*\d{1,2}(?:\s*[/.-]\s*\d{1,2}|\s+[A-Za-zÀ-ÿ]{3})/;
+const TEM_VALOR = /\d[.,]\d{2}(?![\d.,])/;
+
+/** Faixas horizontais sem nenhum item — candidatas a corredor entre colunas. */
+function corredoresVazios(itens: ItemPosicionado[]): Array<{ inicio: number; fim: number }> {
+  const intervalos = itens
+    .map((item) => ({ inicio: item.x0, fim: item.x0 + item.largura }))
+    .sort((a, b) => a.inicio - b.inicio);
+
+  const corredores: Array<{ inicio: number; fim: number }> = [];
+  let cursor = Number.NEGATIVE_INFINITY;
+  for (const { inicio, fim } of intervalos) {
+    if (inicio > cursor && cursor !== Number.NEGATIVE_INFINITY) {
+      corredores.push({ inicio: cursor, fim: inicio });
+    }
+    cursor = Math.max(cursor, fim);
+  }
+  return corredores;
+}
+
+function pareceColunaDeLancamentos(itens: ItemPosicionado[], tolerancia: number): boolean {
+  const linhas = agruparEmLinhas(itens, tolerancia);
+  const completas = linhas.filter(
+    ({ texto }) => COMECA_COM_DATA.test(texto) && TEM_VALOR.test(texto),
+  );
+  return completas.length >= 2;
+}
+
+/**
+ * Divide os itens da página em uma ou duas colunas. Sem corredor válido — ou
+ * com um lado que não tem lançamento completo — a página segue inteira, que é
+ * o comportamento certo para cabeçalho, resumo e texto corrido.
+ */
+function separarColunas(itens: ItemPosicionado[], tolerancia: number): ItemPosicionado[][] {
+  if (itens.length < 24) return [itens];
+
+  const x0 = Math.min(...itens.map((item) => item.x0));
+  const x1 = Math.max(...itens.map((item) => item.x0 + item.largura));
+  const centro = (x0 + x1) / 2;
+  const faixaUtil = (x1 - x0) * 0.25;
+
+  const candidatos = corredoresVazios(itens)
+    .filter(
+      (corredor) =>
+        corredor.fim - corredor.inicio >= 10 &&
+        corredor.inicio > x0 + faixaUtil &&
+        corredor.fim < x1 - faixaUtil,
+    )
+    // Do mais central para o mais periférico: o corredor entre colunas fica no
+    // meio; os vãos entre colunas de uma tabela comum ficam onde calhar.
+    .sort(
+      (a, b) =>
+        Math.abs((a.inicio + a.fim) / 2 - centro) - Math.abs((b.inicio + b.fim) / 2 - centro),
+    );
+
+  for (const corredor of candidatos) {
+    const corte = (corredor.inicio + corredor.fim) / 2;
+    const esquerda = itens.filter((item) => item.x0 < corte);
+    const direita = itens.filter((item) => item.x0 >= corte);
+    if (
+      pareceColunaDeLancamentos(esquerda, tolerancia) &&
+      pareceColunaDeLancamentos(direita, tolerancia)
+    ) {
+      return [esquerda, direita];
+    }
+  }
+  return [itens];
+}
+
 type ConteudoPdf = {
   paginas: Array<{ pagina: PaginaCanonica; itens: ItemPosicionado[] }>;
   producer: string | null;
@@ -451,8 +531,12 @@ export async function canonizar(
 
     const linhas: Linha[] = [];
     for (const { pagina, itens } of paginas) {
-      for (const { texto, bbox } of agruparEmLinhas(itens, tolerancia)) {
-        linhas.push({ id: linhas.length + 1, pagina: pagina.numero, bbox, texto, origem });
+      // Coluna da esquerda inteira primeiro, depois a da direita: é a ordem de
+      // leitura, e é o que mantém cada lançamento com as próprias linhas.
+      for (const coluna of separarColunas(itens, tolerancia)) {
+        for (const { texto, bbox } of agruparEmLinhas(coluna, tolerancia)) {
+          linhas.push({ id: linhas.length + 1, pagina: pagina.numero, bbox, texto, origem });
+        }
       }
     }
 

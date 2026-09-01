@@ -304,7 +304,10 @@ const DATA = new RegExp(
  * tudo o que já está lançado. O prefixo `CAMPO=` cobre o OFX, em que a linha é
  * uma sequência de pares chave-valor.
  */
-const DATA_INICIAL = new RegExp(`^\\s*(?:[A-Z][A-Z0-9_.]*=)?(?:${DATA.source})`, "i");
+// A fronteira à direita impede pedaço de número maior de virar data: sem ela,
+// "02.03" dentro do CNPJ "02.038.232/0001-64" transformava a linha do boleto
+// num lançamento do valor da fatura inteira.
+const DATA_INICIAL = new RegExp(`^\\s*(?:[A-Z][A-Z0-9_.]*=)?(?:${DATA.source})(?!\\d)`, "i");
 
 export type DataBruta = {
   /** Como está escrito no documento. Preservado para auditoria. */
@@ -366,58 +369,129 @@ export function dataInicial(texto: string): DataBruta | null {
 }
 
 export type PeriodoReferencia = {
-  /** Primeira data completa que o documento escreve. */
+  /** Começo do período de referência — o ciclo de compras da fatura. */
   inicio: string | null;
-  /** Última data completa — na prática o vencimento, quando existe. */
+  /** Fim do período de referência. */
   fim: string | null;
+  /** Data de vencimento declarada, quando o documento a rotula. */
+  vencimento: string | null;
   /** Mês e ano de fechamento, base para resolver as datas sem ano. */
   fechamentoMes: number;
   fechamentoAno: number;
 };
 
 const DATA_COMPLETA = new RegExp(
-  "(?<![\\d/-])(?:(?<iso>\\d{4}-\\d{2}-\\d{2})|(?<numerica>\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{4}))(?![\\d/-])",
-  "g",
+  "(?<![\\d/-])(?:(?<iso>\\d{4}-\\d{2}-\\d{2})|(?<numerica>\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{4})|" +
+    `(?<extensa>\\d{1,2}\\s+(?:DE\\s+)?(?:${MES_ALTERNATIVAS})[a-zç]*\\.?\\s+(?:DE\\s+)?\\d{4}))(?![\\d/-])`,
+  "gi",
 );
 
 function iso(ano: number, mes: number, dia: number): string {
   return `${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
 }
 
-/**
- * Período do documento, a partir das datas que ele escreve por extenso.
- *
- * A maior delas é o fechamento: numa fatura é o vencimento, e é ela que decide
- * o ano das linhas que vêm só com dia e mês. Sem nenhuma data completa, sobra a
- * data de hoje — que o chamador informa, para o resultado não depender do
- * relógio nos testes.
- */
-export function detectarPeriodo(textos: readonly string[], hoje: Date): PeriodoReferencia {
+/** Todas as datas completas do texto, numéricas ou por extenso ("11 AGO 2026"). */
+function datasCompletasDe(texto: string): string[] {
   const datas: string[] = [];
-
-  for (const texto of textos) {
-    for (const encontro of texto.matchAll(DATA_COMPLETA)) {
-      const grupos = encontro.groups ?? {};
-      if (grupos["iso"]) {
-        datas.push(grupos["iso"]);
-        continue;
-      }
-      const partes = grupos["numerica"]!.split(/[/.-]/).map(Number);
+  for (const encontro of texto.matchAll(DATA_COMPLETA)) {
+    const grupos = encontro.groups ?? {};
+    if (grupos["iso"]) {
+      datas.push(grupos["iso"]);
+      continue;
+    }
+    if (grupos["numerica"]) {
+      const partes = grupos["numerica"].split(/[/.-]/).map(Number);
       const [dia, mes, ano] = partes as [number, number, number];
       if (valida(dia, mes)) datas.push(iso(ano, mes, dia));
+      continue;
+    }
+    const extensa = /^(\d{1,2})\s+(?:DE\s+)?([a-zç]{3})[a-zç]*\.?\s+(?:DE\s+)?(\d{4})/i.exec(
+      grupos["extensa"]!,
+    );
+    if (!extensa) continue;
+    const dia = Number(extensa[1]);
+    const mes = MESES[extensa[2]!.toLowerCase()] ?? 0;
+    if (valida(dia, mes)) datas.push(iso(Number(extensa[3]), mes, dia));
+  }
+  return datas;
+}
+
+/** "REF 1 JUL A 1 AGO" — o ciclo de compras escrito só com dia e mês. */
+const REFERENCIA_EXTENSA = new RegExp(
+  `(\\d{1,2})\\s+(?:DE\\s+)?(${MES_ALTERNATIVAS})[a-zç]*\\.?\\s+A[TÉE]*\\s+(\\d{1,2})\\s+(?:DE\\s+)?(${MES_ALTERNATIVAS})[a-zç]*\\.?`,
+  "i",
+);
+
+/** Rótulos genéricos que anunciam o ciclo de referência e o vencimento. */
+const ROTULO_REFERENCIA = /\bREF\b|REFER[ÊE]NCIA|PER[ÍI]ODO/i;
+const ROTULO_VENCIMENTO = /VENCIMENT/i;
+
+/**
+ * Período do documento.
+ *
+ * O vencimento vem da linha que o rotula ("VENCIMENTO 11 AGO 2026"), e é ele a
+ * base para resolver as datas sem ano. O ciclo de compras vem da linha de
+ * referência ("REF 1 JUL A 1 AGO", "Período: 01/01/2026 a 04/02/2026") — as
+ * compras de uma fatura acontecem *antes* das datas administrativas que ela
+ * imprime, então tratar a menor data completa como início do período marcaria
+ * a fatura inteira como anômala. Sem rótulo nenhum, sobram as datas completas
+ * do documento; sem nenhuma, a data de hoje, que o chamador informa.
+ */
+export function detectarPeriodo(textos: readonly string[], hoje: Date): PeriodoReferencia {
+  const todas: string[] = [];
+  let vencimento: string | null = null;
+
+  for (const texto of textos) {
+    const datas = datasCompletasDe(texto);
+    todas.push(...datas);
+    if (!vencimento && ROTULO_VENCIMENTO.test(texto) && datas[0]) vencimento = datas[0];
+  }
+
+  todas.sort();
+  const base =
+    vencimento ??
+    todas[todas.length - 1] ??
+    iso(hoje.getFullYear(), hoje.getMonth() + 1, hoje.getDate());
+  const fechamentoAno = Number(base.slice(0, 4));
+  const fechamentoMes = Number(base.slice(5, 7));
+  const fechamento = { fechamentoMes, fechamentoAno };
+
+  let inicio: string | null = null;
+  let fim: string | null = null;
+  for (const texto of textos) {
+    if (!ROTULO_REFERENCIA.test(texto)) continue;
+    const completas = datasCompletasDe(texto);
+    if (completas.length >= 2) {
+      completas.sort();
+      inicio = completas[0]!;
+      fim = completas[completas.length - 1]!;
+      break;
+    }
+    const extensa = REFERENCIA_EXTENSA.exec(texto);
+    if (extensa) {
+      const [, diaInicio, mesInicio, diaFim, mesFim] = extensa as unknown as [
+        string,
+        string,
+        string,
+        string,
+        string,
+      ];
+      const mes1 = MESES[mesInicio.toLowerCase()] ?? 0;
+      const mes2 = MESES[mesFim.toLowerCase()] ?? 0;
+      if (valida(Number(diaInicio), mes1) && valida(Number(diaFim), mes2)) {
+        inicio = iso(resolverAno(mes1, fechamento), mes1, Number(diaInicio));
+        fim = iso(resolverAno(mes2, fechamento), mes2, Number(diaFim));
+        break;
+      }
     }
   }
 
-  datas.sort();
-  const inicio = datas[0] ?? null;
-  const fim = datas[datas.length - 1] ?? null;
-  const base = fim ?? iso(hoje.getFullYear(), hoje.getMonth() + 1, hoje.getDate());
-
   return {
-    inicio,
-    fim,
-    fechamentoAno: Number(base.slice(0, 4)),
-    fechamentoMes: Number(base.slice(5, 7)),
+    inicio: inicio ?? todas[0] ?? null,
+    fim: fim ?? todas[todas.length - 1] ?? null,
+    vencimento,
+    fechamentoMes,
+    fechamentoAno,
   };
 }
 
@@ -427,7 +501,10 @@ export function detectarPeriodo(textos: readonly string[], hoje: Date): PeriodoR
  * Mês depois do fechamento é do ano anterior: numa fatura de fevereiro, `17 JUL`
  * é a parcela de uma compra do julho passado, não uma compra do futuro.
  */
-export function resolverAno(mes: number, periodo: PeriodoReferencia): number {
+export function resolverAno(
+  mes: number,
+  periodo: Pick<PeriodoReferencia, "fechamentoMes" | "fechamentoAno">,
+): number {
   return mes <= periodo.fechamentoMes ? periodo.fechamentoAno : periodo.fechamentoAno - 1;
 }
 
@@ -480,7 +557,9 @@ export function extrairParcela(descricao: string): Parcela | null {
 export function extrairDescricao(texto: string, data: DataBruta | null): string {
   const semData = data ? texto.slice(data.fim) : texto;
   const restantes = colunas(semData).filter((coluna) => !ehColunaDeValor(coluna));
-  const bruta = restantes[0] ?? semData.trim();
+  // Sobrou só valor? A descrição está em branco de verdade — devolver o "R$
+  // 72,00" como nome seria inventar descrição a partir do número.
+  const bruta = restantes[0] ?? "";
   const parcela = extrairParcela(semData);
   return stripInstallmentSuffix(bruta, parcela?.numero, parcela?.total);
 }
@@ -616,11 +695,16 @@ export function tipar(documento: DocumentoCanonico, opcoes: { hoje?: Date } = {}
     valores: valoresDaLinha(linha.texto, convencao),
   }));
 
+  /** O que a linha tem depois da data — é o que separa descrição de fragmento. */
+  const conteudoAposData = (fato: Fatos): string =>
+    fato.data ? fato.linha.texto.slice(fato.data.fim) : fato.linha.texto;
+
   /**
    * A linha completa a de cima: o PDF quebrou a descrição em duas e o valor
-   * ficou na segunda. Data sozinha não é lançamento — algo tem de completá-la —,
-   * e o que parece data no começo da continuação costuma ser a marca de parcela
-   * que desceu junto ("17 JUL INDUSTRIA DE JOIAS C" / "06/10 CHAPECO R$ 110.00").
+   * ficou na segunda ("17 JUL INDUSTRIA DE JOIAS C" / "06/10 CHAPECO R$ 110.00").
+   * A linha de cima precisa ter descrição própria: um "01/02" solto — sobra de
+   * parcela que a fatura imprime em linha própria — não rouba o valor da linha
+   * de baixo, que é um lançamento inteiro por si.
    */
   const continuacoes = fatos.map(({ valores }, indice) => {
     const anterior = fatos[indice - 1];
@@ -628,21 +712,121 @@ export function tipar(documento: DocumentoCanonico, opcoes: { hoje?: Date } = {}
       valores.length > 0 &&
       anterior !== undefined &&
       anterior.data !== null &&
-      anterior.valores.length === 0
+      anterior.valores.length === 0 &&
+      /[A-Za-zÀ-ÿ]{2}/.test(conteudoAposData(anterior))
     );
   });
 
+  /** A linha é um lançamento por si — completo, ou completado pela de baixo. */
+  const ehEntrada = (indice: number): boolean => {
+    const fato = fatos[indice];
+    if (!fato?.data) return false;
+    if (fato.valores.length > 0) return !continuacoes[indice];
+    return continuacoes[indice + 1] === true;
+  };
+
+  /**
+   * Onde a descrição costuma começar depois da data, em caracteres. Fatura
+   * alinha a coluna de descrição; uma linha em que o primeiro texto aparece
+   * bem além desse ponto está com a descrição em branco — o nome ficou na
+   * linha de cima, que é como este layout quebra lançamento comprido.
+   */
+  const inicios: number[] = [];
+  fatos.forEach((fato, indice) => {
+    if (!fato.data || fato.valores.length === 0 || continuacoes[indice]) return;
+    const posicao = /\S/.exec(conteudoAposData(fato))?.index;
+    if (posicao !== undefined) inicios.push(posicao);
+  });
+  const frequencia = new Map<number, number>();
+  for (const posicao of inicios) {
+    const faixa = Math.round(posicao / 4);
+    frequencia.set(faixa, (frequencia.get(faixa) ?? 0) + 1);
+  }
+  const faixaModal = [...frequencia.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0;
+  const inicioTipico = faixaModal * 4;
+
+  const faltaDescricao = (indice: number): boolean => {
+    const fato = fatos[indice]!;
+    if (!fato.data) return false;
+    const corpo = continuacoes[indice + 1]
+      ? `${conteudoAposData(fato)} ${fatos[indice + 1]?.linha.texto ?? ""}`
+      : conteudoAposData(fato);
+    const restantes = colunas(corpo).filter((coluna) => !ehColunaDeValor(coluna));
+    if (restantes.length === 0) return true;
+    if (inicios.length < 6 || fato.valores.length === 0) return false;
+    const posicao = /\S/.exec(conteudoAposData(fato))?.index ?? 0;
+    return posicao - inicioTipico > 12;
+  };
+
+  /* Reivindicações: cada pedaço de lançamento encontra o seu dono. */
+  const donoDe = new Map<number, number>();
+  const nomesDe = new Map<number, number[]>();
+  const caudasDe = new Map<number, number[]>();
+
+  const podeSerNome = (indice: number): boolean => {
+    const fato = fatos[indice];
+    if (!fato || donoDe.has(indice)) return false;
+    if (fato.data || fato.valores.length > 0) return false;
+    const texto = fato.linha.texto.trim();
+    return (
+      texto !== "" &&
+      texto.length <= 45 &&
+      !texto.endsWith(":") &&
+      !ehCabecalho(fato.linha.texto) &&
+      !ehRuido(fato.linha.texto)
+    );
+  };
+
+  /** "PROTEÇÃO PERDA OU" pede a linha de baixo: nome quebrado no conectivo. */
+  const CONECTIVO_FINAL = /\b(?:DE|DA|DO|DAS|DOS|E|OU|COM|PARA|POR|NO|NA|NOS|NAS)\s*$/i;
+  /** Sobra de parcela em linha própria: "(5249) 03/12", "01/02". */
+  const FRAGMENTO_DE_CAUDA = /^\(?\d{3,4}\)?\s*\d{1,2}\s*\/\s*\d{1,2}$|^\d{1,2}\s*\/\s*\d{1,2}$/;
+
+  fatos.forEach((fato, indice) => {
+    if (!ehEntrada(indice)) return;
+
+    if (faltaDescricao(indice)) {
+      const nomes: number[] = [];
+      if (podeSerNome(indice - 1)) {
+        nomes.unshift(indice - 1);
+        if (
+          podeSerNome(indice - 2) &&
+          CONECTIVO_FINAL.test(fatos[indice - 2]!.linha.texto.trim())
+        ) {
+          nomes.unshift(indice - 2);
+        }
+      }
+      if (nomes.length > 0) {
+        for (const nome of nomes) donoDe.set(nome, indice);
+        nomesDe.set(indice, nomes);
+      }
+    }
+
+    const fimDaEntrada = continuacoes[indice + 1] ? indice + 1 : indice;
+    const cauda = fimDaEntrada + 1;
+    const fatoCauda = fatos[cauda];
+    if (
+      fatoCauda &&
+      !donoDe.has(cauda) &&
+      fatoCauda.valores.length === 0 &&
+      FRAGMENTO_DE_CAUDA.test(fatoCauda.linha.texto.trim())
+    ) {
+      donoDe.set(cauda, indice);
+      caudasDe.set(indice, [cauda]);
+    }
+  });
+
   const tipos: TipoLinha[] = fatos.map(({ linha, data, valores }, indice) => {
-    if (continuacoes[indice]) return TipoLinha.LANCAMENTO;
-    if (data && valores.length > 0) return TipoLinha.LANCAMENTO;
+    // Pedaço de lançamento — continuação, nome ou cauda — é lançamento.
+    if (continuacoes[indice] || donoDe.has(indice)) return TipoLinha.LANCAMENTO;
+    if (ehEntrada(indice)) return TipoLinha.LANCAMENTO;
 
     // Valor sem data é total, saldo, limite ou resumo. Vale em qualquer
     // documento financeiro: lançamento tem data própria; total, não.
     if (valores.length > 0) return TipoLinha.TOTAL_DECLARADO;
 
-    // Data sem valor: é lançamento quando a linha de baixo traz o valor que
-    // falta; sozinha, não dá para dizer o que é, e quem decide é o LLM.
-    if (data) return continuacoes[indice + 1] ? TipoLinha.LANCAMENTO : TipoLinha.AMBIGUA;
+    // Data sem valor e sem dono: sobra que nenhuma regra reclamou. LLM decide.
+    if (data) return TipoLinha.AMBIGUA;
 
     const texto = linha.texto;
     if (ehCabecalho(texto)) return TipoLinha.CABECALHO;
@@ -663,19 +847,20 @@ export function tipar(documento: DocumentoCanonico, opcoes: { hoje?: Date } = {}
   });
 
   const linhas: LinhaTipada[] = [];
-  const absorve = new Map<number, number[]>();
+  const absorvidasPorDono = new Map<number, number[]>();
   let grupo: number | null = null;
 
   fatos.forEach(({ linha, data, valores }, indice) => {
     const tipo = tipos[indice]!;
     if (tipo === TipoLinha.MARCADOR_GRUPO) grupo = linha.id;
 
-    if (continuacoes[indice]) {
-      const dono = fatos[indice - 1]!.linha.id;
-      absorve.set(dono, [...(absorve.get(dono) ?? []), linha.id]);
+    const donoIndice = continuacoes[indice] ? indice - 1 : donoDe.get(indice);
+    if (donoIndice !== undefined) {
+      const dono = fatos[donoIndice]!.linha.id;
+      absorvidasPorDono.set(dono, [...(absorvidasPorDono.get(dono) ?? []), linha.id]);
       linhas.push({
         id: linha.id,
-        tipo,
+        tipo: TipoLinha.LANCAMENTO,
         texto: linha.texto,
         absorvidaPor: dono,
         absorve: [],
@@ -693,15 +878,41 @@ export function tipar(documento: DocumentoCanonico, opcoes: { hoje?: Date } = {}
 
     const ehLancamento = tipo === TipoLinha.LANCAMENTO;
     const ano = data ? (data.ano ?? resolverAno(data.mes, periodo)) : null;
-    // Quando a linha de baixo completa esta, o valor e o resto da descrição
-    // estão lá — e é o texto das duas juntas que vale para descrição e parcela.
+
+    if (!ehLancamento || !data) {
+      linhas.push({
+        id: linha.id,
+        tipo,
+        texto: linha.texto,
+        absorvidaPor: null,
+        absorve: [],
+        dataRaw: data?.raw ?? null,
+        dataIso: data && ano !== null ? iso(ano, data.mes, data.dia) : null,
+        descricao: null,
+        valores,
+        valor: null,
+        estorno: false,
+        parcela: null,
+        grupo,
+      });
+      return;
+    }
+
+    // O lançamento inteiro: nome absorvido de cima, corpo (com a continuação
+    // de valor, quando houver) e cauda de parcela. Descrição e parcela saem
+    // desse conjunto; o valor, da linha que o carrega.
+    const nomes = (nomesDe.get(indice) ?? []).map((nome) => fatos[nome]!.linha.texto.trim());
+    const caudas = (caudasDe.get(indice) ?? []).map((cauda) => fatos[cauda]!.linha.texto.trim());
     const completada = continuacoes[indice + 1] === true;
-    const proprios = completada ? (fatos[indice + 1]?.valores ?? []) : valores;
-    const valor = ehLancamento ? (proprios[proprios.length - 1] ?? null) : null;
-    const textoCompleto = completada
+    const corpo = completada
       ? `${linha.texto} ${fatos[indice + 1]?.linha.texto ?? ""}`
       : linha.texto;
-    const descricao = ehLancamento ? extrairDescricao(textoCompleto, data) : null;
+    const proprios = completada ? (fatos[indice + 1]?.valores ?? []) : valores;
+    const valor = proprios[proprios.length - 1] ?? null;
+
+    const parcela = extrairParcela([corpo.slice(data.fim), ...caudas].join(" "));
+    const descricaoBase = nomes.length > 0 ? nomes.join(" ") : extrairDescricao(corpo, data);
+    const descricao = stripInstallmentSuffix(descricaoBase, parcela?.numero, parcela?.total);
 
     linhas.push({
       id: linha.id,
@@ -709,19 +920,21 @@ export function tipar(documento: DocumentoCanonico, opcoes: { hoje?: Date } = {}
       texto: linha.texto,
       absorvidaPor: null,
       absorve: [],
-      dataRaw: data?.raw ?? null,
-      dataIso: data && ano !== null ? iso(ano, data.mes, data.dia) : null,
+      dataRaw: data.raw,
+      dataIso: ano !== null ? iso(ano, data.mes, data.dia) : null,
       descricao,
       valores,
       valor,
       estorno: valor !== null && valor < 0,
-      parcela: ehLancamento ? extrairParcela(textoCompleto.slice(data?.fim ?? 0)) : null,
+      parcela,
       grupo,
     });
   });
 
   const comAbsorcao = linhas.map((linha) =>
-    absorve.has(linha.id) ? { ...linha, absorve: absorve.get(linha.id)! } : linha,
+    absorvidasPorDono.has(linha.id)
+      ? { ...linha, absorve: absorvidasPorDono.get(linha.id)!.sort((a, b) => a - b) }
+      : linha,
   );
 
   const contagemPorTipo = Object.fromEntries(

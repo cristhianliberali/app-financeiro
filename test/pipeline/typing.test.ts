@@ -264,3 +264,135 @@ describe("camada 2 — sem conhecimento de emissor", () => {
     expect(fontes.map((fonte) => emissores.test(fonte))).toEqual([false, false]);
   });
 });
+
+describe("camada 2 — lançamento repartido em várias linhas", () => {
+  test("o nome que ficou na linha de cima é absorvido pelo lançamento", async () => {
+    const documento = await tiparTexto(
+      [
+        "VENCIMENTO 11 AGO 2026",
+        "MOVIMENTACOES DA CONTA",
+        "05 JUL   BEM POPULAR DO BRASIL   Maravilha   R$ 49,90",
+        "ANUIDADE CARTAO",
+        "04 MAI                                      R$ 72,00",
+        "(5249) 03/12",
+      ].join("\n"),
+    );
+
+    const entradas = lancamentos(documento);
+    expect(entradas).toHaveLength(2);
+    expect(entradas[1]).toMatchObject({
+      descricao: "ANUIDADE CARTAO",
+      valor: 72,
+      dataIso: "2026-05-04",
+      parcela: { numero: 3, total: 12 },
+    });
+    // O nome e a cauda viram parte do lançamento, nunca marcador de grupo.
+    expect(documento.linhas.filter((l) => l.absorvidaPor === entradas[1]!.id)).toHaveLength(2);
+    // E o marcador de verdade continua marcador.
+    const marcador = documento.linhas.find((l) => l.texto === "MOVIMENTACOES DA CONTA")!;
+    expect(marcador.tipo).toBe(TipoLinha.MARCADOR_GRUPO);
+  });
+
+  test("nome quebrado no conectivo junta as duas linhas de cima", async () => {
+    const documento = await tiparTexto(
+      [
+        "VENCIMENTO 11 AGO 2026",
+        "PROTECAO PERDA OU",
+        "ROUBO",
+        "04 MAI                                      R$ 4,99",
+      ].join("\n"),
+    );
+
+    expect(lancamentos(documento)[0]).toMatchObject({
+      descricao: "PROTECAO PERDA OU ROUBO",
+      valor: 4.99,
+    });
+  });
+
+  test("cidade sozinha não vira descrição quando o nome está na linha de cima", async () => {
+    const normais = Array.from(
+      { length: 7 },
+      (_, i) => `0${i + 1} JUL   LOJA NUMERO ${i + 1}   MARAVILHA   R$ 1${i},00`,
+    );
+    const documento = await tiparTexto(
+      [
+        "VENCIMENTO 11 AGO 2026",
+        ...normais,
+        "MERCADOPAGO*QUATROP",
+        "01 JAN                             JUIZ DE FORA   R$ 50,25",
+      ].join("\n"),
+    );
+
+    const ultima = lancamentos(documento).at(-1)!;
+    expect(ultima).toMatchObject({ descricao: "MERCADOPAGO*QUATROP", valor: 50.25 });
+  });
+
+  test("sobra de parcela em linha própria não rouba o valor do lançamento de baixo", async () => {
+    const documento = await tiparTexto(
+      [
+        "VENCIMENTO 11 AGO 2026",
+        "20 JUL   LOJA DO CENTRO   Pinhalzinho   R$ 65,97",
+        "01/02",
+        "21 JUL   MERCADO GERAL    CURITIBA      R$ 163,87",
+      ].join("\n"),
+    );
+
+    const entradas = lancamentos(documento);
+    expect(entradas).toHaveLength(2);
+    // A sobra "01/02" pertence ao lançamento de cima, como parcela…
+    expect(entradas[0]).toMatchObject({
+      descricao: "LOJA DO CENTRO",
+      valor: 65.97,
+      parcela: { numero: 1, total: 2 },
+    });
+    // …e o de baixo continua inteiro, com a própria data e o próprio valor.
+    expect(entradas[1]).toMatchObject({
+      descricao: "MERCADO GERAL",
+      valor: 163.87,
+      dataIso: "2026-07-21",
+      parcela: null,
+    });
+  });
+
+  test("a descrição em branco fica em branco — não vira o próprio valor", async () => {
+    const documento = await tiparTexto(
+      ["VENCIMENTO 11 AGO 2026", "", "04 MAI                             R$ 72,00"].join("\n"),
+    );
+    expect(lancamentos(documento)[0]!.descricao).toBe("");
+  });
+});
+
+describe("camada 2 — período com rótulos e datas por extenso", () => {
+  test("vencimento e referência saem das linhas que os anunciam", () => {
+    const periodo = detectarPeriodo(
+      [
+        "Consulta realizada em: 31/08/2026 às 19:22",
+        "VENCIMENTO             11 AGO 2026",
+        "REF 1 JUL A 1 AGO",
+      ],
+      HOJE,
+    );
+
+    expect(periodo.vencimento).toBe("2026-08-11");
+    expect(periodo.inicio).toBe("2026-07-01");
+    expect(periodo.fim).toBe("2026-08-01");
+    // O fechamento vem do vencimento, não da maior data solta do documento.
+    expect(periodo).toMatchObject({ fechamentoMes: 8, fechamentoAno: 2026 });
+  });
+
+  test("compra do ciclo não é anterior ao período: os alertas somem", async () => {
+    const documento = await tiparTexto(
+      [
+        "VENCIMENTO 11 AGO 2026",
+        "REF 1 JUL A 1 AGO",
+        "05 JUL   PADARIA DA ESQUINA   MARAVILHA   R$ 12,50",
+        "28 JUL   POSTO BANDEIRA       MARAVILHA   R$ 300,00",
+      ].join("\n"),
+    );
+    const { datasNoPeriodo } = await import("@/integrations/ai/pipeline/reconcile");
+
+    expect(datasNoPeriodo.verificar({ documento, lancamentos: lancamentos(documento) })).toEqual(
+      [],
+    );
+  });
+});

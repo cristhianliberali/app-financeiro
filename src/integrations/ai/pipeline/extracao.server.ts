@@ -47,10 +47,15 @@ export type TotalConferido = {
   via: ViaDeFechamento | null;
   /** Declarado menos encontrado; é o tamanho do buraco quando não fechou. */
   diferenca: number;
+  /**
+   * Entra no veredito da conferência. Limite, taxa, mínimo e projeção ficam
+   * `false`: são declarados pelo documento, mas não são soma das linhas.
+   */
+  conferivel: boolean;
 };
 
 export type ConferenciaExtracao = {
-  /** `false` quando o documento não declara total nenhum (CSV cru, texto solto). */
+  /** `false` quando o documento não declara nenhum total conferível. */
   disponivel: boolean;
   fechouTudo: boolean;
   totais: TotalConferido[];
@@ -60,7 +65,7 @@ export type ConferenciaExtracao = {
 export type ExtracaoParaTela = {
   origem: OrigemLinha;
   convencao: ConvencaoNumerica;
-  /** Última data completa do documento — numa fatura, o vencimento. */
+  /** Vencimento declarado no documento; sem rótulo, o fim do período. */
   vencimento: string | null;
   periodo: { inicio: string | null; fim: string | null };
   transacoes: TransacaoExtraida[];
@@ -138,8 +143,14 @@ export async function extrairParaTela(
   const rotuloDoGrupo = (grupo: number | null): string | null =>
     grupo === null ? null : (porId.get(grupo)?.texto.trim() ?? null);
 
-  const temTotais = relatorio.totais.length > 0;
-  const orfaos = new Set(temTotais ? relatorio.orfaos : []);
+  const temTotais = relatorio.totais.some((fechamento) => fechamento.total.conferivel);
+  // "Fora dos totais" só é sinal quando o documento enumera as linhas em
+  // subtotais por bloco e sobra pouca coisa. Quando a maioria ficaria órfã, o
+  // documento simplesmente não fecha por blocos — aí o aviso linha a linha é
+  // ruído, e quem fala é o veredito da conferência.
+  const todosOrfaos = new Set(temTotais ? relatorio.orfaos : []);
+  const quantosLancamentos = lancamentos(tipado).length;
+  const orfaos = todosOrfaos.size <= quantosLancamentos * 0.3 ? todosOrfaos : new Set<number>();
   const comSanidade = new Set(relatorio.alertas.flatMap((alerta) => alerta.linhas));
 
   const transacoes: TransacaoExtraida[] = [];
@@ -177,7 +188,7 @@ export async function extrairParaTela(
   return {
     origem: canonico.origem,
     convencao: tipado.convencao,
-    vencimento: tipado.periodo.fim,
+    vencimento: tipado.periodo.vencimento ?? tipado.periodo.fim,
     periodo: { inicio: tipado.periodo.inicio, fim: tipado.periodo.fim },
     transacoes,
     conferencia: {
@@ -190,6 +201,7 @@ export async function extrairParaTela(
         fechou: fechamento.fechou,
         via: fechamento.via,
         diferenca: fechamento.diferenca,
+        conferivel: fechamento.total.conferivel,
       })),
       alertas: relatorio.alertas.map((alerta) => ({
         mensagem: alerta.mensagem,
