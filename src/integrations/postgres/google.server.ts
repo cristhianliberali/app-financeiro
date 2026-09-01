@@ -580,8 +580,20 @@ export async function listCalendarEvents(
 
 /** Sincronização completa de um usuário: puxa a agenda e devolve o resumo. */
 export async function syncUser(userId: string): Promise<SyncResult> {
-  const push = await pushPendingTasks(userId);
+  /*
+   * Ler primeiro, escrever depois — a ordem importa.
+   *
+   * Ao contrário, `pushPendingTasks` via a tarefa cujo vínculo se perdeu como
+   * "ainda não enviada", criava um compromisso novo para ela e gravava o
+   * vínculo; quando a leitura chegava, a tarefa já tinha vínculo e o
+   * compromisso antigo — o que a pessoa tinha acabado de mover — era descartado
+   * como cópia. A edição sumia e ainda sobrava um evento duplicado na agenda.
+   *
+   * Lendo antes, a leitura readota o compromisso de verdade e o envio já o
+   * encontra vinculado, sem duplicar nada.
+   */
   const result = await pullCalendarChanges(userId);
+  const push = await pushPendingTasks(userId);
   if (!push.error)
     await query(`UPDATE google_accounts SET last_error = NULL WHERE user_id = $1`, [userId]);
   return { ...result, pushed: push.pushed, ...(push.error ? { error: push.error } : {}) };
@@ -637,6 +649,131 @@ export async function pushPendingTasks(
     pushed += 1;
   }
   return { pushed };
+}
+
+/**
+ * Retrato do que o Google devolve para esta pessoa, agora.
+ *
+ * Existe porque "não está sincronizando" tem meia dúzia de causas que, de fora,
+ * são idênticas: a conta não está conectada, o compromisso não é espelho de
+ * tarefa nenhuma, ele é espelho mas perdeu o vínculo, ou é espelho e está igual
+ * à tarefa. Sem ver o que voltou do Google, a diferença entre elas é palpite.
+ *
+ * A leitura é sempre completa, ignorando o marcador de sincronização: o
+ * diagnóstico precisa enxergar a agenda como ela está, não só o que mudou desde
+ * a última rodada. Nada aqui grava — é só leitura.
+ */
+export type CalendarDiagnostic = {
+  conectado: boolean;
+  email: string | null;
+  calendarId: string | null;
+  /** Já existe marcador incremental? Sem ele, toda rodada relê a janela. */
+  temMarcador: boolean;
+  ultimaSync: string | null;
+  ultimoErro: string | null;
+  /** Vínculos evento↔tarefa no banco para esta pessoa. */
+  vinculos: number;
+  eventosLidos: number;
+  /** Dos lidos, quantos carregam a marca que só o app escreve. */
+  comMarcaDeTarefa: number;
+  /** Dos com marca, quantos o banco reconhece pelo id do evento. */
+  comVinculo: number;
+  amostra: Array<{
+    titulo: string;
+    googleInicio: string | null;
+    googleFim: string | null;
+    googleAlterado: string | null;
+    tarefaInicio: string | null;
+    tarefaPrazo: string | null;
+    veredito: string;
+  }>;
+  erro?: string;
+};
+
+export async function diagnoseCalendar(userId: string): Promise<CalendarDiagnostic> {
+  const vazio: CalendarDiagnostic = {
+    conectado: false,
+    email: null,
+    calendarId: null,
+    temMarcador: false,
+    ultimaSync: null,
+    ultimoErro: null,
+    vinculos: 0,
+    eventosLidos: 0,
+    comMarcaDeTarefa: 0,
+    comVinculo: 0,
+    amostra: [],
+  };
+
+  const connection = await getConnection(userId);
+  if (!connection) return vazio;
+
+  const base: CalendarDiagnostic = {
+    ...vazio,
+    conectado: true,
+    email: connection.google_email,
+    calendarId: connection.calendar_id,
+    temMarcador: !!connection.sync_token,
+    ultimaSync: connection.last_sync_at ? new Date(connection.last_sync_at).toISOString() : null,
+    ultimoErro: connection.last_error,
+  };
+
+  const links = await query<{ task_id: string; event_id: string }>(
+    `SELECT task_id, event_id FROM task_calendar_events WHERE user_id = $1`,
+    [userId],
+  );
+  const porEvento = new Map(links.map((link) => [link.event_id, link.task_id]));
+  base.vinculos = links.length;
+
+  const now = Date.now();
+  let page;
+  try {
+    page = await listEvents(await accessTokenFor(connection), connection.calendar_id, {
+      timeMin: new Date(now - 60 * 86_400_000).toISOString(),
+      timeMax: new Date(now + 180 * 86_400_000).toISOString(),
+    });
+  } catch (error) {
+    return { ...base, erro: error instanceof Error ? error.message : String(error) };
+  }
+
+  base.eventosLidos = page.events.length;
+
+  for (const event of page.events) {
+    if (event.status === "cancelled") continue;
+    const marcada = taskIdOf(event);
+    if (!marcada) continue;
+    base.comMarcaDeTarefa += 1;
+
+    const vinculada = porEvento.get(event.id);
+    if (vinculada) base.comVinculo += 1;
+
+    if (base.amostra.length >= 8) continue;
+
+    const task = await queryOne<TaskDatesRow>(
+      `SELECT start_date, due_date FROM tasks WHERE id = $1`,
+      [vinculada ?? marcada],
+    );
+    const proximas = task ? taskDatesFromEvent(task, event) : null;
+
+    base.amostra.push({
+      titulo: event.summary ?? "(sem título)",
+      googleInicio: event.start?.dateTime ?? event.start?.date ?? null,
+      googleFim: event.end?.dateTime ?? event.end?.date ?? null,
+      googleAlterado: event.updated ?? null,
+      tarefaInicio: task?.start_date ? new Date(task.start_date).toISOString() : null,
+      tarefaPrazo: task?.due_date ? new Date(task.due_date).toISOString() : null,
+      veredito: !task
+        ? "a tarefa não existe mais no banco"
+        : !vinculada
+          ? "compromisso nosso sem vínculo no banco — a leitura vai readotá-lo"
+          : proximas
+            ? `gravaria início=${proximas.start_date?.toISOString() ?? "—"} ` +
+              `prazo=${proximas.due_date?.toISOString() ?? "—"}`
+            : "já está igual à tarefa; nada a gravar",
+    });
+  }
+
+  return base;
 }
 
 /** Quem está conectado e já passou do intervalo — usado pelo agendador. */
