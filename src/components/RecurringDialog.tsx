@@ -1,8 +1,7 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { History, Trash2 } from "lucide-react";
+import { Repeat, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { DateField } from "@/components/ui/date-field";
 import { Label } from "@/components/ui/label";
@@ -23,19 +22,30 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAppState } from "@/lib/app-state";
-import { activeCategories, useCategories, useRecurring, useRemove, useUpsert } from "@/lib/data";
+import {
+  activeCategories,
+  useCategories,
+  useRecurring,
+  useRecurringImpact,
+  useRemoveRecurring,
+  useSaveRecurring,
+  type RecurringRule,
+} from "@/lib/data";
 import { brl, formatDateBR, toISODate } from "@/lib/format";
-import { MAX_RECURRING_BACKFILL, occurrencesUntil } from "@/lib/recurring";
+import { RECURRING_HORIZON_MONTHS } from "@/lib/recurring";
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void };
+
+/** O que acontece com os lançamentos já criados quando a regra sai. */
+type DeleteScope = "all" | "future" | "keep";
 
 export function RecurringDialog({ open, onOpenChange }: Props) {
   const { profileId } = useAppState();
   const { data: categories = [] } = useCategories(profileId);
   const { data: rules = [] } = useRecurring(profileId);
-  const upsert = useUpsert("recurring_rules");
-  const upsertTransactions = useUpsert("transactions");
-  const remove = useRemove("recurring_rules");
+  const save = useSaveRecurring();
+  const impact = useRecurringImpact();
+  const remove = useRemoveRecurring();
 
   const today = toISODate(new Date());
 
@@ -48,110 +58,111 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
     category_id: "",
     start_date: today,
   });
-  /** Confirmação do retroativo: fica aberta com as datas que serão gravadas. */
-  const [backfill, setBackfill] = useState<string[] | null>(null);
-  /** No passado, boa parte já foi paga; quem sabe disso é quem está cadastrando. */
-  const [markPaid, setMarkPaid] = useState(false);
-  const [saving, setSaving] = useState(false);
 
-  /**
-   * As cobranças que a regra já teria feito se existisse desde o início.
-   *
-   * Calculado enquanto se digita, e não só ao salvar: quem escolhe uma data
-   * antiga vê na hora quantos lançamentos aquilo significa.
-   */
-  const pending = useMemo(
-    () =>
-      form.start_date < today
-        ? occurrencesUntil(
-            {
-              frequency: form.frequency,
-              day_of_month: Number(form.day_of_month) || 1,
-              start_date: form.start_date,
-            },
-            today,
-          )
-        : [],
-    [form.start_date, form.frequency, form.day_of_month, today],
-  );
+  /** Regra em vias de ser excluída, com o retrato do que ela criou. */
+  const [confirming, setConfirming] = useState<{
+    rule: RecurringRule;
+    total: number;
+    futuros: number;
+    liquidados: number;
+  } | null>(null);
+  const [scope, setScope] = useState<DeleteScope>("future");
 
-  function validate(): boolean {
-    if (!form.description || !form.amount) {
+  const options = activeCategories(categories).filter((c) => c.kind === form.kind);
+
+  async function submit() {
+    if (!form.description.trim() || !form.amount) {
       toast.error("Preencha descrição e valor");
-      return false;
+      return;
     }
-    // A recorrência vira lançamento, e lançamento sem categoria não entra.
     if (!form.category_id) {
       toast.error("Escolha uma categoria para a recorrência");
-      return false;
+      return;
     }
-    return true;
-  }
+    if (!profileId) return;
 
-  /**
-   * Grava a regra e, quando pedido, os lançamentos que ela já teria feito.
-   *
-   * A ordem importa: a regra primeiro. Se a gravação dos retroativos falhar no
-   * meio, a recorrência ainda ficou configurada — e o que faltou é visível na
-   * lista de transações, em vez de sumir junto.
-   */
-  async function save(dates: string[]) {
-    const amount = Number(form.amount.replace(",", "."));
-    setSaving(true);
     try {
-      await upsert.mutateAsync({
-        profile_id: profileId,
-        description: form.description,
-        amount,
+      const { created } = await save.mutateAsync({
+        profileId,
+        categoryId: form.category_id,
+        description: form.description.trim(),
+        amount: Number(form.amount.replace(",", ".")),
         kind: form.kind,
         frequency: form.frequency,
-        day_of_month: Number(form.day_of_month) || 1,
-        category_id: form.category_id,
-        start_date: form.start_date,
-        active: true,
+        dayOfMonth: Number(form.day_of_month) || 1,
+        startDate: form.start_date,
       });
-
-      if (dates.length > 0) {
-        await upsertTransactions.mutateAsync(
-          dates.map((date) => ({
-            profile_id: profileId,
-            category_id: form.category_id,
-            description: form.description,
-            amount,
-            kind: form.kind,
-            transaction_date: date,
-            due_date: date,
-            status: markPaid ? "paid" : "pending",
-          })),
-        );
-        toast.success(
-          `Recorrência configurada · ${dates.length} lançamento${dates.length === 1 ? "" : "s"} retroativo${
-            dates.length === 1 ? "" : "s"
-          } gerado${dates.length === 1 ? "" : "s"}`,
-        );
-      } else {
-        toast.success("Recorrência configurada");
-      }
-
+      toast.success(
+        created > 0
+          ? `Recorrência criada · ${created} lançamento${created === 1 ? "" : "s"} gerado${
+              created === 1 ? "" : "s"
+            }`
+          : "Recorrência criada",
+      );
       setForm({ ...form, description: "", amount: "" });
-      setBackfill(null);
-      setMarkPaid(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível salvar");
-    } finally {
-      setSaving(false);
     }
   }
 
-  /** Data no passado nunca grava direto: ela sempre passa pela confirmação. */
-  function requestSave() {
-    if (!validate()) return;
-    if (pending.length > 0) setBackfill(pending);
-    else void save([]);
+  /** Abre a confirmação já sabendo o tamanho do estrago. */
+  async function askDelete(rule: RecurringRule) {
+    try {
+      const found = await impact.mutateAsync(rule.id);
+      setScope(found.futuros > 0 ? "future" : "keep");
+      setConfirming({ rule, ...found });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível ler a recorrência");
+    }
   }
 
-  const previewAmount = Number(form.amount.replace(",", ".")) || 0;
-  const options = activeCategories(categories).filter((c) => c.kind === form.kind);
+  async function confirmDelete() {
+    if (!confirming) return;
+    const { rule } = confirming;
+    try {
+      const { removed } = await remove.mutateAsync({ id: rule.id, scope });
+      toast.success(
+        removed > 0
+          ? `Recorrência excluída · ${removed} lançamento${removed === 1 ? "" : "s"} apagado${
+              removed === 1 ? "" : "s"
+            }`
+          : "Recorrência excluída · os lançamentos foram mantidos",
+      );
+      setConfirming(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível excluir");
+    }
+  }
+
+  const escolhas: Array<{ value: DeleteScope; titulo: string; detalhe: string; perigo?: boolean }> =
+    confirming
+      ? [
+          {
+            value: "future",
+            titulo: `Apagar as futuras (${confirming.futuros})`,
+            detalhe:
+              "Some o que ainda vai vencer, a partir de amanhã. O que já venceu continua no " +
+              "extrato — inclusive o de hoje, que pode já ter sido pago.",
+          },
+          {
+            value: "all",
+            titulo: `Apagar todas (${confirming.total})`,
+            detalhe:
+              confirming.liquidados > 0
+                ? `Some tudo o que esta recorrência criou, incluindo ${confirming.liquidados} já ` +
+                  "liquidado(s). O histórico desses pagamentos vai junto."
+                : "Some tudo o que esta recorrência criou, passado e futuro.",
+            perigo: true,
+          },
+          {
+            value: "keep",
+            titulo: "Manter todos os lançamentos",
+            detalhe:
+              "Só a regra sai; os lançamentos ficam e viram lançamentos comuns. É o caso de um " +
+              "contrato encerrado, em que o histórico precisa continuar de pé.",
+          },
+        ]
+      : [];
 
   return (
     <>
@@ -161,25 +172,35 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
             <DialogTitle>Receitas e despesas recorrentes</DialogTitle>
           </DialogHeader>
 
+          <p className="flex items-start gap-2 rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
+            <Repeat className="mt-0.5 size-3.5 shrink-0" />
+            Ao salvar, os lançamentos são criados de uma vez: do início da recorrência até{" "}
+            {RECURRING_HORIZON_MONTHS} meses à frente. Daí em diante a série se completa sozinha,
+            então o que está por vir sempre aparece nas transações e nas pendências.
+          </p>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
-              <Label>Descrição</Label>
+              <Label htmlFor="rec-descricao">Descrição</Label>
               <Input
+                id="rec-descricao"
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Valor (R$)</Label>
+              <Label htmlFor="rec-valor">Valor (R$)</Label>
               <Input
+                id="rec-valor"
                 inputMode="decimal"
                 value={form.amount}
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Tipo</Label>
+              <Label htmlFor="rec-tipo">Tipo</Label>
               <select
+                id="rec-tipo"
                 value={form.kind}
                 onChange={(e) =>
                   setForm({
@@ -195,8 +216,9 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>Frequência</Label>
+              <Label htmlFor="rec-frequencia">Frequência</Label>
               <select
+                id="rec-frequencia"
                 value={form.frequency}
                 onChange={(e) =>
                   setForm({ ...form, frequency: e.target.value as typeof form.frequency })
@@ -209,8 +231,9 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>Dia do mês</Label>
+              <Label htmlFor="rec-dia">Dia do mês</Label>
               <Input
+                id="rec-dia"
                 inputMode="numeric"
                 value={form.day_of_month}
                 disabled={form.frequency !== "monthly"}
@@ -218,8 +241,9 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Categoria</Label>
+              <Label htmlFor="rec-categoria">Categoria</Label>
               <select
+                id="rec-categoria"
                 value={form.category_id}
                 onChange={(e) => setForm({ ...form, category_id: e.target.value })}
                 className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
@@ -239,27 +263,14 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
                 value={form.start_date}
                 onChange={(e) => setForm({ ...form, start_date: e.target.value })}
               />
+              {form.start_date < today && (
+                <p className="text-[11px] text-muted-foreground">
+                  Início no passado: as cobranças de {formatDateBR(form.start_date)} até hoje também
+                  serão lançadas, como agendadas.
+                </p>
+              )}
             </div>
           </div>
-
-          {/*
-            Aviso do retroativo, ainda no formulário: quem escolhe uma data
-            antiga descobre o tamanho da conta antes de clicar em salvar, não
-            num diálogo que aparece de surpresa depois.
-          */}
-          {pending.length > 0 && (
-            <p className="flex items-start gap-2 rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
-              <History className="mt-0.5 size-3.5 shrink-0" />
-              <span>
-                O início é anterior a hoje: esta regra já teria cobrado{" "}
-                <span className="font-semibold text-foreground">
-                  {pending.length} {pending.length === 1 ? "vez" : "vezes"}
-                </span>
-                , de {formatDateBR(pending[0]!)} a {formatDateBR(pending[pending.length - 1]!)}. Ao
-                salvar, você escolhe se esses lançamentos são gerados.
-              </span>
-            </p>
-          )}
 
           {rules.length > 0 && (
             <div className="space-y-2 border-t border-border pt-4">
@@ -272,12 +283,12 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
                   <span>
                     {r.description}
                     <span className="ml-2 text-xs text-muted-foreground">
-                      dia {r.day_of_month} ·{" "}
                       {r.frequency === "monthly"
-                        ? "mensal"
+                        ? `dia ${r.day_of_month} · mensal`
                         : r.frequency === "weekly"
                           ? "semanal"
-                          : "anual"}
+                          : "anual"}{" "}
+                      · desde {formatDateBR(r.start_date)}
                     </span>
                   </span>
                   <span className="flex items-center gap-3">
@@ -289,9 +300,10 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
                       {brl(r.amount)}
                     </span>
                     <button
-                      onClick={() => remove.mutate(r.id)}
-                      className="text-muted-foreground hover:text-destructive"
-                      aria-label="Remover recorrência"
+                      onClick={() => void askDelete(r)}
+                      disabled={impact.isPending}
+                      className="text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
+                      aria-label={`Excluir recorrência ${r.description}`}
                     >
                       <Trash2 className="size-4" />
                     </button>
@@ -305,88 +317,77 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Fechar
             </Button>
-            <Button onClick={requestSave} disabled={upsert.isPending || saving}>
-              Adicionar recorrência
+            <Button onClick={() => void submit()} disabled={save.isPending}>
+              {save.isPending ? "Criando lançamentos…" : "Adicionar recorrência"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/*
-        Confirmação do retroativo. Gerar dezenas de lançamentos mexe em saldo,
-        teto de categoria e lista de pendências de uma vez só — por isso a tela
-        mostra quantos, quanto e até quando antes de qualquer gravação, e a
-        saída "só a recorrência" fica no mesmo lugar, não escondida.
+        Excluir uma recorrência mexe em dezenas de lançamentos de uma vez, e as
+        três saídas querem coisas diferentes: parar de cobrar daqui para a
+        frente, apagar o registro inteiro, ou tirar só a regra do caminho. Cada
+        opção mostra quantos lançamentos ela alcança — sem esse número, a
+        escolha seria no escuro.
       */}
-      <AlertDialog open={!!backfill} onOpenChange={(v) => !v && setBackfill(null)}>
+      <AlertDialog open={!!confirming} onOpenChange={(v) => !v && setConfirming(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Gerar {backfill?.length ?? 0} lançamento{backfill?.length === 1 ? "" : "s"} anterior
-              {backfill?.length === 1 ? "" : "es"} a hoje?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Excluir “{confirming?.rule.description}”?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
                 <p>
-                  “{form.description}” começa em{" "}
+                  Esta recorrência criou{" "}
                   <span className="font-semibold text-foreground">
-                    {formatDateBR(form.start_date)}
+                    {confirming?.total ?? 0} lançamento(s)
                   </span>
-                  , no passado. Podemos criar agora as cobranças que já teriam acontecido — de{" "}
-                  {backfill && backfill.length > 0 ? formatDateBR(backfill[0]!) : "—"} a{" "}
-                  {backfill && backfill.length > 0
-                    ? formatDateBR(backfill[backfill.length - 1]!)
-                    : "—"}
-                  , somando{" "}
-                  <span className="font-semibold text-foreground">
-                    {brl(previewAmount * (backfill?.length ?? 0))}
-                  </span>
-                  .
+                  , dos quais {confirming?.futuros ?? 0} ainda vão vencer. Escolha o que fazer com
+                  eles:
                 </p>
-                <ul className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-border bg-surface p-3 text-xs">
-                  {(backfill ?? []).map((date) => (
-                    <li key={date} className="flex items-center justify-between gap-3">
-                      <span>{formatDateBR(date)}</span>
-                      <span
-                        className={`shrink-0 font-mono font-semibold ${
-                          form.kind === "income" ? "text-positive" : "text-negative"
-                        }`}
-                      >
-                        {brl(previewAmount)}
+                <div className="space-y-2">
+                  {escolhas.map((escolha) => (
+                    <label
+                      key={escolha.value}
+                      className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition-colors ${
+                        scope === escolha.value
+                          ? "border-primary bg-primary-soft/40"
+                          : "border-border hover:bg-accent/40"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="escopo-exclusao"
+                        className="mt-0.5"
+                        checked={scope === escolha.value}
+                        onChange={() => setScope(escolha.value)}
+                      />
+                      <span className="text-xs">
+                        <span
+                          className={`block font-semibold ${
+                            escolha.perigo ? "text-negative" : "text-foreground"
+                          }`}
+                        >
+                          {escolha.titulo}
+                        </span>
+                        <span className="mt-0.5 block text-muted-foreground">
+                          {escolha.detalhe}
+                        </span>
                       </span>
-                    </li>
+                    </label>
                   ))}
-                </ul>
-                {backfill?.length === MAX_RECURRING_BACKFILL && (
-                  <p className="text-negative">
-                    A lista foi cortada em {MAX_RECURRING_BACKFILL} lançamentos. Confira a data de
-                    início antes de continuar.
-                  </p>
-                )}
-                <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-border p-3">
-                  <Checkbox
-                    className="mt-0.5"
-                    checked={markPaid}
-                    onCheckedChange={(checked) => setMarkPaid(checked === true)}
-                  />
-                  <span className="text-xs">
-                    Marcar como já {form.kind === "income" ? "recebidos" : "pagos"}
-                    <span className="mt-0.5 block text-muted-foreground">
-                      Sem isso, eles entram como agendados e aparecem em Transações pendentes, onde
-                      dá para baixar o que já foi quitado.
-                    </span>
-                  </span>
-                </label>
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
-            <Button variant="outline" disabled={saving} onClick={() => void save([])}>
-              Só a recorrência
-            </Button>
-            <Button disabled={saving} onClick={() => void save(backfill ?? [])}>
-              {saving ? "Gerando…" : `Gerar ${backfill?.length ?? 0} lançamentos`}
+            <AlertDialogCancel disabled={remove.isPending}>Cancelar</AlertDialogCancel>
+            <Button
+              variant={scope === "all" ? "destructive" : "default"}
+              disabled={remove.isPending}
+              onClick={() => void confirmDelete()}
+            >
+              {remove.isPending ? "Excluindo…" : "Excluir recorrência"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

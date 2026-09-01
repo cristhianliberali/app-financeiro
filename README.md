@@ -118,6 +118,22 @@ perfil: nome, troca de e-mail e senha.
   (`SMTP_*`). Sem ele, o resto do app funciona normalmente e a tela avisa o que
   falta.
 
+#Receitas e despesas recorrentes
+A regra não é projeção: ao salvar, ela **cria os lançamentos de verdade**, do
+início dela até 24 meses à frente. O passado entra como agendado, e aparece em
+Transações pendentes para receber baixa; o futuro se completa sozinho a cada
+mês, na primeira vez que alguém abre uma tela de Finanças — não há rotina de
+fundo para manter de pé.
+
+A geração é idempotente (um índice único por regra e vencimento), então rodar de
+novo nunca duplica nada.
+
+Excluir a regra pergunta o que fazer com o que ela criou:
+
+- **apagar as futuras** — some o que ainda vai vencer, a partir de amanhã;
+- **apagar todas** — some o histórico inteiro daquela recorrência;
+- **manter todos** — só a regra sai, e os lançamentos viram lançamentos comuns.
+
 #Integração com o Google Agenda
 A conexão é por pessoa: cada uma autoriza o app na própria conta, pelo perfil.
 A tarefa vira compromisso na agenda de quem é **responsável** por ela — sem

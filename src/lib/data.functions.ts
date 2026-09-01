@@ -80,6 +80,81 @@ export const fetchGoals = createServerFn({ method: "GET" })
     return listGoals(context.user.id, data.profileId);
   });
 
+/**
+ * Grava a recorrência e já cria a série de lançamentos dela.
+ *
+ * Não passa pelo `upsertRows` genérico de propósito: gravar a regra e
+ * materializar a série são uma coisa só, e precisam cair na mesma transação.
+ */
+export const saveRecurring = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator(
+    (input: {
+      id?: string;
+      profileId: string;
+      categoryId: string;
+      description: string;
+      amount: number;
+      kind: "income" | "expense";
+      frequency: "monthly" | "weekly" | "yearly";
+      dayOfMonth: number;
+      startDate: string;
+      endDate?: string | null;
+    }) => {
+      const amount = Number(input?.amount);
+      if (!Number.isFinite(amount) || amount <= 0) throw new Error("Informe um valor válido");
+      if (!input?.description?.trim()) throw new Error("Informe a descrição");
+      // A série vira lançamento, e lançamento sem categoria é recusado.
+      const categoryId = requireId(input?.categoryId, "categoryId");
+      if (!["monthly", "weekly", "yearly"].includes(input?.frequency)) {
+        throw new Error("Frequência inválida");
+      }
+      if (input?.kind !== "income" && input?.kind !== "expense") throw new Error("Tipo inválido");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(input?.startDate ?? "")) {
+        throw new Error("Informe a data de início");
+      }
+      return {
+        ...(input.id ? { id: requireId(input.id) } : {}),
+        profileId: requireId(input?.profileId, "profileId"),
+        categoryId,
+        description: input.description.trim(),
+        amount,
+        kind: input.kind,
+        frequency: input.frequency,
+        dayOfMonth: Math.min(31, Math.max(1, Math.trunc(Number(input?.dayOfMonth) || 1))),
+        startDate: input.startDate,
+        endDate: input?.endDate ?? null,
+      };
+    },
+  )
+  .handler(async ({ data, context }): Promise<{ id: string; created: number }> => {
+    const { saveRecurringRule } = await import("@/integrations/postgres/recurring.server");
+    return saveRecurringRule(context.user.id, data);
+  });
+
+/** Quantos lançamentos a regra tem hoje — o que a confirmação de exclusão mostra. */
+export const fetchRecurringImpact = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((input: { id: string }) => ({ id: requireId(input?.id) }))
+  .handler(async ({ data, context }) => {
+    const { recurringImpact } = await import("@/integrations/postgres/recurring.server");
+    return recurringImpact(context.user.id, data.id);
+  });
+
+/** Exclui a regra, com o destino dos lançamentos escolhido por quem exclui. */
+export const removeRecurring = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((input: { id: string; scope: "all" | "future" | "keep" }) => {
+    if (!["all", "future", "keep"].includes(input?.scope)) {
+      throw new Error("Escolha o que fazer com os lançamentos já criados");
+    }
+    return { id: requireId(input?.id), scope: input.scope };
+  })
+  .handler(async ({ data, context }): Promise<{ removed: number }> => {
+    const { deleteRecurringRule } = await import("@/integrations/postgres/recurring.server");
+    return deleteRecurringRule(context.user.id, data.id, data.scope);
+  });
+
 export const upsertRows = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator(

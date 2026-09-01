@@ -257,6 +257,23 @@ CREATE TABLE IF NOT EXISTS recurring_rules (
   updated_at   timestamptz NOT NULL DEFAULT now()
 );
 
+-- Até que data as ocorrências desta regra já viraram lançamento. É o que deixa
+-- o "para sempre à frente" barato: sem esta coluna, cada leitura de transações
+-- teria de recalcular a série inteira da regra desde o começo para descobrir
+-- que não há nada novo a criar.
+ALTER TABLE recurring_rules ADD COLUMN IF NOT EXISTS materialized_until date;
+
+-- De qual regra este lançamento nasceu. `ON DELETE SET NULL` é deliberado: quem
+-- decide o destino dos lançamentos ao excluir a regra é a pessoa, na
+-- confirmação — o banco não pode apagar histórico financeiro por conta própria.
+ALTER TABLE transactions
+  ADD COLUMN IF NOT EXISTS recurring_rule_id uuid REFERENCES recurring_rules(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS transactions_recurring_idx ON transactions(recurring_rule_id);
+-- Uma ocorrência por vencimento: é o que torna a geração idempotente, e o que
+-- deixa a rotina rodar de novo sem duplicar nada.
+CREATE UNIQUE INDEX IF NOT EXISTS transactions_recurring_occurrence
+  ON transactions(recurring_rule_id, due_date) WHERE recurring_rule_id IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS recurring_rules_profile_idx ON recurring_rules(profile_id);
 
 CREATE TABLE IF NOT EXISTS investments (
