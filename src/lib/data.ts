@@ -8,9 +8,10 @@ import {
   fetchRecurring,
   fetchRecurringImpact,
   fetchTransactions,
+  removeManyRows,
   removeRecurring,
-  saveRecurring,
   removeRow,
+  saveRecurring,
   upsertRows,
   type DataTableName,
 } from "./data.functions";
@@ -218,6 +219,15 @@ export function useUpsert(table: TableName) {
       qc.invalidateQueries({ queryKey: [invalidationKey[table]] });
       if (table === "categories") qc.invalidateQueries({ queryKey: ["transactions"] });
     },
+  });
+}
+
+/** Exclusão em massa da tabela, numa requisição só. */
+export function useRemoveMany(table: TableName) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => removeManyRows({ data: { table, ids } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [invalidationKey[table]] }),
   });
 }
 

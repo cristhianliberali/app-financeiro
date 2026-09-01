@@ -175,6 +175,21 @@ export const upsertRows = createServerFn({ method: "POST" })
     return null;
   });
 
+/** Exclusão em massa: uma transação no banco, uma requisição só. */
+export const removeManyRows = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((input: { table: DataTableName; ids: string[] }) => {
+    const ids = Array.isArray(input?.ids) ? input.ids : [];
+    if (ids.length === 0) throw new Error("Nenhum registro selecionado");
+    // Teto de sanidade: nenhuma tela seleciona mais que isso de uma vez.
+    if (ids.length > 500) throw new Error("Selecione no máximo 500 registros por vez");
+    return { table: requireTable(input?.table), ids: ids.map((id) => requireId(id)) };
+  })
+  .handler(async ({ data, context }): Promise<{ removed: number }> => {
+    const { removeRows } = await import("@/integrations/postgres/repository.server");
+    return removeRows(context.user.id, data.table, data.ids);
+  });
+
 export const removeRow = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((input: { table: DataTableName; id: string }) => ({

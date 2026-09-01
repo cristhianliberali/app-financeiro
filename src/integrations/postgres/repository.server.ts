@@ -317,3 +317,25 @@ export async function removeRow(userId: string, table: DataTable, id: string): P
   await requireRowAccess(userId, table, id, "editor");
   await query(`DELETE FROM ${table} WHERE id = $1`, [id]);
 }
+
+/**
+ * Exclusão em massa.
+ *
+ * Uma requisição por linha seria dezenas de idas ao servidor para uma ação que
+ * a pessoa pensou como uma só — e, pior, deixaria a lista meio apagada se uma
+ * delas falhasse no meio. Aqui a permissão é conferida linha a linha (ninguém
+ * apaga o que não pode) e o DELETE sai numa transação só: ou vai tudo, ou nada.
+ */
+export async function removeRows(
+  userId: string,
+  table: DataTable,
+  ids: string[],
+): Promise<{ removed: number }> {
+  if (ids.length === 0) return { removed: 0 };
+  for (const id of ids) await requireRowAccess(userId, table, id, "editor");
+
+  return withTransaction(async (client) => {
+    const result = await client.query(`DELETE FROM ${table} WHERE id = ANY($1::uuid[])`, [ids]);
+    return { removed: result.rowCount ?? 0 };
+  });
+}
