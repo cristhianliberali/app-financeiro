@@ -16,12 +16,15 @@ export type SessionUser = {
   id: string;
   email: string;
   name: string | null;
+  /** Tela em que o app abre para esta pessoa; nulo = o padrão do app. */
+  startRoute: string | null;
 };
 
 type SessionRow = {
   user_id: string;
   email: string;
   full_name: string | null;
+  start_route: string | null;
   expires_at: Date;
 };
 
@@ -66,7 +69,7 @@ export async function readSession(): Promise<SessionUser | null> {
   if (!token) return null;
 
   const row = await queryOne<SessionRow>(
-    `SELECT s.user_id, s.expires_at, u.email, u.full_name
+    `SELECT s.user_id, s.expires_at, u.email, u.full_name, u.start_route
        FROM user_sessions s
        JOIN app_users u ON u.id = s.user_id
       WHERE s.token_hash = $1 AND s.expires_at > now()`,
@@ -80,7 +83,12 @@ export async function readSession(): Promise<SessionUser | null> {
     hashToken(token),
   ]).catch(() => {});
 
-  return { id: row.user_id, email: row.email, name: row.full_name };
+  return {
+    id: row.user_id,
+    email: row.email,
+    name: row.full_name,
+    startRoute: row.start_route,
+  };
 }
 
 /** Revoga a sessão da requisição atual e limpa o cookie. */

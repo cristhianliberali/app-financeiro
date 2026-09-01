@@ -7,6 +7,8 @@ export type AuthedUser = {
   id: string;
   email: string;
   name: string | null;
+  /** Tela em que o app abre para esta pessoa; nulo = o padrão do app. */
+  startRoute: string | null;
 };
 
 /**

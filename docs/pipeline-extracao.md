@@ -25,11 +25,13 @@ cliente falso pela interface `LlmClient`.
 A importação no app acontece em duas etapas, e a primeira não usa IA nenhuma:
 
 1. **Ler documento** — `extracao.server.ts` roda as camadas 1, 2 e 4 e a tela
-   (`DocumentImportDialog`) mostra tudo de uma vez: as transações na ordem do
-   documento, agrupadas por portador/seção, a conferência de cada total
-   declarado, e as linhas não interpretadas. O usuário confere, ajusta e pode
-   lançar direto, com categoria manual.
-2. **Categorizar com IA** (botão no rodapé) — só então a IA entra
+   (`DocumentImportPanel`, em `/importar`) mostra tudo de uma vez: as transações
+   na ordem do documento, agrupadas por portador/seção, a conferência de cada
+   total declarado, e as linhas não interpretadas. O usuário confere, ajusta e
+   pode lançar direto, com categoria manual — que é obrigatória para lançar.
+   A revisão em aberto fica guardada no `localStorage` do navegador: sair da
+   tela e voltar não custa a leitura, e só o botão "Limpar" a descarta.
+2. **Categorizar com IA** (botão na barra de ação) — só então a IA entra
    (`categorize.server.ts`): as descrições numeradas e as categorias
    disponíveis vão para o modelo, que devolve `id:codigo,confiança`. O arquivo
    nunca é enviado. Gasto e entrada rodam separados, cada um só com as

@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppStateProvider } from "../lib/app-state";
 import { ThemeProvider, THEME_INIT_SCRIPT } from "../lib/theme";
 import { Toaster } from "../components/ui/sonner";
+import { StartRouteRedirect } from "../components/StartRouteRedirect";
 
 function NotFoundComponent() {
   return (
@@ -126,6 +127,8 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AppStateProvider>
+          {/* Abre o app na tela que a pessoa escolheu nas preferências. */}
+          <StartRouteRedirect />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
           <Toaster richColors position="top-right" />

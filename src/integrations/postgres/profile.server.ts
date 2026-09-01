@@ -44,8 +44,27 @@ export function assertEmail(email: string): string {
 export async function updateUserName(userId: string, name: string | null): Promise<UserRow> {
   const clean = name?.trim() ? name.trim().slice(0, 120) : null;
   const row = await queryOne<UserRow>(
-    `UPDATE app_users SET full_name = $2 WHERE id = $1 RETURNING id, email, full_name`,
+    `UPDATE app_users SET full_name = $2 WHERE id = $1 RETURNING id, email, full_name, start_route`,
     [userId, clean],
+  );
+  if (!row) throw new Error("Usuário não encontrado");
+  return row;
+}
+
+// ─────────────────────── tela inicial preferida ─────────────────────────
+
+/**
+ * Grava a tela em que o app abre para esta pessoa.
+ *
+ * O caminho é validado contra a lista fechada de `src/lib/start-route.ts`
+ * antes de chegar aqui: o valor vira destino de navegação, e aceitar caminho
+ * arbitrário do cliente faria da preferência um redirecionador aberto.
+ */
+export async function updateStartRoute(userId: string, route: string): Promise<UserRow> {
+  const row = await queryOne<UserRow>(
+    `UPDATE app_users SET start_route = $2 WHERE id = $1
+     RETURNING id, email, full_name, start_route`,
+    [userId, route],
   );
   if (!row) throw new Error("Usuário não encontrado");
   return row;
@@ -141,7 +160,7 @@ export async function confirmEmailChange(userId: string, rawCode: string): Promi
 
   const updated = await withTransaction(async (client) => {
     const result = await client.query<UserRow>(
-      `UPDATE app_users SET email = $2 WHERE id = $1 RETURNING id, email, full_name`,
+      `UPDATE app_users SET email = $2 WHERE id = $1 RETURNING id, email, full_name, start_route`,
       [userId, pending.new_email],
     );
     const row = result.rows[0];
@@ -207,7 +226,7 @@ export async function requestPasswordReset(
   const email = assertEmail(rawEmail);
 
   const user = await queryOne<UserRow>(
-    `SELECT id, email, full_name FROM app_users WHERE email = $1`,
+    `SELECT id, email, full_name, start_route FROM app_users WHERE email = $1`,
     [email],
   );
   if (!user) {

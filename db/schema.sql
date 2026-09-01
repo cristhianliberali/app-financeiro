@@ -65,6 +65,11 @@ CREATE TABLE IF NOT EXISTS app_users (
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
 
+-- Tela em que o app abre para esta pessoa (caminho, ex.: '/tarefas/meu-dia').
+-- Nulo mantém o dashboard do Finanças. O conjunto de valores aceitos vive em
+-- src/lib/start-route.ts e é validado no servidor antes de gravar.
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS start_route text;
+
 -- Uma linha por login ativo. Guardamos só o SHA-256 do token que está no
 -- cookie: quem lê a tabela não consegue se passar por ninguém.
 CREATE TABLE IF NOT EXISTS user_sessions (
