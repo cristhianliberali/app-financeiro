@@ -18,6 +18,7 @@ import {
   useBoardMembers,
   useCreateBoard,
   useDeleteBoard,
+  useStatusTemplates,
   useTasks,
   useUpdateBoard,
   type Board,
@@ -58,6 +59,7 @@ export function BoardDialog({
 }) {
   const { accountId } = useAppState();
   const { data: users = [] } = useAccountUsers(accountId);
+  const { data: templates = [] } = useStatusTemplates(accountId);
   const { data: tasks = [] } = useTasks({ accountId });
   const create = useCreateBoard();
   const update = useUpdateBoard();
@@ -109,9 +111,18 @@ export function BoardDialog({
     setMembersLoaded(true);
   }, [open, membersLoaded, currentMembers]);
 
+  /**
+   * Conjuntos oferecidos na criação: os que vêm com o app e os que a conta
+   * guardou. Os da conta primeiro — quem salvou um modelo o quer à mão.
+   */
+  const conjuntos = [
+    ...templates.map((t) => ({ id: `modelo:${t.id}`, label: t.name, statuses: t.statuses })),
+    ...STATUS_PRESETS,
+  ];
+
   function applyPreset(id: string) {
     setPreset(id);
-    const found = STATUS_PRESETS.find((p) => p.id === id);
+    const found = conjuntos.find((p) => p.id === id);
     if (found) setStatuses(found.statuses.map((s) => ({ ...s })));
   }
 
@@ -314,16 +325,19 @@ export function BoardDialog({
           <div className="space-y-3 rounded-xl border border-border bg-surface/60 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Label>Status das tarefas</Label>
-              <div className="flex gap-1">
-                {STATUS_PRESETS.map((p) => (
+              <div className="flex flex-wrap gap-1">
+                {conjuntos.map((p) => (
                   <button
                     key={p.id}
                     onClick={() => applyPreset(p.id)}
                     className={`rounded-md border px-2 py-1 text-xs transition-colors ${
                       preset === p.id ? "border-primary bg-primary/10" : "border-border"
                     }`}
+                    // O modelo da conta ganha um traço da marca: no meio dos
+                    // conjuntos do app, é o que a equipe combinou.
+                    title={p.id.startsWith("modelo:") ? "Modelo salvo nesta conta" : undefined}
                   >
-                    {p.label}
+                    {p.id.startsWith("modelo:") ? `★ ${p.label}` : p.label}
                   </button>
                 ))}
               </div>

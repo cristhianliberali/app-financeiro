@@ -134,6 +134,18 @@ Excluir a regra pergunta o que fazer com o que ela criou:
 - **apagar todas** — some o histórico inteiro daquela recorrência;
 - **manter todos** — só a regra sai, e os lançamentos viram lançamentos comuns.
 
+#Modelos de etapas
+As etapas de um quadro podem virar **modelo da conta**, em "Etapas do quadro".
+O modelo aparece na criação de qualquer quadro, ao lado dos conjuntos que vêm
+com o app, e pode ser aplicado a um quadro já existente.
+
+É um retrato, não um vínculo: aplicar copia as etapas e acaba ali. Mudar o
+quadro depois não reescreve o modelo, e mudar o modelo não mexe em quadro
+nenhum — vínculo vivo renomearia etapas em quadros que ninguém está olhando.
+
+Aplicar **acrescenta** as etapas que faltam (comparando pelo nome) e nunca
+substitui: trocar as etapas de um quadro em uso deixaria as tarefas sem etapa.
+
 #Integração com o Google Agenda
 A conexão é por pessoa: cada uma autoriza o app na própria conta, pelo perfil.
 A tarefa vira compromisso na agenda de quem é **responsável** por ela — sem

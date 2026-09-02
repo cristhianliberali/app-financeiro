@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, Lock, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Bookmark, Lock, Plus, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,11 +12,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   useDeleteStatus,
+  useDeleteStatusTemplate,
   useReorderStatuses,
   useSaveStatus,
+  useSaveStatusTemplate,
+  useStatusTemplates,
   type BoardStatus,
   type Task,
 } from "@/lib/tasks";
+import { useAppState } from "@/lib/app-state";
 import { POLARITIES, type Polarity } from "@/lib/tasks-analytics";
 
 /** Criação, renomeação, reordenação e exclusão das etapas de um quadro. */
@@ -34,11 +38,16 @@ export function StatusManagerDialog({
   /** Tarefas do quadro — é o que diz quais etapas ainda estão em uso. */
   tasks: Task[];
 }) {
+  const { accountId } = useAppState();
   const save = useSaveStatus(boardId);
   const reorder = useReorderStatuses();
   const remove = useDeleteStatus();
+  const { data: templates = [] } = useStatusTemplates(accountId);
+  const saveTemplate = useSaveStatusTemplate();
+  const removeTemplate = useDeleteStatusTemplate();
   const [draft, setDraft] = useState<BoardStatus[]>([]);
   const [newName, setNewName] = useState("");
+  const [templateName, setTemplateName] = useState("");
 
   const taskCount = useMemo(() => {
     const map = new Map<string, number>();
@@ -52,6 +61,61 @@ export function StatusManagerDialog({
   useEffect(() => {
     if (open) setDraft(statuses);
   }, [open, statuses]);
+
+  /** Guarda as etapas deste quadro como modelo da conta. */
+  async function guardarModelo() {
+    if (!accountId) return;
+    const nome = templateName.trim();
+    if (!nome) {
+      toast.error("Dê um nome ao modelo");
+      return;
+    }
+    try {
+      await saveTemplate.mutateAsync({
+        accountId,
+        name: nome,
+        statuses: draft.map((s) => ({ name: s.name, color: s.color, polarity: s.polarity })),
+      });
+      setTemplateName("");
+      toast.success(`Modelo “${nome}” salvo para esta conta`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o modelo");
+    }
+  }
+
+  /**
+   * Traz as etapas do modelo que ainda faltam neste quadro.
+   *
+   * Acrescenta, nunca substitui: trocar as etapas de um quadro em uso deixaria
+   * as tarefas órfãs de status. O que já existe pelo nome é deixado como está.
+   */
+  async function aplicarModelo(id: string) {
+    const modelo = templates.find((t) => t.id === id);
+    if (!modelo) return;
+    const existentes = new Set(draft.map((s) => s.name.trim().toLowerCase()));
+    const faltando = modelo.statuses.filter((s) => !existentes.has(s.name.trim().toLowerCase()));
+    if (faltando.length === 0) {
+      toast.info(`O quadro já tem todas as etapas de “${modelo.name}”`);
+      return;
+    }
+    try {
+      for (const [i, seed] of faltando.entries()) {
+        await save.mutateAsync({
+          name: seed.name,
+          color: seed.color,
+          polarity: seed.polarity,
+          sort_order: draft.length + i,
+        });
+      }
+      toast.success(
+        `${faltando.length} etapa(s) de “${modelo.name}” ${
+          faltando.length === 1 ? "adicionada" : "adicionadas"
+        }`,
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível aplicar o modelo");
+    }
+  }
 
   async function move(index: number, dir: -1 | 1) {
     const target = index + dir;
@@ -74,6 +138,78 @@ export function StatusManagerDialog({
           usa para saber se a tarefa está ativa, concluída ou arquivada. Uma etapa só pode ser
           excluída quando está vazia — mova ou exclua as tarefas dela antes.
         </p>
+
+        {/*
+          Modelos da conta. Um quadro afinado costuma valer para os próximos, e
+          recriar as etapas à mão em cada um sai diferente toda vez — um "Em
+          revisão" aqui, um "Revisão" ali —, o que estraga qualquer leitura que
+          cruze quadros.
+        */}
+        <section className="space-y-2 rounded-xl border border-border bg-surface/60 p-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold">
+            <Bookmark className="size-4" /> Modelos da conta
+          </h3>
+
+          {templates.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {templates.map((t) => (
+                <span
+                  key={t.id}
+                  className="flex items-center gap-1 rounded-lg border border-border bg-card pl-2 text-xs"
+                >
+                  <button
+                    onClick={() => void aplicarModelo(t.id)}
+                    disabled={save.isPending}
+                    className="py-1.5 font-medium transition-colors hover:text-primary disabled:opacity-50"
+                    title={`Trazer para este quadro: ${t.statuses.map((x) => x.name).join(", ")}`}
+                  >
+                    {t.name}
+                    <span className="ml-1 text-muted-foreground">({t.statuses.length})</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      void removeTemplate
+                        .mutateAsync(t.id)
+                        .then(() => toast.success(`Modelo “${t.name}” excluído`));
+                    }}
+                    className="px-1.5 py-1.5 text-muted-foreground transition-colors hover:text-destructive"
+                    aria-label={`Excluir modelo ${t.name}`}
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Nenhum modelo salvo ainda. Guarde as etapas deste quadro para reaproveitá-las nos
+              próximos.
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Input
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="Nome do modelo (ex.: Desenvolvimento)"
+              className="h-9 min-w-48 flex-1"
+              onKeyDown={(e) => e.key === "Enter" && void guardarModelo()}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void guardarModelo()}
+              disabled={saveTemplate.isPending || draft.length === 0}
+            >
+              Salvar estas etapas
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Aplicar um modelo <span className="font-medium text-foreground">acrescenta</span> as
+            etapas que faltam; nada é substituído, para nenhuma tarefa ficar sem etapa. Repetir um
+            nome de modelo substitui o que estava salvo.
+          </p>
+        </section>
 
         <div className="space-y-2">
           {draft.map((s, i) => (

@@ -393,6 +393,27 @@ CREATE TABLE IF NOT EXISTS board_statuses (
 );
 CREATE INDEX IF NOT EXISTS board_statuses_board_idx ON board_statuses(board_id, sort_order);
 
+-- Modelos de etapas, por conta.
+--
+-- Um quadro afinado ("Backlog, A fazer, Em revisão, Concluído") costuma valer
+-- para os próximos, e recriá-lo à mão em cada um é trabalho repetido que sai
+-- diferente toda vez. O modelo guarda a lista como retrato — jsonb, e não uma
+-- tabela filha —, de propósito: mexer no quadro depois não pode reescrever o
+-- modelo pelas costas de quem o salvou, nem o contrário.
+CREATE TABLE IF NOT EXISTS status_templates (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  name       text NOT NULL,
+  -- [{ name, color, polarity }], na ordem em que as etapas entram no quadro.
+  statuses   jsonb NOT NULL DEFAULT '[]'::jsonb,
+  created_by uuid REFERENCES app_users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (account_id, name)
+);
+CREATE INDEX IF NOT EXISTS status_templates_account_idx ON status_templates(account_id);
+
+
 CREATE TABLE IF NOT EXISTS tasks (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   board_id            uuid NOT NULL REFERENCES boards(id) ON DELETE CASCADE,

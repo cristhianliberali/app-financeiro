@@ -611,3 +611,49 @@ export const fetchAccountTimeEntries = createServerFn({ method: "GET" })
       data,
     ),
   );
+
+// ─────────────────────── modelos de etapas (por conta) ───────────────────────
+
+export const fetchStatusTemplates = createServerFn({ method: "GET" })
+  .middleware([requireAuth])
+  .inputValidator((input: { accountId: string }) => ({
+    accountId: requireId(input?.accountId, "accountId"),
+  }))
+  .handler(async ({ data, context }) =>
+    (await import("@/integrations/postgres/status-templates.server")).listStatusTemplates(
+      context.user.id,
+      data.accountId,
+    ),
+  );
+
+/**
+ * Salva o modelo. A lista de etapas é higienizada no servidor — ela vira etapa
+ * de quadro depois, e uma polaridade inventada aqui viraria um status que o
+ * resto do app não sabe classificar.
+ */
+export const saveStatusTemplate = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator(
+    (input: { id?: string; accountId: string; name: string; statuses: unknown[] }) => ({
+      ...(input?.id ? { id: requireId(input.id) } : {}),
+      accountId: requireId(input?.accountId, "accountId"),
+      name: requireText(input?.name, "Nome do modelo", 80),
+      statuses: Array.isArray(input?.statuses) ? input.statuses : [],
+    }),
+  )
+  .handler(async ({ data, context }) =>
+    (await import("@/integrations/postgres/status-templates.server")).saveStatusTemplate(
+      context.user.id,
+      data,
+    ),
+  );
+
+export const deleteStatusTemplate = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((input: { id: string }) => ({ id: requireId(input?.id) }))
+  .handler(async ({ data, context }): Promise<null> => {
+    await (
+      await import("@/integrations/postgres/status-templates.server")
+    ).deleteStatusTemplate(context.user.id, data.id);
+    return null;
+  });
