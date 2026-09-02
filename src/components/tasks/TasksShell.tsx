@@ -82,12 +82,23 @@ export function TasksShell({
   boardId = null,
   /** Último nível do caminho quando a tela não é um espaço/quadro. */
   breadcrumbCurrent,
+  /**
+   * Solta a largura máxima do conteúdo.
+   *
+   * As telas de leitura — painel, "Meu dia", espaços — mantêm a medida: linha
+   * de texto larga demais cansa, e um cartão esticado por dois mil pixels não
+   * diz mais do que um cartão do tamanho certo. Já uma grade não tem esse
+   * limite: cada pixel a mais no quadro é uma coluna do Kanban, uma coluna da
+   * tabela ou uma faixa do calendário que aparece sem rolar.
+   */
+  wide = false,
 }: {
   children: ReactNode;
   actions?: ReactNode;
   spaceId?: string | null;
   boardId?: string | null;
   breadcrumbCurrent?: string;
+  wide?: boolean;
 }) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -534,7 +545,9 @@ export function TasksShell({
             Kanban ou num calendário que ocupam o resto da janela, e cada folga
             a mais aqui em cima é altura que sai deles.
           */}
-          <div className="mx-auto max-w-[1600px] space-y-4 p-4 lg:px-6 lg:py-5">{children}</div>
+          <div className={`space-y-4 p-4 lg:px-6 lg:py-5 ${wide ? "" : "mx-auto max-w-[1600px]"}`}>
+            {children}
+          </div>
         </div>
       </main>
 

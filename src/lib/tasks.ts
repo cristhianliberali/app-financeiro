@@ -22,6 +22,9 @@ import {
   fetchLabels,
   fetchSpaceMembers,
   fetchSpaceStatuses,
+  fetchStatusTemplates,
+  deleteStatusTemplate,
+  saveStatusTemplate,
   fetchSpaces,
   fetchTaskActivity,
   fetchTasks,
@@ -392,6 +395,41 @@ export function useBoardStatuses(boardId: string | null) {
     enabled: !!boardId,
     queryFn: async (): Promise<BoardStatus[]> =>
       (await fetchBoardStatuses({ data: { boardId: boardId! } })) as BoardStatus[],
+  });
+}
+
+/** Etapas guardadas como modelo, no nível da conta. */
+export type StatusTemplate = {
+  id: string;
+  account_id: string;
+  name: string;
+  statuses: StatusSeed[];
+  created_at: string;
+};
+
+export function useStatusTemplates(accountId: string | null) {
+  return useQuery({
+    queryKey: [KEY, "status-templates", accountId],
+    enabled: !!accountId,
+    queryFn: async (): Promise<StatusTemplate[]> =>
+      (await fetchStatusTemplates({ data: { accountId: accountId! } })) as StatusTemplate[],
+  });
+}
+
+export function useSaveStatusTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id?: string; accountId: string; name: string; statuses: StatusSeed[] }) =>
+      saveStatusTemplate({ data: input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY, "status-templates"] }),
+  });
+}
+
+export function useDeleteStatusTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteStatusTemplate({ data: { id } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY, "status-templates"] }),
   });
 }
 

@@ -303,7 +303,24 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(func
           >
             <CalendarDays className="size-4" />
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-auto p-0">
+          {/*
+            No celular o painel abria maior que a tela.
+            Empilhado — calendário em cima, atalhos embaixo —, ele passa de 550px
+            de altura; num telefone com o campo no meio de um diálogo, o Radix
+            não tinha para onde encaixá-lo e o topo (mês, navegação, as duas
+            primeiras semanas) ficava acima da área visível. Quem tocava via um
+            retângulo branco com "Atalhos" e concluía, com razão, que o
+            calendário não abria.
+
+            Duas medidas: o painel nunca passa da altura que sobra na tela (e
+            rola por dentro se precisar), e os atalhos viram uma faixa deitada
+            no celular, que é o que devolve os ~180px que faltavam.
+          */}
+          <PopoverContent
+            align="end"
+            collisionPadding={12}
+            className="max-h-(--radix-popover-content-available-height) w-auto max-w-[calc(100vw-1.5rem)] overflow-y-auto p-0 sm:max-w-none"
+          >
             <div className="flex flex-col sm:flex-row">
               <div className="p-2">
                 <Calendar
@@ -314,8 +331,8 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(func
                   {...(selected ? { selected, defaultMonth: selected } : {})}
                 />
               </div>
-              <div className="flex flex-col gap-1 border-t border-border p-2 sm:w-44 sm:border-l sm:border-t-0">
-                <p className="label-caps px-1 pb-1">Atalhos</p>
+              <div className="flex w-full min-w-0 flex-wrap gap-1 border-t border-border p-2 sm:w-44 sm:flex-col sm:flex-nowrap sm:border-l sm:border-t-0">
+                <p className="label-caps w-full px-1 pb-1">Atalhos</p>
                 {SHORTCUTS.map((shortcut) => (
                   <button
                     key={shortcut.label}
@@ -324,14 +341,14 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(func
                       pickDate(shortcut.date());
                       if (!withTime) setOpen(false);
                     }}
-                    className="rounded-lg px-2 py-1.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    className="rounded-lg border border-border px-2 py-1.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:border-transparent"
                   >
                     {shortcut.label}
                   </button>
                 ))}
 
                 {withTime && (
-                  <div className="mt-1 border-t border-border pt-2">
+                  <div className="mt-1 w-full border-t border-border pt-2">
                     <p className="label-caps px-1 pb-1.5">Horário</p>
                     <div className="flex items-center gap-2 rounded-lg border border-input px-2">
                       <Clock className="size-3.5 shrink-0 text-muted-foreground" />

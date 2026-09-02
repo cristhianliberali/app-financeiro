@@ -133,6 +133,8 @@ function BoardPage() {
     <TasksShell
       spaceId={board?.space_id ?? null}
       boardId={boardId}
+      // Kanban, lista e calendário são grades: aqui a largura vira conteúdo.
+      wide
       actions={
         <>
           <Button variant="outline" size="sm" onClick={() => setStatusDialog(true)}>
