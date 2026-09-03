@@ -1,6 +1,7 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 import { brl } from "@/lib/format";
+import { PIE_TOOLTIP } from "@/lib/chart-theme";
 
 /**
  * A rosca de categorias do painel — despesas de um lado, entradas do outro.
@@ -9,13 +10,6 @@ import { brl } from "@/lib/format";
  * quer olhar para ela sozinha: a rota exige sessão e banco, e a rosca não exige
  * nada além de uma lista de números.
  */
-const TOOLTIP_STYLE = {
-  borderRadius: 12,
-  border: "1px solid var(--color-border)",
-  background: "var(--color-popover)",
-  boxShadow: "var(--elevation-lg)",
-  fontSize: 12,
-} as const;
 
 export type CategorySlice = { id: string; name: string; color: string; value: number };
 
@@ -54,7 +48,7 @@ export function CategoryPie({
                 <Cell key={d.id} fill={d.color} />
               ))}
             </Pie>
-            <Tooltip formatter={(v: number) => brl(v)} contentStyle={TOOLTIP_STYLE} />
+            <Tooltip {...PIE_TOOLTIP} formatter={(v: number) => brl(v)} />
           </PieChart>
         </ResponsiveContainer>
       </div>
