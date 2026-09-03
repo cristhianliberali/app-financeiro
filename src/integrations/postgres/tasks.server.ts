@@ -386,6 +386,30 @@ export async function listSpaceStatuses(userId: string, spaceId: string) {
   );
 }
 
+/**
+ * Status de todos os quadros da conta, para o Kanban da tela "Tarefas".
+ *
+ * Mesma ideia do espaço, um nível acima: a visibilidade continua sendo a do
+ * espaço (`VISIBLE_SPACE`), então quadro de espaço restrito não vaza status
+ * para quem não participa dele. A ordenação por espaço, quadro e `sort_order`
+ * é o que faz colunas de mesmo nome se encontrarem na ordem certa do outro
+ * lado, onde viram uma coluna só.
+ */
+export async function listAccountStatuses(userId: string, accountId: string) {
+  await requireAccountRole(userId, accountId, "viewer");
+  return query(
+    `SELECT ${STATUS_COLUMNS.split(", ")
+      .map((c) => `bs.${c}`)
+      .join(", ")}
+       FROM board_statuses bs
+       JOIN boards b ON b.id = bs.board_id
+       JOIN spaces s ON s.id = b.space_id
+      WHERE s.account_id = $2 AND (${VISIBLE_SPACE})
+      ORDER BY s.created_at, b.created_at, bs.sort_order`,
+    [userId, accountId],
+  );
+}
+
 export async function saveStatus(
   userId: string,
   input: {
