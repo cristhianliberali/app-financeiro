@@ -97,21 +97,27 @@ export function UserSelect({
   onChange,
   placeholder = "Sem responsável",
   allowEmpty = true,
+  /** Troca o visual do gatilho sem duplicar a lista de busca que vem abaixo. */
+  triggerClassName = "flex h-9 w-full items-center gap-2 rounded-md border border-input bg-card px-3 text-sm outline-none transition-colors hover:bg-secondary focus:ring-1 focus:ring-ring",
+  /** Já nasce aberto — para quem só aparece na tela depois de um clique. */
+  autoOpen = false,
 }: {
   users: AccountUser[];
   value: string | null;
   onChange: (id: string | null) => void;
   placeholder?: string;
   allowEmpty?: boolean;
+  triggerClassName?: string;
+  autoOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoOpen);
   const [term, setTerm] = useState("");
   const filtered = useFiltered(users, term);
   const selected = users.find((u) => u.user_id === value) ?? null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger className="flex h-9 w-full items-center gap-2 rounded-md border border-input bg-card px-3 text-sm outline-none transition-colors hover:bg-secondary focus:ring-1 focus:ring-ring">
+      <PopoverTrigger className={triggerClassName}>
         {selected ? (
           <>
             <UserAvatar user={selected} size={20} />

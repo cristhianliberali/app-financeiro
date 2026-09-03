@@ -173,6 +173,8 @@ export type DateFieldProps = {
   readOnly?: boolean;
   required?: boolean;
   autoFocus?: boolean;
+  /** Já nasce com o calendário aberto — para o campo que só surge após um clique. */
+  autoOpen?: boolean;
   placeholder?: string;
   "aria-label"?: string;
   "aria-labelledby"?: string;
@@ -189,6 +191,7 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(func
     readOnly,
     placeholder,
     autoFocus,
+    autoOpen = false,
     onBlur,
     ...rest
   },
@@ -201,8 +204,9 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(func
 
   const withTime = masked === "datetime-local";
   const [text, setText] = React.useState(() => valueToText(value, masked));
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = React.useState(autoOpen);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const fieldRef = React.useRef<HTMLDivElement>(null);
   React.useImperativeHandle(ref, () => inputRef.current as HTMLInputElement);
   const coarsePointer = useCoarsePointer();
 
@@ -303,6 +307,7 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(func
 
   const field = (
     <div
+      ref={fieldRef}
       data-disabled={disabled || undefined}
       className={cn(
         "group flex h-11 w-full items-center rounded-xl border border-input bg-card shadow-xs transition-colors",
@@ -383,6 +388,17 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(func
       <PopoverContent
         align="end"
         collisionPadding={12}
+        /*
+          O campo é a âncora, não o gatilho — e para o Radix tudo que não é
+          gatilho nem conteúdo é "fora". Sem isto, tocar no campo com o
+          calendário aberto o fechava, e o `onClick` do campo o reabria em
+          seguida: uma piscada, e o dia sob o dedo trocando de lugar no meio do
+          toque. Tocar na âncora agora não fecha nada; fecha-se escolhendo um
+          dia, tocando fora de verdade ou com Esc.
+        */
+        onInteractOutside={(event) => {
+          if (fieldRef.current?.contains(event.target as Node)) event.preventDefault();
+        }}
         className="max-h-(--radix-popover-content-available-height) w-auto max-w-[calc(100vw-1.5rem)] overflow-y-auto p-0 sm:max-w-none"
       >
         <div className="flex flex-col sm:flex-row">
