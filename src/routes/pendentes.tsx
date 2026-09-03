@@ -15,6 +15,7 @@ import {
 
 import { AppShell } from "@/components/AppShell";
 import { CategorySelect } from "@/components/CategorySelect";
+import { RecurringTag } from "@/components/RecurringTag";
 import { SettleDialog } from "@/components/SettleDialog";
 import { TransactionDialog } from "@/components/TransactionDialog";
 import { Button } from "@/components/ui/button";
@@ -355,6 +356,7 @@ function PendingPage() {
                           {t.installment_no}/{t.installment_total}
                         </span>
                       ) : null}
+                      <RecurringTag transaction={t} />
                     </p>
                     <p className="text-[11px] text-muted-foreground">
                       {cat?.name ?? "Sem categoria"} · vence {formatDateBR(t.due_date)}

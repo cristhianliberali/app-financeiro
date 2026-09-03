@@ -42,6 +42,7 @@ import {
 } from "@/lib/analytics";
 import { MonthTimeline } from "@/components/MonthTimeline";
 import { CategoryPie } from "@/components/CategoryPie";
+import { RecurringTag } from "@/components/RecurringTag";
 import { BAR_TOOLTIP, LINE_TOOLTIP } from "@/lib/chart-theme";
 import { brl, brlCompact, formatDateBR, monthLabel } from "@/lib/format";
 import { DEFAULT_CATEGORY_ICON, IconBadge } from "@/lib/icons";
@@ -445,7 +446,10 @@ function Dashboard() {
                     </td>
                     <td className="px-6 py-3.5">
                       <div className="flex flex-col">
-                        <span className="font-semibold">{tx.description}</span>
+                        <span className="font-semibold">
+                          {tx.description}
+                          <RecurringTag transaction={tx} />
+                        </span>
                         {tx.installment_total && (
                           <span className="text-[10px] text-muted-foreground">
                             Parcela {tx.installment_no}/{tx.installment_total}
