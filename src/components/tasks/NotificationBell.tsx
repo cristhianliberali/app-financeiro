@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useUpcomingReminders } from "@/lib/tasks";
 import { formatDateTimeBR } from "@/lib/tasks-analytics";
+import { resumirTitulo, tituloPorExtenso } from "@/lib/task-title";
 import { useTaskNotifications } from "./useTaskNotifications";
 
 /**
@@ -73,7 +74,12 @@ export function NotificationBell({ enabled = true }: { enabled?: boolean }) {
               onClick={() => setOpen(false)}
               className="state-bar state-due block rounded-xl border border-border p-2.5 transition-colors hover:bg-accent"
             >
-              <p className="truncate text-xs font-semibold">{reminder.task_title}</p>
+              <p
+                className="truncate text-xs font-semibold"
+                title={tituloPorExtenso(reminder.task_title)}
+              >
+                {resumirTitulo(reminder.task_title)}
+              </p>
               <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
                 {reminder.space_name} › {reminder.board_name}
               </p>

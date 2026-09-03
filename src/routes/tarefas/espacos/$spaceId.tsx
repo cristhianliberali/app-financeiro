@@ -39,6 +39,7 @@ import {
 } from "@/lib/tasks";
 import { BOARD_VIEWS, type BoardView } from "@/lib/tasks-analytics";
 import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
+import { resumirTitulo } from "@/lib/task-title";
 
 export const Route = createFileRoute("/tarefas/espacos/$spaceId")({
   head: () => ({
@@ -128,7 +129,7 @@ function SpacePage() {
     }
     try {
       await move.mutateAsync({ id: task.id, status_id: statusId });
-      toast.success(`“${task.title}” movida para ${column!.name}`);
+      toast.success(`“${resumirTitulo(task.title)}” movida para ${column!.name}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível mover a tarefa");
     }

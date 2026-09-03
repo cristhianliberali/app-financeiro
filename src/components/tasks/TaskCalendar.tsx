@@ -15,6 +15,7 @@ import {
   weekDays,
 } from "@/lib/tasks-analytics";
 import { useTone } from "@/hooks/use-tone";
+import { resumirTitulo } from "@/lib/task-title";
 import { buildCalendarEntries, type EntryMeta } from "./calendar-entries";
 import { TimeGrid, type GridEntry } from "./TimeGrid";
 
@@ -212,7 +213,7 @@ export function TaskCalendar({
         title={`${c.title} · Google Agenda`}
       >
         <CalendarClock className="size-2.5 shrink-0" />
-        <span className="truncate">{c.title}</span>
+        <span className="truncate">{resumirTitulo(c.title)}</span>
         <ExternalLink className="ml-auto size-2.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
       </a>
     ) : (
@@ -224,7 +225,7 @@ export function TaskCalendar({
       >
         <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: tone(c.color) }} />
         <span className={`truncate ${c.kind === "subtask" ? "text-muted-foreground" : ""}`}>
-          {c.title}
+          {resumirTitulo(c.title)}
         </span>
       </button>
     );

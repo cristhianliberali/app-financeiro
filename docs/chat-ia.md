@@ -1,7 +1,8 @@
 # Chat com IA (assistente do Finanças)
 
-O botão **Assistente**, no cabeçalho do módulo Finanças, abre uma gaveta onde a
-pessoa escreve em português o que quer consultar ou lançar:
+Uma bolha flutuante no canto inferior direito — em todas as telas do módulo
+Finanças, no computador e no celular — abre uma gaveta onde a pessoa escreve em
+português o que quer consultar ou lançar:
 
 - *"Quanto gastei este mês em alimentação?"* → **Você gastou R$ 100,00 do seu
   teto de R$ 350,00 em Alimentação, em setembro de 2026. Ainda cabem R$ 250,00

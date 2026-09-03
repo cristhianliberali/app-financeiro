@@ -39,6 +39,7 @@ import {
 import { dayKey, todayKey } from "@/lib/tasks-analytics";
 import { parseISODate } from "@/lib/format";
 import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
+import { resumirTitulo, tituloPorExtenso } from "@/lib/task-title";
 import { useAgendaDone } from "./agenda-done";
 
 /**
@@ -387,8 +388,11 @@ function EventRow({
         <CalendarClock className="size-3.5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className={`block truncate text-sm font-semibold ${done ? "done-text" : ""}`}>
-          {item.title}
+        <span
+          className={`block truncate text-sm font-semibold ${done ? "done-text" : ""}`}
+          title={tituloPorExtenso(item.title)}
+        >
+          {resumirTitulo(item.title)}
         </span>
         <span className="label-caps text-[0.6rem]">Google Agenda</span>
       </span>
@@ -443,8 +447,11 @@ function TaskRow({
           onCheckedChange={(checked) => void onToggle(task, checked === true)}
         />
         <button onClick={() => onOpen(task)} className="min-w-0 flex-1 text-left">
-          <span className={`block truncate text-sm font-semibold ${isDone ? "done-text" : ""}`}>
-            {task.title}
+          <span
+            className={`block truncate text-sm font-semibold ${isDone ? "done-text" : ""}`}
+            title={tituloPorExtenso(task.title)}
+          >
+            {resumirTitulo(task.title)}
           </span>
           <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
             <IconBadge
@@ -478,8 +485,9 @@ function TaskRow({
           />
           <span
             className={`min-w-0 flex-1 truncate text-xs ${subtask.completed ? "done-text" : ""}`}
+            title={tituloPorExtenso(subtask.title)}
           >
-            {subtask.title}
+            {resumirTitulo(subtask.title)}
           </span>
           <span className="font-mono text-[11px] text-muted-foreground">
             {hourLabel(subtask.due_date ?? subtask.start_date)}

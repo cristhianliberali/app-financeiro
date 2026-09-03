@@ -22,6 +22,7 @@ import {
   formatHours,
 } from "@/lib/tasks-analytics";
 import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
+import { resumirTitulo, tituloPorExtenso } from "@/lib/task-title";
 import { LabelChip } from "./LabelPicker";
 import { PriorityBadge } from "./PriorityPicker";
 import { UserAvatar, UserStack } from "./UserPicker";
@@ -109,8 +110,11 @@ export function TaskCard({
     >
       <div className="flex items-start gap-2">
         {done && <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-positive" />}
-        <p className={`flex-1 text-sm font-semibold leading-snug ${done ? "done-text" : ""}`}>
-          {task.title}
+        <p
+          className={`flex-1 text-sm font-semibold leading-snug ${done ? "done-text" : ""}`}
+          title={tituloPorExtenso(task.title)}
+        >
+          {resumirTitulo(task.title)}
         </p>
         <PriorityBadge priority={task.priority} className="mt-0.5 shrink-0" />
         <button

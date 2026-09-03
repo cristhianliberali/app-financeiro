@@ -62,8 +62,9 @@ vez de lançar tudo de novo.
 
 #Assistente de IA (chat)
 
-Um botão "Assistente" no cabeçalho abre um chat onde dá para escrever em
-português. Ele faz duas coisas:
+Uma bolha flutuante no canto inferior direito, presente em todas as telas do
+módulo Finanças (no computador e no celular), abre um chat onde dá para escrever
+em português. Ele faz duas coisas:
 
 - **Consultar**: "quanto gastei este mês em alimentação?" responde
   "Você gastou R$ 100,00 do seu teto de R$ 350,00". Vale para gastos, entradas e
@@ -121,6 +122,11 @@ ou quadro.
 - **Prioridade** (urgente, alta, normal, baixa) com nome e cor no cartão e na
   lista — junto de entrada/saída de dinheiro, é o que escapa do preto e branco;
 - **Etiquetas** da conta, reaproveitadas entre quadros, com filtro próprio;
+- **Nome da tarefa**: as listagens (cartão, lista, calendário, agenda, lembretes)
+  mostram até 70 caracteres e marcam o corte com "…" — um título longo não
+  empurra o cartão para cinco linhas nem estica a coluna da tabela. Passar o
+  mouse mostra o nome inteiro, e a tarefa aberta sempre traz o título completo,
+  editável. A busca e a ordenação continuam olhando o nome inteiro;
 - **Estimativa de horas** por tarefa, comparada com o tempo cronometrado no
   dashboard (estimado x realizado, saldo de horas, o que estourou);
 - **Lembretes** por tarefa, entregues como notificação do navegador e no sininho

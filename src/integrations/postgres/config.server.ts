@@ -169,7 +169,8 @@ export function isAiConfigured(): boolean {
 }
 
 /**
- * Configuração do chat de IA (`/transacoes`, `/` — o botão "Assistente").
+ * Configuração do chat de IA (a bolha do assistente, em todas as telas do
+ * módulo Finanças).
  *
  * É separada da importação de propósito. São dois trabalhos diferentes: a
  * importação lê um documento inteiro e paga por isso; o chat interpreta uma
