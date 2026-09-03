@@ -217,11 +217,12 @@ function AccountPage() {
         </section>
       )}
 
-      {/* Perfis */}
+      {/* Subcontas financeiras */}
       <section className="panel p-6">
-        <h2 className="label-caps mb-1">Perfis desta conta</h2>
+        <h2 className="label-caps mb-1">Subcontas financeiras</h2>
         <p className="mb-4 text-xs text-muted-foreground">
-          Cada perfil tem transações, categorias, investimentos e metas totalmente isolados.
+          Cada subconta tem transações, categorias, investimentos e metas totalmente isolados. É a
+          única divisão do dinheiro: acima dela existe só a sua conta de e-mail.
         </p>
         <div className="space-y-2">
           {profiles?.map((p) => (
@@ -238,7 +239,7 @@ function AccountPage() {
                   variant="ghost"
                   className="ml-auto"
                   onClick={() => setDeletingProfile({ id: p.id, name: p.name })}
-                  aria-label={`Excluir o perfil ${p.name}`}
+                  aria-label={`Excluir a subconta ${p.name}`}
                 >
                   <Trash2 className="size-4" />
                 </Button>
@@ -249,7 +250,7 @@ function AccountPage() {
         {canEdit && (
           <div className="mt-4 flex flex-wrap items-end gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="profile-name">Novo perfil</Label>
+              <Label htmlFor="profile-name">Nova subconta</Label>
               <Input
                 id="profile-name"
                 value={profileName}
@@ -263,7 +264,7 @@ function AccountPage() {
               value={profileColor}
               onChange={(e) => setProfileColor(e.target.value)}
               className="h-10 w-16 p-1"
-              aria-label="Cor do perfil"
+              aria-label="Cor da subconta"
             />
             <Button
               variant="outline"
@@ -276,10 +277,10 @@ function AccountPage() {
                   is_default: false,
                 });
                 setProfileName("");
-                toast.success("Perfil criado");
+                toast.success("Subconta criada");
               }}
             >
-              <Plus className="mr-1 size-4" /> Adicionar perfil
+              <Plus className="mr-1 size-4" /> Adicionar subconta
             </Button>
           </div>
         )}
@@ -455,24 +456,25 @@ function AccountPage() {
       <ConfirmDeleteDialog
         open={deletingProfile !== null}
         onOpenChange={(value) => !value && setDeletingProfile(null)}
-        itemLabel="perfil"
+        itemLabel="subconta"
         itemName={deletingProfile?.name ?? ""}
         description={
           <>
-            O perfil <span className="font-semibold text-foreground">{deletingProfile?.name}</span>{" "}
-            e todos os dados financeiros dele somem. Os outros perfis da conta não são afetados.
+            A subconta{" "}
+            <span className="font-semibold text-foreground">{deletingProfile?.name}</span> e todos
+            os dados financeiros dele somem. Os outros perfis da conta não são afetados.
           </>
         }
         consequences={[
-          "Todos os lançamentos do perfil, incluindo os já conciliados",
+          "Todos os lançamentos da subconta, incluindo os já conciliados",
           "As categorias e os tetos de orçamento definidos nele",
-          "Os investimentos, as metas e as regras de recorrência do perfil",
+          "Os investimentos, as metas e as regras de recorrência da subconta",
         ]}
-        confirmLabel="Excluir perfil"
+        confirmLabel="Excluir subconta"
         onConfirm={async () => {
           await removeProfile.mutateAsync(deletingProfile!.id);
           setDeletingProfile(null);
-          toast.success("Perfil excluído");
+          toast.success("Subconta excluída");
         }}
       />
     </AppShell>
