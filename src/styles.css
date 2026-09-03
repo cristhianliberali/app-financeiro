@@ -619,3 +619,27 @@
     opacity: 0.45;
   }
 }
+
+/*
+ * No celular, nenhum campo abaixo de 16px.
+ *
+ * O Safari do iPhone dá zoom sozinho ao focar um campo com fonte menor que
+ * isso — e o estrago não para no zoom: um painel flutuante posicionado antes
+ * dele (o calendário, um menu) sai da área visível e não tem como voltar, o
+ * que na prática trava a tela. Vários campos do app são `text-xs` de propósito,
+ * porque no desktop a densidade ajuda; no dedo, ela cobra caro demais.
+ *
+ * Fora de `@layer` de propósito. Dentro de `base` a regra seria letra morta:
+ * a camada `utilities` do Tailwind vem depois e o `text-xs` escrito no próprio
+ * campo continuaria vencendo — justamente nos sete campos que causam o
+ * problema. Sem camada, ela ganha de qualquer utilitário.
+ *
+ * Só vale para ponteiro grosso: no desktop a densidade fica como está.
+ */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

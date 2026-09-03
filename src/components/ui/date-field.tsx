@@ -416,19 +416,27 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(func
                 <p className="label-caps px-1 pb-1.5">Horário</p>
                 <div className="flex items-center gap-2 rounded-lg border border-input px-2">
                   <Clock className="size-3.5 shrink-0 text-muted-foreground" />
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="hh:mm"
-                    value={time}
-                    onChange={(e) => {
-                      const digits = digitsOf(e.target.value, "time");
-                      const parsed = digitsToValue(digits, "time");
-                      if (parsed) pickTime(parsed);
-                      else if (digits.length === 0 && selected) pickTime("00:00");
-                    }}
-                    className="h-8 w-full bg-transparent font-mono text-xs outline-none placeholder:font-sans placeholder:text-muted-foreground/70"
-                  />
+                  {coarsePointer ? (
+                    /*
+                      No dedo, o seletor de hora do próprio sistema.
+
+                      Digitar "hh:mm" num teclado de telefone, dentro de um
+                      painel flutuante, é o pior caminho possível: o teclado
+                      sobe por cima do calendário e cobre justamente o campo. O
+                      seletor nativo resolve em dois giros, sem teclado — e
+                      aqui ele cabe, porque hora não tem a ambiguidade de
+                      formato que fez a data virar campo próprio.
+                    */
+                    <input
+                      type="time"
+                      value={time}
+                      onChange={(e) => e.target.value && pickTime(e.target.value)}
+                      className="h-10 w-full bg-transparent font-mono outline-none"
+                      aria-label="Horário"
+                    />
+                  ) : (
+                    <TimeText value={time} onPick={pickTime} />
+                  )}
                 </div>
                 <div className="mt-1.5 grid grid-cols-3 gap-1">
                   {["08:00", "12:00", "18:00"].map((preset) => (
@@ -436,7 +444,8 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(func
                       key={preset}
                       type="button"
                       onClick={() => pickTime(preset)}
-                      className="rounded-md border border-border py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary hover:bg-primary-soft hover:text-primary"
+                      // Alvo de dedo no celular; a densidade do desktop volta no `sm`.
+                      className="rounded-md border border-border py-2.5 font-mono text-xs text-muted-foreground transition-colors hover:border-primary hover:bg-primary-soft hover:text-primary sm:py-1 sm:text-[11px]"
                     >
                       {preset}
                     </button>
@@ -461,6 +470,48 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(func
     </Popover>
   );
 });
+
+/**
+ * O campo de hora digitável do painel, no mouse.
+ *
+ * Precisa de texto próprio pelo mesmo motivo que o campo principal: preso
+ * direto ao valor, ele era impossível de digitar. "09:30" começa em "0", que
+ * não é hora nenhuma, então nada era emitido — e o React repunha na tela a hora
+ * antiga antes do segundo dígito chegar. Na prática só os atalhos de baixo
+ * mudavam a hora; digitar não fazia nada.
+ *
+ * Com texto próprio, os dígitos ficam na tela enquanto são digitados e o valor
+ * sobe só quando as quatro casas fecham uma hora que existe.
+ */
+function TimeText({ value, onPick }: { value: string; onPick: (time: string) => void }) {
+  const [text, setText] = React.useState(value);
+
+  // Mudou por fora (um atalho, outra data): reescreve, mas nunca por cima de
+  // uma digitação que já vale.
+  React.useEffect(() => {
+    setText((current) =>
+      digitsToValue(digitsOf(current, "time"), "time") === value ? current : value,
+    );
+  }, [value]);
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      placeholder="hh:mm"
+      value={text}
+      onChange={(e) => {
+        const digits = digitsOf(e.target.value, "time");
+        setText(maskDigits(digits, "time"));
+        const parsed = digitsToValue(digits, "time");
+        if (parsed && parsed !== value) onPick(parsed);
+      }}
+      // Texto pela metade ao sair volta para a hora que vale.
+      onBlur={() => setText(value)}
+      className="h-8 w-full bg-transparent font-mono text-xs outline-none placeholder:font-sans placeholder:text-muted-foreground/70"
+    />
+  );
+}
 
 /** Atalhos do calendário — os saltos que aparecem em quase todo formulário. */
 const SHORTCUTS: Array<{ label: string; date: () => Date }> = [
