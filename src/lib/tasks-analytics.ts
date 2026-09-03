@@ -233,6 +233,22 @@ export const toLocalInput = (iso: string | null) => {
 
 export const fromLocalInput = (value: string) => (value ? new Date(value).toISOString() : null);
 
+/**
+ * Um dia escolhido (YYYY-MM-DD) vira prazo no fim desse dia, no fuso de quem
+ * escolheu.
+ *
+ * Montado campo a campo de propósito: `new Date("2026-09-10")` é lido como
+ * meia-noite em UTC, que em São Paulo é 21h do dia 9 — a tarefa nasceria
+ * vencendo um dia antes do que a pessoa marcou. E o fim do dia, e não o
+ * começo, porque "para o dia 10" quer dizer até o fim do dia 10.
+ */
+export const dueFromDay = (day: string): string | null => {
+  if (!day) return null;
+  const [year, month, date] = day.split("-").map(Number);
+  if (!year || !month || !date) return null;
+  return new Date(year, month - 1, date, 23, 59).toISOString();
+};
+
 /** Dia local (YYYY-MM-DD) de um timestamptz. */
 export const dayKey = (iso: string | null) => (iso ? toISODate(new Date(iso)) : null);
 

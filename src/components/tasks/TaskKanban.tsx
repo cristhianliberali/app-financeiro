@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
+import { QuickTaskForm, type QuickTaskDraft } from "./QuickTaskForm";
 import { useTone } from "@/hooks/use-tone";
 import type { AccountUser, Task } from "@/lib/tasks";
 import { TaskCard } from "./TaskCard";
@@ -82,6 +83,7 @@ export function TaskKanban({
   onOpen,
   onToggleTimer,
   onAdd,
+  onQuickAdd,
   showBoard = false,
 }: {
   columns: KanbanColumn[];
@@ -93,10 +95,18 @@ export function TaskKanban({
   onOpen: (task: Task) => void;
   onToggleTimer: (task: Task) => void;
   onAdd?: (columnId: string) => void;
+  /**
+   * Criação rápida na própria coluna. Quando existe, o rodapé e o vazio da
+   * coluna abrem o formulário curto; o `+` do cabeçalho segue no completo.
+   */
+  onQuickAdd?: (columnId: string, draft: QuickTaskDraft) => Promise<void>;
   showBoard?: boolean;
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
+  /** Coluna com o formulário curto aberto — só uma por vez. */
+  const [quick, setQuick] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const tone = useTone();
   const { ref, height } = useFillHeight();
 
@@ -118,6 +128,7 @@ export function TaskKanban({
         const items = tasks.filter((t) => columnOf(t) === col.id);
         const color = tone(col.color);
         const active = over === col.id;
+        const quickOpen = onQuickAdd && quick === col.id;
         // Colunas vizinhas: é para elas que as setinhas do cartão empurram.
         const index = columns.indexOf(col);
         const prev = columns[index - 1];
@@ -160,8 +171,8 @@ export function TaskKanban({
                 <button
                   onClick={() => onAdd(col.id)}
                   className="ml-auto rounded-lg p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                  aria-label={`Nova tarefa em ${col.name}`}
-                  title={`Nova tarefa em ${col.name}`}
+                  aria-label={`Nova tarefa em ${col.name}, com todos os campos`}
+                  title={`Nova tarefa em ${col.name}, com todos os campos`}
                 >
                   <Plus className="size-4" />
                 </button>
@@ -194,11 +205,27 @@ export function TaskKanban({
                 />
               ))}
 
-              {items.length === 0 && (
+              {quickOpen && (
+                <QuickTaskForm
+                  users={users}
+                  saving={saving}
+                  onCancel={() => setQuick(null)}
+                  onCreate={async (draft) => {
+                    setSaving(true);
+                    try {
+                      await onQuickAdd(col.id, draft);
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                />
+              )}
+
+              {items.length === 0 && !quickOpen && (
                 <div className="flex h-full flex-col items-center justify-center gap-2 py-8 text-center">
-                  {onAdd && (
+                  {(onQuickAdd || onAdd) && (
                     <button
-                      onClick={() => onAdd(col.id)}
+                      onClick={() => (onQuickAdd ? setQuick(col.id) : onAdd?.(col.id))}
                       className="flex size-11 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground transition-colors hover:border-border-strong hover:bg-accent hover:text-foreground"
                       aria-label={`Nova tarefa em ${col.name}`}
                     >
@@ -213,10 +240,10 @@ export function TaskKanban({
               )}
             </div>
 
-            {onAdd && (
+            {(onQuickAdd || onAdd) && !quickOpen && (
               <div className="p-2 pt-0">
                 <button
-                  onClick={() => onAdd(col.id)}
+                  onClick={() => (onQuickAdd ? setQuick(col.id) : onAdd?.(col.id))}
                   className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border px-2.5 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-border-strong hover:bg-accent hover:text-foreground"
                 >
                   <Plus className="size-3.5" /> Adicionar tarefa

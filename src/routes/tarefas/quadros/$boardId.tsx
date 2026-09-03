@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { TaskCalendar } from "@/components/tasks/TaskCalendar";
 import { TaskDialog } from "@/components/tasks/TaskDialog";
 import { TaskKanban } from "@/components/tasks/TaskKanban";
+import type { QuickTaskDraft } from "@/components/tasks/QuickTaskForm";
 import { TaskListView } from "@/components/tasks/TaskListView";
 import { BoardDialog } from "@/components/tasks/BoardDialog";
 import {
@@ -22,6 +23,7 @@ import {
   useBoardStatuses,
   useLabels,
   useMoveTask,
+  useSaveTask,
   useSpaces,
   useTasks,
   type Task,
@@ -62,6 +64,7 @@ function BoardPage() {
   const { data: spaces = [] } = useSpaces(accountId);
   const { data: labels = [] } = useLabels(accountId);
   const move = useMoveTask();
+  const saveTask = useSaveTask();
 
   const [view, setView] = useState<BoardView>("kanban");
   const [filters, setFilters] = useState<TaskFilterState>(EMPTY_FILTERS);
@@ -121,6 +124,28 @@ function BoardPage() {
   ]
     .filter(Boolean)
     .join(" · ");
+
+  /**
+   * Criação rápida na coluna: só nome, responsável e prazo.
+   *
+   * Erro não é engolido — quem acabou de digitar precisa saber que a linha não
+   * entrou, e o formulário só limpa o nome depois que isto resolve.
+   */
+  async function quickAdd(columnId: string, draft: QuickTaskDraft) {
+    try {
+      await saveTask.mutateAsync({
+        board_id: boardId,
+        status_id: columnId,
+        title: draft.title,
+        responsible_user_id: draft.responsible_user_id,
+        due_date: draft.due_date,
+      });
+      toast.success(`“${draft.title}” criada`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível criar a tarefa");
+      throw error;
+    }
+  }
 
   function closeTaskDialog() {
     setTaskDialog({ open: false, task: null });
@@ -223,6 +248,7 @@ function BoardPage() {
           onOpen={(task) => setTaskDialog({ open: true, task })}
           onToggleTimer={toggleTimer}
           onAdd={(columnId) => setTaskDialog({ open: true, task: null, statusId: columnId })}
+          onQuickAdd={quickAdd}
         />
       )}
 
