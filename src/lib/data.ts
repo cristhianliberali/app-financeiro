@@ -63,6 +63,8 @@ export type Transaction = {
   notes: string | null;
   /** Preenchido quando o lançamento nasceu de uma recorrência. */
   recurring_rule_id: string | null;
+  /** A regra que gerou este lançamento é de valor variável. */
+  recurring_variable?: boolean;
 };
 
 export type RecurringRule = {
@@ -77,6 +79,8 @@ export type RecurringRule = {
   start_date: string;
   end_date: string | null;
   active: boolean;
+  /** O valor da regra é estimativa; cada ocorrência confirma o seu ao ser paga. */
+  variable_amount: boolean;
 };
 
 export type Investment = {

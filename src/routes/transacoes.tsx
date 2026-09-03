@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { CategorySelect } from "@/components/CategorySelect";
+import { SettleDialog } from "@/components/SettleDialog";
 import { DEFAULT_CATEGORY_ICON, IconBadge } from "@/lib/icons";
 import { StatusPill } from "@/components/ui/status";
 import { PaginationBar, usePagination } from "@/components/PaginationBar";
@@ -206,12 +207,33 @@ function TransactionsPage() {
     }
   }
 
+  /** Baixa parada esperando o valor real das ocorrências de valor variável. */
+  const [settling, setSettling] = useState<Transaction[] | null>(null);
+
   function setStatus(status: "paid" | "pending") {
+    // Só ao dar baixa. Voltar para pendente não confirma valor nenhum: é o
+    // gesto de desfazer, e ele não deveria pedir nada.
+    const variaveis = status === "paid" ? chosen.filter((t) => t.recurring_variable) : [];
+    if (variaveis.length > 0) {
+      setSettling(variaveis);
+      return;
+    }
     void applyBulk(
       chosen,
       () => ({ status }),
       (t) => ({ status: t.status }),
       `${chosen.length} lançamento(s) marcado(s) como ${status === "paid" ? "pago" : "pendente"}`,
+    );
+  }
+
+  async function confirmSettle(amounts: Array<{ id: string; amount: number }>) {
+    const valor = new Map(amounts.map((a) => [a.id, a.amount]));
+    setSettling(null);
+    await applyBulk(
+      chosen,
+      (t) => (valor.has(t.id) ? { status: "paid", amount: valor.get(t.id) } : { status: "paid" }),
+      (t) => (valor.has(t.id) ? { status: t.status, amount: t.amount } : { status: t.status }),
+      `${chosen.length} lançamento(s) baixado(s)`,
     );
   }
 
@@ -614,6 +636,13 @@ function TransactionsPage() {
         editing={editing}
       />
       <RecurringDialog open={recurringOpen} onOpenChange={setRecurringOpen} />
+      <SettleDialog
+        open={!!settling}
+        onOpenChange={(open) => !open && setSettling(null)}
+        items={settling ?? []}
+        pending={upsert.isPending}
+        onConfirm={confirmSettle}
+      />
     </AppShell>
   );
 }
