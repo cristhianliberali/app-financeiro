@@ -71,7 +71,7 @@ function CalendarPage() {
   const openTask = selected ? (allTasks.find((t) => t.id === selected.id) ?? selected) : null;
 
   return (
-    <TasksShell breadcrumbCurrent="Calendário">
+    <TasksShell breadcrumbCurrent="Calendário" wide>
       <div>
         <h1 className="title-xl">Calendário</h1>
         <p className="mt-1 text-sm text-muted-foreground">

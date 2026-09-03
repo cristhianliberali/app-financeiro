@@ -146,6 +146,8 @@ function SpacePage() {
   return (
     <TasksShell
       spaceId={spaceId}
+      // As mesmas três grades do quadro, reunindo os quadros do espaço.
+      wide
       actions={
         <>
           <Button variant="outline" size="sm" onClick={() => setSpaceDialog(true)}>
