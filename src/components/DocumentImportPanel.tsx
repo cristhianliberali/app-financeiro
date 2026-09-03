@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { DateField } from "@/components/ui/date-field";
+import { CategorySelect } from "@/components/CategorySelect";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -822,23 +823,16 @@ export function DocumentImportPanel() {
                 onChange={(e) => patch(r.linhaId, { data: e.target.value })}
                 aria-label="Data da transação"
               />
-              <select
-                className={`col-span-3 h-8 rounded-md border bg-card px-2 text-xs ${
-                  r.include && !r.category_id ? "border-negative/60" : "border-input"
-                }`}
+              <CategorySelect
+                size="sm"
+                className="col-span-3"
+                categories={categories.filter((c) => c.kind === r.kind)}
                 value={r.category_id}
-                onChange={(e) => patch(r.linhaId, { category_id: e.target.value, ia: null })}
+                invalid={r.include && !r.category_id}
+                placeholder="Escolha…"
                 aria-label="Categoria da transação"
-              >
-                <option value="">Escolha…</option>
-                {categories
-                  .filter((c) => c.kind === r.kind)
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-              </select>
+                onChange={(category_id) => patch(r.linhaId, { category_id, ia: null })}
+              />
               <span
                 className={`col-span-2 text-right font-mono text-xs font-semibold ${
                   r.kind === "income" ? "text-positive" : "text-negative"

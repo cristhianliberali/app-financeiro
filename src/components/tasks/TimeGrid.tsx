@@ -136,6 +136,22 @@ export function TimeGrid({ days, entries, onOpen, onMove, onResize }: Props) {
   const surface = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+  /*
+   * O mesmo gesto, também num ref.
+   *
+   * O estado é para desenhar; o ref é para decidir. Ao soltar, era preciso ler
+   * o arraste corrente, e a versão anterior fazia isso de dentro de um
+   * atualizador do `setDrag` — onde o React pode chamar a função duas vezes e,
+   * pior, fora da tarefa que o toque iniciou. Era ali que o `window.open` do
+   * compromisso morria: sem o gesto do usuário por trás, o navegador engole a
+   * aba nova em silêncio, sem erro nenhum no console.
+   */
+  const dragRef = useRef<Drag | null>(null);
+
+  function applyDrag(next: Drag | null) {
+    dragRef.current = next;
+    setDrag(next);
+  }
   const now = useNow(60_000);
 
   const timed = entries.filter((e) => !e.allDay);
@@ -196,7 +212,17 @@ export function TimeGrid({ days, entries, onOpen, onMove, onResize }: Props) {
     const endMin = Math.max(startMin + MIN_MINUTES, minutesOf(entry.end));
     const slot = pointerToSlot(event);
 
-    setDrag({
+    // Captura o ponteiro: o gesto continua nosso mesmo que o dedo saia do bloco
+    // ou da grade, e o navegador para de tentar rolar a página no meio dele.
+    if (event.pointerId !== undefined && event.currentTarget instanceof Element) {
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // Teclado chega aqui por um evento sintético, sem ponteiro para capturar.
+      }
+    }
+
+    applyDrag({
       entry,
       mode,
       grab: slot ? slot.minutes - startMin : 0,
@@ -215,47 +241,48 @@ export function TimeGrid({ days, entries, onOpen, onMove, onResize }: Props) {
 
     const move = (event: PointerEvent) => {
       const slot = pointerToSlot(event);
-      if (!slot) return;
-      setDrag((current) => {
-        if (!current) return current;
-        const snap = (m: number) => Math.round(m / SNAP) * SNAP;
+      const current = dragRef.current;
+      if (!slot || !current) return;
+      const snap = (m: number) => Math.round(m / SNAP) * SNAP;
 
-        if (current.mode === "resize") {
-          const end = clamp(snap(slot.minutes), current.startMin + MIN_MINUTES, DAY_MINUTES);
-          if (end === current.endMin && current.moved) return current;
-          return { ...current, endMin: end, moved: true };
-        }
+      if (current.mode === "resize") {
+        const end = clamp(snap(slot.minutes), current.startMin + MIN_MINUTES, DAY_MINUTES);
+        if (end === current.endMin && current.moved) return;
+        applyDrag({ ...current, endMin: end, moved: true });
+        return;
+      }
 
-        const start = clamp(snap(slot.minutes - current.grab), 0, DAY_MINUTES - current.duration);
-        if (current.moved && start === current.startMin && slot.dayIndex === current.dayIndex) {
-          return current;
-        }
-        return {
-          ...current,
-          dayIndex: slot.dayIndex,
-          startMin: start,
-          endMin: start + current.duration,
-          moved: true,
-        };
+      const start = clamp(snap(slot.minutes - current.grab), 0, DAY_MINUTES - current.duration);
+      if (current.moved && start === current.startMin && slot.dayIndex === current.dayIndex) {
+        return;
+      }
+      applyDrag({
+        ...current,
+        dayIndex: slot.dayIndex,
+        startMin: start,
+        endMin: start + current.duration,
+        moved: true,
       });
     };
 
     const up = () => {
-      setDrag((current) => {
-        if (!current) return null;
-        // Um clique é um arraste que não andou: abre em vez de mover.
-        if (!current.moved) {
-          onOpen(current.entry);
-          return null;
-        }
-        const day = days[current.dayIndex] ?? current.entry.start;
-        if (current.mode === "resize") {
-          onResize(current.entry, dateAt(current.entry.start, current.endMin));
-        } else {
-          onMove(current.entry, dateAt(day, current.startMin), dateAt(day, current.endMin));
-        }
-        return null;
-      });
+      const current = dragRef.current;
+      applyDrag(null);
+      if (!current) return;
+
+      // Um clique é um arraste que não andou: abre em vez de mover. E abre
+      // daqui, direto do manipulador do evento, que é o que preserva o gesto
+      // do usuário para o `window.open` do compromisso.
+      if (!current.moved) {
+        onOpen(current.entry);
+        return;
+      }
+      const day = days[current.dayIndex] ?? current.entry.start;
+      if (current.mode === "resize") {
+        onResize(current.entry, dateAt(current.entry.start, current.endMin));
+      } else {
+        onMove(current.entry, dateAt(day, current.startMin), dateAt(day, current.endMin));
+      }
     };
 
     window.addEventListener("pointermove", move);
@@ -353,7 +380,26 @@ export function TimeGrid({ days, entries, onOpen, onMove, onResize }: Props) {
               {days.map((day, dayIndex) => {
                 const key = dayKey(day);
                 const isToday = key === today;
-                const laid = layoutLanes(byDay.get(key) ?? []);
+                /*
+                 * Enquanto arrasta, o bloco muda de coluna de verdade.
+                 *
+                 * Antes ele era desenhado só na coluna do dia a que pertence, e
+                 * quem cruzasse para a coluna vizinha via o bloco sumir: ele
+                 * saía da lista de origem e não entrava em nenhuma outra,
+                 * reaparecendo apenas ao soltar. Tirá-lo da origem e injetá-lo
+                 * no destino faz o desenho seguir o dedo, e ainda dá a ele uma
+                 * faixa coerente com o que já existe no dia de destino.
+                 */
+                const doDia = byDay.get(key) ?? [];
+                const lista = drag
+                  ? [
+                      ...doDia.filter((e) => e.id !== drag.entry.id),
+                      ...(days[drag.dayIndex] && dayKey(days[drag.dayIndex]!) === key
+                        ? [drag.entry]
+                        : []),
+                    ]
+                  : doDia;
+                const laid = layoutLanes(lista);
 
                 return (
                   <div key={key} className="relative flex-1 border-l border-border">
@@ -370,9 +416,6 @@ export function TimeGrid({ days, entries, onOpen, onMove, onResize }: Props) {
 
                     {laid.map(({ entry, lane, lanes }) => {
                       const dragging = drag?.entry.id === entry.id;
-                      // Enquanto arrasta, o bloco só existe na coluna de destino.
-                      if (dragging && drag && drag.dayIndex !== dayIndex) return null;
-
                       const startMin = dragging && drag ? drag.startMin : minutesOf(entry.start);
                       const endMin = dragging && drag ? drag.endMin : minutesOf(entry.end);
                       const height = Math.max(
@@ -387,10 +430,15 @@ export function TimeGrid({ days, entries, onOpen, onMove, onResize }: Props) {
                           dragging={dragging}
                           top={(startMin / 60) * HOUR}
                           height={height}
-                          left={dragging ? 0 : (lane / lanes) * 100}
-                          width={dragging ? 100 : (1 / lanes) * 100}
+                          /* Sem pular para a largura toda ao ser pego: o salto
+                             de geometria no primeiro pixel do gesto é metade da
+                             sensação de "piscou". O bloco fica onde está e só
+                             se levanta. */
+                          left={(lane / lanes) * 100}
+                          width={(1 / lanes) * 100}
                           label={`${hourLabel(startMin)} – ${hourLabel(endMin)}`}
                           onPointerDown={(event, mode) => startDrag(event, entry, mode, dayIndex)}
+                          onActivate={() => onOpen(entry)}
                         />
                       );
                     })}
@@ -438,6 +486,7 @@ function EventBlock({
   width,
   label,
   onPointerDown,
+  onActivate,
 }: {
   entry: GridEntry;
   dragging: boolean;
@@ -447,31 +496,60 @@ function EventBlock({
   width: number;
   label: string;
   onPointerDown: (event: React.PointerEvent, mode: "move" | "resize") => void;
+  onActivate: () => void;
 }) {
   const agenda = entry.source === "agenda";
   const compact = height < 44;
+  /*
+   * Bloco que não se arrasta precisa de um clique de verdade.
+   *
+   * O compromisso da agenda vem com `canMove` e `canResize` falsos, e o
+   * `startDrag` desistia logo na primeira linha por causa disso — sem gesto
+   * registrado, o `pointerup` que abriria o evento nunca acontecia. Na prática
+   * o bloco era decoração: clicar nele não fazia absolutamente nada. Aqui ele
+   * volta a ser um botão, com `onClick` nativo, que é também o que mantém o
+   * gesto do usuário vivo para o `window.open` do outro lado.
+   */
+  const fixo = !entry.canMove && !entry.canResize;
 
   return (
     <div
       role="button"
       tabIndex={0}
-      onPointerDown={(event) => onPointerDown(event, "move")}
+      {...(fixo
+        ? { onClick: onActivate }
+        : { onPointerDown: (event: React.PointerEvent) => onPointerDown(event, "move") })}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          onPointerDown(event as unknown as React.PointerEvent, "move");
+          // Sempre abrir: arrastar pelo teclado não existe, e mandar um evento
+          // sintético para o `startDrag` deixava um arraste iniciado que nenhum
+          // `pointerup` viria encerrar.
+          onActivate();
         }
       }}
       title={`${entry.title} · ${label}${entry.subtitle ? ` · ${entry.subtitle}` : ""}`}
       className={cn(
         "group absolute overflow-hidden rounded-lg border px-2 py-1 text-left",
         entry.canMove ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
-        dragging ? "z-30 glow-strong" : "z-10 hover-glow",
         agenda && "border-dashed",
+        /*
+         * O passo do arraste é de 15 minutos, então o bloco anda aos pulos de
+         * 14px. Sem nada, cada pulo é um teletransporte; com uma transição
+         * curtíssima o olho lê o mesmo pulo como deslizamento, e ainda assim o
+         * bloco não fica para trás do dedo. Só enquanto arrasta: fora do gesto
+         * uma transição atrapalharia a chegada de dados novos.
+         */
+        dragging
+          ? "z-30 scale-[1.02] shadow-lg transition-[top,height] duration-75 ease-out glow-strong"
+          : "z-10 hover-glow",
       )}
       style={{
         top,
         height,
+        // Sem isto, no celular o navegador entende o arraste como rolagem da
+        // página e o gesto nunca chega até aqui.
+        touchAction: entry.canMove || entry.canResize ? "none" : undefined,
         left: `calc(${left}% + 2px)`,
         width: `calc(${width}% - 4px)`,
         // A cor do item pinta a borda, um véu de fundo e o halo: cor cheia num

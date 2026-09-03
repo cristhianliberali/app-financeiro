@@ -100,6 +100,7 @@ export const saveRecurring = createServerFn({ method: "POST" })
       dayOfMonth: number;
       startDate: string;
       endDate?: string | null;
+      variableAmount?: boolean;
     }) => {
       const amount = Number(input?.amount);
       if (!Number.isFinite(amount) || amount <= 0) throw new Error("Informe um valor válido");
@@ -124,6 +125,7 @@ export const saveRecurring = createServerFn({ method: "POST" })
         dayOfMonth: Math.min(31, Math.max(1, Math.trunc(Number(input?.dayOfMonth) || 1))),
         startDate: input.startDate,
         endDate: input?.endDate ?? null,
+        variableAmount: input?.variableAmount === true,
       };
     },
   )

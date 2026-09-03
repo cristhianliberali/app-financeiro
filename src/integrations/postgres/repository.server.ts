@@ -84,7 +84,7 @@ const TRANSACTION_COLUMNS =
   "installment_no, installment_total, installment_group, notes, recurring_rule_id";
 const RECURRING_COLUMNS =
   "id, profile_id, category_id, description, amount, kind, frequency, day_of_month, start_date, " +
-  "end_date, active";
+  "end_date, active, variable_amount";
 const INVESTMENT_COLUMNS =
   "id, profile_id, name, type, invested_amount, current_amount, expected_rate, started_at";
 const GOAL_COLUMNS =
@@ -189,10 +189,23 @@ export async function listTransactions(
   // inputValidator da server function antes de chegar aqui.
   const basis = opts.basis === "due_date" ? "due_date" : "transaction_date";
   const params: unknown[] = [opts.profileId];
-  let sql = `SELECT ${TRANSACTION_COLUMNS} FROM transactions WHERE profile_id = $1`;
-  if (opts.from) sql += ` AND ${basis} >= $${params.push(opts.from)}`;
-  if (opts.to) sql += ` AND ${basis} <= $${params.push(opts.to)}`;
-  sql += ` ORDER BY ${basis} DESC LIMIT 2000`;
+  /*
+   * `variable_amount` da regra viaja junto com o lançamento.
+   *
+   * Quem dá baixa precisa saber, ali na linha, se aquele valor é estimativa a
+   * confirmar ou número fechado. Buscar a regra depois seria uma consulta por
+   * linha; o LEFT JOIN custa nada e responde de uma vez.
+   */
+  let sql =
+    `SELECT ${TRANSACTION_COLUMNS.split(", ")
+      .map((c) => `t.${c}`)
+      .join(", ")}, ` +
+    `COALESCE(r.variable_amount, false) AS recurring_variable ` +
+    `FROM transactions t LEFT JOIN recurring_rules r ON r.id = t.recurring_rule_id ` +
+    `WHERE t.profile_id = $1`;
+  if (opts.from) sql += ` AND t.${basis} >= $${params.push(opts.from)}`;
+  if (opts.to) sql += ` AND t.${basis} <= $${params.push(opts.to)}`;
+  sql += ` ORDER BY t.${basis} DESC LIMIT 2000`;
 
   return query(sql, params);
 }

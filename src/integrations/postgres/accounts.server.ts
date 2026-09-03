@@ -19,7 +19,74 @@ export type AccountRow = {
 
 const ACCOUNT_COLUMNS = "a.id, a.name, a.color, a.owner_id";
 
+/**
+ * Uma conta própria por pessoa.
+ *
+ * O app tinha dois níveis de divisão empilhados — contas dentro do usuário,
+ * perfis dentro da conta — e ninguém consegue guardar na cabeça em qual dos
+ * dois uma despesa foi parar. Agora a conta é encanamento: ela existe porque é
+ * dela que pendem o compartilhamento e o módulo de Projetos, mas quem divide o
+ * dinheiro é a subconta financeira, e ela é a única divisão visível.
+ *
+ * Esta função junta o que já estava separado. Roda a cada carregamento, mas
+ * custa uma contagem quando não há nada a fazer, que é o caso a partir da
+ * segunda vez.
+ *
+ * Mexe só no que a pessoa é dona. Conta de outra pessoa em que ela foi
+ * convidada continua de pé, intocada — consolidar aquilo seria mudar os dados
+ * de terceiros a partir da preferência de quem entrou de visita.
+ */
+async function consolidateOwnAccounts(userId: string): Promise<void> {
+  const owned = await query<{ id: string }>(
+    `SELECT id FROM accounts WHERE owner_id = $1 ORDER BY created_at`,
+    [userId],
+  );
+  if (owned.length < 2) return;
+
+  const [principal, ...extras] = owned.map((a) => a.id);
+  const sobras = extras as string[];
+
+  await withTransaction(async (client) => {
+    // Tudo que pendura na conta muda de dono de uma vez. O compartilhamento
+    // vai junto: quem tinha acesso a uma conta secundária passa a ter acesso à
+    // principal, senão a consolidação tiraria gente de dentro sem avisar.
+    for (const tabela of [
+      "budget_profiles",
+      "spaces",
+      "labels",
+      "status_templates",
+      "account_invites",
+    ]) {
+      await client.query(
+        `UPDATE ${tabela} SET account_id = $1 WHERE account_id = ANY($2::uuid[])`,
+        [principal, sobras],
+      );
+    }
+
+    // Membros: quem já está na principal fica com o papel que tem lá; os
+    // demais entram. `DO NOTHING` porque o par (conta, pessoa) é único.
+    await client.query(
+      `INSERT INTO account_members (account_id, user_id, role, email)
+       SELECT $1, m.user_id, m.role, m.email
+         FROM account_members m
+        WHERE m.account_id = ANY($2::uuid[])
+       ON CONFLICT (account_id, user_id) DO NOTHING`,
+      [principal, sobras],
+    );
+
+    // As sobras saem. O CASCADE só alcança o que já foi movido acima — nada
+    // de financeiro sobra pendurado nelas a esta altura.
+    await client.query(`DELETE FROM accounts WHERE id = ANY($1::uuid[])`, [sobras]);
+  });
+
+  console.info(
+    `[contas] usuário ${userId}: ${sobras.length} conta(s) consolidada(s) em ${principal}`,
+  );
+}
+
 export async function listAccounts(userId: string, email: string): Promise<AccountRow[]> {
+  await consolidateOwnAccounts(userId);
+
   const rows = await query<AccountRow>(
     `SELECT ${ACCOUNT_COLUMNS}, m.role
        FROM account_members m

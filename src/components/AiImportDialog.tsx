@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { DateField } from "@/components/ui/date-field";
+import { CategorySelect } from "@/components/CategorySelect";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -559,21 +560,16 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
                     onChange={(e) => patchDate(i, "due_date", e.target.value)}
                     aria-label="Data de vencimento"
                   />
-                  <select
-                    className="col-span-2 h-8 rounded-md border border-input bg-card px-2 text-xs disabled:opacity-60"
+                  <CategorySelect
+                    size="sm"
+                    className="col-span-2"
+                    categories={categories.filter((c) => c.kind === r.kind)}
                     value={r.category_id}
                     disabled={blocked}
-                    onChange={(e) => patch(i, { category_id: e.target.value })}
-                  >
-                    <option value="">Escolha…</option>
-                    {categories
-                      .filter((c) => c.kind === r.kind)
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                  </select>
+                    placeholder="Escolha…"
+                    aria-label="Categoria da transação"
+                    onChange={(category_id) => patch(i, { category_id })}
+                  />
                   <span
                     className={`col-span-2 flex items-center justify-end gap-1 text-right font-mono text-xs font-semibold ${
                       blocked

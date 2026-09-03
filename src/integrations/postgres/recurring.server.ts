@@ -45,11 +45,12 @@ type RuleRow = {
   start_date: string;
   end_date: string | null;
   materialized_until: string | null;
+  variable_amount: boolean;
 };
 
 const RULE_COLUMNS =
   "id, profile_id, category_id, description, amount, kind, frequency, day_of_month, " +
-  "start_date, end_date, materialized_until";
+  "start_date, end_date, materialized_until, variable_amount";
 
 /** Erro do Postgres de coluna que não existe — banco sem o `db:migrate` novo. */
 function isMissingColumn(error: unknown): boolean {
@@ -188,6 +189,8 @@ export async function saveRecurringRule(
     dayOfMonth: number;
     startDate: string;
     endDate?: string | null;
+    /** Valor varia a cada ocorrência: o `amount` vira estimativa. */
+    variableAmount?: boolean;
   },
 ): Promise<{ id: string; created: number }> {
   await requireProfileAccess(userId, input.profileId, "editor");
@@ -201,15 +204,15 @@ export async function saveRecurringRule(
         ? `UPDATE recurring_rules
               SET profile_id = $2, category_id = $3, description = $4, amount = $5, kind = $6,
                   frequency = $7, day_of_month = $8, start_date = $9, end_date = $10,
-                  active = true,
+                  variable_amount = $11, active = true,
                   -- Mudou a regra: a série precisa ser reconferida desde o começo.
                   materialized_until = NULL
             WHERE id = $1
         RETURNING ${RULE_COLUMNS}`
         : `INSERT INTO recurring_rules
              (id, user_id, profile_id, category_id, description, amount, kind, frequency,
-              day_of_month, start_date, end_date, active)
-           VALUES (COALESCE($1::uuid, gen_random_uuid()), $11, $2, $3, $4, $5, $6, $7, $8, $9, $10, true)
+              day_of_month, start_date, end_date, variable_amount, active)
+           VALUES (COALESCE($1::uuid, gen_random_uuid()), $12, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true)
         RETURNING ${RULE_COLUMNS}`,
       input.id
         ? [
@@ -223,6 +226,7 @@ export async function saveRecurringRule(
             input.dayOfMonth,
             input.startDate,
             input.endDate ?? null,
+            input.variableAmount ?? false,
           ]
         : [
             null,
@@ -235,6 +239,7 @@ export async function saveRecurringRule(
             input.dayOfMonth,
             input.startDate,
             input.endDate ?? null,
+            input.variableAmount ?? false,
             userId,
           ],
     );

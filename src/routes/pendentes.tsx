@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 
 import { AppShell } from "@/components/AppShell";
+import { CategorySelect } from "@/components/CategorySelect";
+import { SettleDialog } from "@/components/SettleDialog";
 import { TransactionDialog } from "@/components/TransactionDialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -230,9 +232,48 @@ function PendingPage() {
   }
 
   /** Uma só vai direto; mais de uma passa pela confirmação. */
+  /** Baixa parada esperando o valor real das ocorrências variáveis. */
+  const [settling, setSettling] = useState<{
+    variaveis: Transaction[];
+    resto: Transaction[];
+  } | null>(null);
+
+  /**
+   * Antes de dar baixa, separa o que tem valor a confirmar.
+   *
+   * Recorrência variável nasce com estimativa; baixar pela estimativa gravaria
+   * um palpite como fato. As demais seguem direto — perguntar o valor do
+   * aluguel todo mês seria interrupção sem ganho.
+   */
   function requestSettle(list: Transaction[]) {
+    const variaveis = list.filter((t) => t.recurring_variable);
+    if (variaveis.length > 0) {
+      setSettling({ variaveis, resto: list.filter((t) => !t.recurring_variable) });
+      return;
+    }
     if (list.length > 1) setConfirming(list);
     else void settle(list);
+  }
+
+  /** Grava o valor confirmado e dá baixa, tudo na mesma ida ao servidor. */
+  async function confirmSettle(amounts: Array<{ id: string; amount: number }>) {
+    if (!settling) return;
+    const { resto } = settling;
+    setSettling(null);
+    await upsert.mutateAsync([
+      ...amounts.map((a) => ({ id: a.id, amount: a.amount, status: "paid" as const })),
+      ...resto.map((t) => ({ id: t.id, status: "paid" as const })),
+    ]);
+    const todas = [...settling.variaveis, ...resto];
+    setSelected((current) => {
+      const next = new Set(current);
+      for (const t of todas) next.delete(t.id);
+      return next;
+    });
+    toast.success(
+      `${todas.length} lançamento(s) baixado(s)` +
+        (amounts.length ? ` · valor confirmado em ${amounts.length}` : ""),
+    );
   }
 
   const section = (title: string, list: Transaction[], kind: "income" | "expense") => {
@@ -418,19 +459,15 @@ function PendingPage() {
             className="pl-9"
           />
         </div>
-        <select
+        <CategorySelect
+          className="md:w-56"
+          categories={categories}
           value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          className={`${SELECT_CLASS} md:w-56`}
+          onChange={setCategoryId}
+          placeholder="Todas as categorias"
+          allowEmpty
           aria-label="Filtrar por categoria"
-        >
-          <option value="">Todas as categorias</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+        />
         <select
           value={due}
           onChange={(e) => setDue(e.target.value as DueFilter)}
@@ -579,6 +616,14 @@ function PendingPage() {
       )}
 
       {/* Confirmação da baixa em massa: quantas, quanto, e o que some da tela. */}
+      <SettleDialog
+        open={!!settling}
+        onOpenChange={(open) => !open && setSettling(null)}
+        items={settling?.variaveis ?? []}
+        pending={upsert.isPending}
+        onConfirm={confirmSettle}
+      />
+
       <AlertDialog open={!!confirming} onOpenChange={(open) => !open && setConfirming(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

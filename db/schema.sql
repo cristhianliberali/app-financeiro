@@ -263,6 +263,14 @@ CREATE TABLE IF NOT EXISTS recurring_rules (
 -- que não há nada novo a criar.
 ALTER TABLE recurring_rules ADD COLUMN IF NOT EXISTS materialized_until date;
 
+-- Recorrência de valor variável: água, luz, cartão. O `amount` da regra deixa
+-- de ser o valor e passa a ser a estimativa com que cada ocorrência nasce; o
+-- valor de verdade é confirmado uma vez, quando a conta é paga. Sem esta
+-- coluna não há como distinguir a conta de luz do aluguel, que é fixo e não
+-- deve interromper ninguém com uma pergunta todo mês.
+ALTER TABLE recurring_rules
+  ADD COLUMN IF NOT EXISTS variable_amount boolean NOT NULL DEFAULT false;
+
 -- De qual regra este lançamento nasceu. `ON DELETE SET NULL` é deliberado: quem
 -- decide o destino dos lançamentos ao excluir a regra é a pessoa, na
 -- confirmação — o banco não pode apagar histórico financeiro por conta própria.

@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateField } from "@/components/ui/date-field";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { CategorySelect } from "@/components/CategorySelect";
 import {
   Dialog,
   DialogContent,
@@ -57,6 +59,7 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
     day_of_month: "5",
     category_id: "",
     start_date: today,
+    variable_amount: false,
   });
 
   /** Regra em vias de ser excluída, com o retrato do que ela criou. */
@@ -87,6 +90,7 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
         categoryId: form.category_id,
         description: form.description.trim(),
         amount: Number(form.amount.replace(",", ".")),
+        variableAmount: form.variable_amount,
         kind: form.kind,
         frequency: form.frequency,
         dayOfMonth: Number(form.day_of_month) || 1,
@@ -189,13 +193,38 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="rec-valor">Valor (R$)</Label>
+              <Label htmlFor="rec-valor">
+                {form.variable_amount ? "Valor estimado (R$)" : "Valor (R$)"}
+              </Label>
               <Input
                 id="rec-valor"
                 inputMode="decimal"
                 value={form.amount}
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
               />
+              {/*
+                Água, luz, cartão: o valor muda todo mês e ninguém sabe qual é
+                até a conta chegar. Marcando aqui, o valor acima deixa de ser o
+                valor e passa a ser a estimativa com que cada mês nasce — o
+                número de verdade é confirmado uma vez, na hora de dar baixa.
+                Sem a marca, aluguel e mensalidade continuam fechando sozinhos,
+                sem interromper ninguém com uma pergunta todo mês.
+              */}
+              <label className="flex cursor-pointer items-start gap-2 pt-1">
+                <Checkbox
+                  checked={form.variable_amount}
+                  onCheckedChange={(checked) =>
+                    setForm({ ...form, variable_amount: checked === true })
+                  }
+                  aria-label="O valor varia a cada ocorrência"
+                />
+                <span className="text-xs leading-tight">
+                  <span className="font-medium">O valor varia a cada mês</span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    Ao dar baixa, o app pede o valor real daquela conta.
+                  </span>
+                </span>
+              </label>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="rec-tipo">Tipo</Label>
@@ -242,19 +271,12 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="rec-categoria">Categoria</Label>
-              <select
+              <CategorySelect
                 id="rec-categoria"
+                categories={options}
                 value={form.category_id}
-                onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-                className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
-              >
-                <option value="">Escolha uma categoria…</option>
-                {options.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(category_id) => setForm({ ...form, category_id })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Início</Label>

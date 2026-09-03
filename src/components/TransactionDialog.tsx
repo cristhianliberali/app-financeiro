@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateField } from "@/components/ui/date-field";
 import { Label } from "@/components/ui/label";
+import { CategorySelect } from "@/components/CategorySelect";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -193,19 +194,12 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="tx-categoria">Categoria</Label>
-            <select
+            <CategorySelect
               id="tx-categoria"
+              categories={options}
               value={form.category_id}
-              onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-              className="h-11 w-full rounded-xl border border-input bg-card px-3 text-sm font-medium shadow-xs outline-none transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25"
-            >
-              <option value="">Escolha uma categoria…</option>
-              {options.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              onChange={(category_id) => setForm({ ...form, category_id })}
+            />
             {options.length === 0 && (
               <p className="text-[11px] text-negative">
                 Nenhuma categoria de {kind === "income" ? "receita" : "despesa"} ativa. Crie uma em

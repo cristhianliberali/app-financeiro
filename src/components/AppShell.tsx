@@ -146,7 +146,7 @@ export function AppShell({
       </nav>
       <div className="mt-auto space-y-3 pt-6">
         <div className="brand-sheen rounded-xl border border-primary/15 p-3.5">
-          <p className="label-caps mb-1.5">Perfil ativo</p>
+          <p className="label-caps mb-1.5">Subconta ativa</p>
           <p className="flex items-center gap-2 text-sm font-semibold">
             <span
               className="size-2.5 shrink-0 rounded-full"
@@ -155,7 +155,7 @@ export function AppShell({
             <span className="truncate">{current?.name ?? "—"}</span>
           </p>
           <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-            Lançamentos, categorias e metas exibidos pertencem a este perfil.
+            Lançamentos, categorias e metas exibidos pertencem a esta subconta.
           </p>
         </div>
         <div className="flex min-w-0 items-center gap-2">
@@ -192,35 +192,45 @@ export function AppShell({
               <Menu className="size-4" />
             </button>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold shadow-xs transition-colors hover:border-border-strong hover:bg-accent">
-                <span
-                  className="size-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: currentAccount?.color ?? "var(--color-primary)" }}
-                />
-                <span className="max-w-28 truncate sm:max-w-none">
-                  {currentAccount?.name ?? "Conta"}
-                </span>
-                <ChevronDown className="size-3.5 shrink-0 opacity-50" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-60">
-                {accounts?.map((a) => (
-                  <DropdownMenuItem key={a.id} onClick={() => setAccountId(a.id)}>
-                    <span
-                      className="size-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: a.color }}
-                    />
-                    <span className="min-w-0 flex-1 truncate">{a.name}</span>
-                    <span className="label-caps text-[0.6rem]">
-                      {a.role === "owner" ? "dono" : a.role === "editor" ? "editor" : "leitor"}
-                    </span>
+            {/*
+              O seletor de contas só existe quando há mais de uma.
+              Depois da consolidação, cada pessoa tem uma conta própria e este
+              nível deixa de ser uma escolha — mostrá-lo era pedir que alguém
+              guardasse em qual de duas gavetas empilhadas uma despesa foi
+              parar. Ele reaparece sozinho para quem foi convidado à conta de
+              outra pessoa: ali a troca é real, e escondê-la esconderia dados.
+            */}
+            {(accounts?.length ?? 0) > 1 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold shadow-xs transition-colors hover:border-border-strong hover:bg-accent">
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: currentAccount?.color ?? "var(--color-primary)" }}
+                  />
+                  <span className="max-w-28 truncate sm:max-w-none">
+                    {currentAccount?.name ?? "Conta"}
+                  </span>
+                  <ChevronDown className="size-3.5 shrink-0 opacity-50" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-60">
+                  {accounts?.map((a) => (
+                    <DropdownMenuItem key={a.id} onClick={() => setAccountId(a.id)}>
+                      <span
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: a.color }}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                      <span className="label-caps text-[0.6rem]">
+                        {a.role === "owner" ? "dono" : a.role === "editor" ? "editor" : "leitor"}
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuItem onClick={() => navigate({ to: "/conta" })}>
+                    <Plus className="size-4" /> Gerenciar contas
                   </DropdownMenuItem>
-                ))}
-                <DropdownMenuItem onClick={() => navigate({ to: "/conta" })}>
-                  <Plus className="size-4" /> Gerenciar contas
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold shadow-xs transition-colors hover:border-border-strong hover:bg-accent">
@@ -230,7 +240,7 @@ export function AppShell({
                 />
                 <span className="max-w-28 truncate sm:max-w-none">
                   <span className="hidden font-normal text-muted-foreground sm:inline">
-                    Perfil:{" "}
+                    Subconta:{" "}
                   </span>
                   {current?.name ?? "—"}
                 </span>
