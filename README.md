@@ -60,6 +60,33 @@ ser a **data do lançamento, o vencimento e o valor** — sem o nome. É o que f
 parcela projetada aqui reencontrar a linha que virá na fatura do mês seguinte, em
 vez de lançar tudo de novo.
 
+#Assistente de IA (chat)
+
+Um botão "Assistente" no cabeçalho abre um chat onde dá para escrever em
+português. Ele faz duas coisas:
+
+- **Consultar**: "quanto gastei este mês em alimentação?" responde
+  "Você gastou R$ 100,00 do seu teto de R$ 350,00". Vale para gastos, entradas e
+  saldo, com ou sem categoria. Sem período informado, responde o mês atual.
+- **Registrar**: "gastei 158 no mercado" monta um rascunho de lançamento —
+  descrição, valor, categoria, data e situação — que aparece na tela para revisão.
+
+Dá para mandar de três formas: escrevendo, **fotografando o comprovante** (a
+imagem é lida por um modelo de visão e o texto vai para a IA, com o que foi lido
+à vista numa linha discreta, para conferir) ou **falando** (o áudio é transcrito
+e enviado sozinho ao parar a gravação).
+
+A IA **nunca grava nada**. Ela devolve a intenção; quem consulta o banco, calcula
+e grava é o código, e só depois do clique em Confirmar. Os números da resposta
+saem de um `SUM` no Postgres e as datas ("mês passado", "ontem") são resolvidas
+pelo servidor — o modelo não escreve valor nem data. Sem "já paguei" na frase, o
+lançamento nasce em aberto; parcelamento usa a mesma divisão do formulário manual.
+
+Precisa de uma chave gratuita da Groq (`GROQ_API_KEY`); sem ela o botão não
+aparece e o resto do app segue igual. Os modelos de texto, imagem e áudio são
+escolhidos em `MODELO_IA_CHAT`, `MODELO_IA_VISAO` e `MODELO_IA_AUDIO`. Detalhes
+em `docs/chat-ia.md`.
+
 #Centro de categorias
 Categorias de entrada e saída
 Com teto de gastos de cada categoria de sáida (para definir um orçamento)
