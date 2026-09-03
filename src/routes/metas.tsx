@@ -198,7 +198,7 @@ function GoalsPage() {
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{form.id ? "Editar meta" : "Nova meta"}</DialogTitle>
           </DialogHeader>

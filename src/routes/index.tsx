@@ -100,7 +100,7 @@ function SettlementCard({
     >
       {/* Rótulo em cima, número embaixo: lado a lado, o nome longo espremia o
           valor, que é justamente o que se quer ler primeiro. */}
-      <div className="p-5 pb-4">
+      <div className="p-4 pb-3 sm:p-5 sm:pb-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <p className="text-sm font-bold tracking-tight">{label}</p>
           <span className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${chip}`}>
@@ -112,7 +112,7 @@ function SettlementCard({
       </div>
       <div className="divide-y divide-border border-t border-border">
         {rows.map((row) => (
-          <div key={row.label} className="flex items-center justify-between px-5 py-2.5">
+          <div key={row.label} className="flex items-center justify-between px-4 py-2.5 sm:px-5">
             <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               {row.state === "done" ? (
                 <CheckCircle2 className="size-3.5 text-positive" />
@@ -143,7 +143,7 @@ function Panel({
   className?: string;
 }) {
   return (
-    <div className={`panel flex flex-col p-6 ${className}`}>
+    <div className={`panel flex flex-col p-4 sm:p-6 ${className}`}>
       <h4 className="text-base font-bold tracking-tight">{title}</h4>
       {subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>}
       {/* `flex-1` faz o gráfico crescer até a altura do cartão vizinho, em vez
@@ -189,7 +189,18 @@ function Dashboard() {
           onde o dia começa, e mandar alguém trocar de tela só para abrir as
           recorrências ou importar uma fatura é um desvio sem motivo.
         */
-        <div className="flex flex-wrap gap-2">
+        <>
+          {/*
+            A ação principal vem primeiro. No celular a barra de ações rola na
+            horizontal, e o que está à esquerda é o que aparece sem arrastar —
+            lançar uma despesa é o que mais se faz aqui.
+          */}
+          <Button size="sm" variant="brand" onClick={() => setDialog("expense")}>
+            <Plus /> Despesa
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setDialog("income")}>
+            <Plus /> Receita
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setRecurringOpen(true)}>
             <Repeat /> Recorrentes
           </Button>
@@ -198,20 +209,21 @@ function Dashboard() {
               <FileScan /> Importar com IA
             </Link>
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setDialog("income")}>
-            <Plus /> Receita
-          </Button>
-          <Button size="sm" variant="brand" onClick={() => setDialog("expense")}>
-            <Plus /> Despesa
-          </Button>
-        </div>
+        </>
       }
     >
       <h1 className="sr-only">Dashboard financeiro</h1>
 
       <MonthTimeline />
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/*
+        Três cartões, três larguras. No celular empilhados — cada um traz um
+        número grande e duas linhas de quebra, e lado a lado nada disso cabe.
+        No tablet as duas pontas do caixa ficam pareadas e os saldos ocupam a
+        fileira de baixo inteira: é a comparação que se quer fazer, receita
+        contra despesa. No desktop os três dividem a fileira.
+      */}
+      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
         <SettlementCard
           label="Receitas"
           total={brl(cash.income)}
@@ -236,7 +248,7 @@ function Dashboard() {
           Os dois saldos lado a lado: o que está em caixa agora e onde o período
           termina se tudo o que está agendado acontecer.
         */}
-        <div className="panel divide-y divide-border">
+        <div className="panel divide-y divide-border sm:col-span-2 lg:col-span-1">
           {(
             [
               {
@@ -257,7 +269,7 @@ function Dashboard() {
               },
             ] as const
           ).map((row) => (
-            <div key={row.label} className="flex flex-1 flex-col justify-center p-5">
+            <div key={row.label} className="flex flex-1 flex-col justify-center p-4 sm:p-5">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <p className="text-sm font-bold tracking-tight">{row.label}</p>
                 <span
@@ -273,7 +285,7 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 lg:grid-cols-3">
         <Panel
           title="Evolução mensal"
           subtitle="Comparativo entre receitas e despesas no ano"
@@ -371,7 +383,7 @@ function Dashboard() {
         </Panel>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 lg:grid-cols-3">
         <Panel title="Despesas por categoria">
           <CategoryPie data={expenseCats} />
         </Panel>
@@ -410,7 +422,7 @@ function Dashboard() {
       </div>
 
       <div className="panel overflow-hidden">
-        <div className="flex items-center justify-between border-b border-border p-6">
+        <div className="flex items-center justify-between border-b border-border p-4 sm:p-6">
           <h4 className="text-base font-bold tracking-tight">Transações recentes</h4>
           <a
             href="/transacoes"
@@ -419,7 +431,95 @@ function Dashboard() {
             Ver tudo →
           </a>
         </div>
-        <div className="overflow-x-auto">
+
+        {/*
+          No celular, a mesma lista sem a tabela.
+
+          Cinco colunas com 24px de recuo de cada lado dão uns 900px de largura
+          mínima: num telefone isso vira uma tabela que rola para o lado dentro
+          de uma página que rola para baixo, e a coluna do valor — a única que
+          se quer ler — fica escondida do outro lado do gesto. A lista mostra
+          tudo de uma vez, em duas linhas por lançamento: descrição e valor em
+          cima, porque são o que se procura; data, categoria e situação embaixo,
+          porque são o que se confere depois de achar.
+
+          É a mesma informação, não um resumo: nada foi cortado, só rearranjado
+          para caber na largura que existe.
+        */}
+        <ul className="divide-y divide-border lg:hidden">
+          {recent.map((tx) => {
+            const cat = categories.find((c) => c.id === tx.category_id);
+            return (
+              <li
+                key={tx.id}
+                className={`border-l-[3px] px-4 py-3 ${
+                  tx.status === "paid" ? "border-l-positive" : "border-l-info"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <span className="min-w-0 flex-1 text-sm font-semibold">
+                    {tx.description}
+                    <RecurringTag transaction={tx} />
+                  </span>
+                  <span
+                    className={`shrink-0 text-sm font-bold ${
+                      tx.kind === "income" ? "text-positive" : "text-negative"
+                    }`}
+                    data-numeric
+                  >
+                    {tx.kind === "income" ? "+ " : "− "}
+                    {brl(tx.amount)}
+                  </span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                  <span className="font-mono" data-numeric>
+                    {formatDateBR(tx[dateBasis])}
+                  </span>
+                  {cat && (
+                    <>
+                      <span aria-hidden>·</span>
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <IconBadge
+                          name={cat.emoji}
+                          color={cat.color}
+                          size="sm"
+                          fallback={DEFAULT_CATEGORY_ICON}
+                        />
+                        <span className="truncate font-medium">{cat.name}</span>
+                      </span>
+                    </>
+                  )}
+                  {tx.installment_total && (
+                    <>
+                      <span aria-hidden>·</span>
+                      <span>
+                        Parcela {tx.installment_no}/{tx.installment_total}
+                      </span>
+                    </>
+                  )}
+                  <span className="ml-auto">
+                    {tx.status === "paid" ? (
+                      <StatusPill tone="done" icon={CheckCircle2}>
+                        {tx.kind === "income" ? "Recebido" : "Pago"}
+                      </StatusPill>
+                    ) : (
+                      <StatusPill tone="pending" icon={Clock3}>
+                        Agendado
+                      </StatusPill>
+                    )}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+          {recent.length === 0 && (
+            <li className="px-4 py-10 text-center text-sm text-muted-foreground">
+              Nenhum lançamento no período selecionado.
+            </li>
+          )}
+        </ul>
+
+        <div className="hidden overflow-x-auto lg:block">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-border bg-surface">
@@ -505,8 +605,8 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="brand-gradient relative overflow-hidden rounded-2xl p-7 shadow-lg">
+      <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
+        <div className="brand-gradient relative overflow-hidden rounded-2xl p-5 shadow-lg sm:p-7">
           {/* Brilho de canto: dá volume ao cartão sem competir com os números. */}
           <span className="pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-white/10 blur-2xl" />
           <div className="relative mb-6 flex items-start justify-between">

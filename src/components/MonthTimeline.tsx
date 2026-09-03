@@ -295,16 +295,25 @@ export function MonthTimeline() {
   const active = MONTH_METRICS.find((m) => m.value === METRIC) ?? MONTH_METRICS[0]!;
 
   return (
-    <div className="panel p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+    <div className="panel p-3 sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <span className="size-2 shrink-0 rounded-full bg-primary" />
-          <span className="label-caps text-foreground">Linha do tempo de meses</span>
-          <span className="truncate text-xs text-muted-foreground">
+          <span className="label-caps truncate text-foreground">Linha do tempo de meses</span>
+          {/*
+            A dica de uso some no celular. Ali o gesto já é o do sistema —
+            deslizar uma fileira com o dedo não precisa de legenda — e a frase
+            era o que fazia o cabeçalho quebrar em duas linhas.
+          */}
+          <span className="hidden truncate text-xs text-muted-foreground lg:inline">
             (Arraste ou clique para navegar)
           </span>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
+        {/*
+          As setas são de mouse: no dedo a fileira desliza, e com inércia. Elas
+          ficam de fora do celular para devolver a linha ao título.
+        */}
+        <div className="hidden shrink-0 items-center gap-1.5 lg:flex">
           <button
             onClick={() => scrollBy(-1)}
             aria-label="Meses anteriores"
@@ -356,7 +365,7 @@ export function MonthTimeline() {
               data-month={point.key}
               data-focus={isFocus || undefined}
               title={monthTitle(point.key)}
-              className={`relative flex w-56 shrink-0 flex-col gap-3 rounded-xl border p-4 text-left transition-[color,background-color,border-color,box-shadow] duration-200 ease-out ${
+              className={`relative flex w-[13.5rem] shrink-0 flex-col gap-3 rounded-xl border p-3.5 text-left sm:w-56 sm:p-4 transition-[color,background-color,border-color,box-shadow] duration-200 ease-out ${
                 isFocus
                   ? "border-primary bg-primary-soft glow-strong"
                   : "border-border bg-card hover:border-border-strong hover:bg-accent/50"

@@ -259,7 +259,7 @@ export function AiImportDialog({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="size-4 text-primary" /> Importar fatura ou extrato com IA

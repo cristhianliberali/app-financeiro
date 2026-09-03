@@ -196,7 +196,7 @@ export function BoardDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{board ? "Editar quadro" : "Novo quadro"}</DialogTitle>
         </DialogHeader>

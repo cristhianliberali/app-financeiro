@@ -287,15 +287,17 @@ function TransactionsPage() {
   return (
     <AppShell
       actions={
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => setRecurringOpen(true)}>
-            <Repeat /> Recorrentes
-          </Button>
-          {/* A importação é tela, não janela: ela guarda a revisão em aberto. */}
-          <Button size="sm" variant="outline" asChild>
-            <Link to="/importar">
-              <FileScan /> Importar com IA
-            </Link>
+        <>
+          {/* Ação principal primeiro: no celular a barra rola, e o que está à
+              esquerda é o que aparece sem arrastar. */}
+          <Button
+            size="sm"
+            onClick={() => {
+              setEditing(null);
+              setDialog("expense");
+            }}
+          >
+            + Despesa
           </Button>
           <Button
             size="sm"
@@ -307,16 +309,16 @@ function TransactionsPage() {
           >
             + Receita
           </Button>
-          <Button
-            size="sm"
-            onClick={() => {
-              setEditing(null);
-              setDialog("expense");
-            }}
-          >
-            + Despesa
+          <Button size="sm" variant="outline" onClick={() => setRecurringOpen(true)}>
+            <Repeat /> Recorrentes
           </Button>
-        </div>
+          {/* A importação é tela, não janela: ela guarda a revisão em aberto. */}
+          <Button size="sm" variant="outline" asChild>
+            <Link to="/importar">
+              <FileScan /> Importar com IA
+            </Link>
+          </Button>
+        </>
       }
     >
       <h1 className="title-xl">Centro de transações</h1>
@@ -458,7 +460,7 @@ function TransactionsPage() {
       )}
 
       <div className="panel overflow-hidden">
-        <div className="flex flex-wrap items-center gap-3 border-b border-border px-6 py-4">
+        <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 sm:px-6 sm:py-4">
           <Checkbox
             checked={pageAllChecked ? true : pageSomeChecked ? "indeterminate" : false}
             onCheckedChange={(checked) => toggleMany(pagination.visible, checked === true)}
@@ -494,25 +496,52 @@ function TransactionsPage() {
           {pagination.visible.map((t) => {
             const cat = t.category_id ? catMap[t.category_id] : undefined;
             return (
+              /*
+                A mesma linha, em duas formas.
+
+                Do `sm` para cima é uma linha só: caixa, ícone, descrição,
+                situação, valor e ações lado a lado. No celular isso não cabia —
+                somando o recuo, a caixa de seleção, o ícone, o valor e os dois
+                botões, sobravam uns cinquenta pixels para a descrição, e todo
+                lançamento virava "R…", "Su…", "Net…". Uma tela de lançamentos
+                em que não se lê o lançamento.
+
+                Abaixo do `sm` o bloco central quebra em três alturas —
+                descrição com o valor à direita, depois categoria e datas,
+                depois a situação. Ninguém perde informação; ela só passa a
+                ocupar altura, que num telefone é o que sobra, em vez de
+                largura, que é o que falta.
+              */
               <div
                 key={t.id}
-                className={`state-bar flex items-center gap-4 px-6 py-3 transition-colors ${
+                className={`state-bar flex items-start gap-3 px-4 py-3 transition-colors sm:items-center sm:gap-4 sm:px-6 ${
                   selected.has(t.id) ? "bg-primary-soft/40" : "hover:bg-accent/40"
                 } ${t.status === "paid" ? "state-done" : "state-pending"}`}
               >
-                <Checkbox
-                  checked={selected.has(t.id)}
-                  onCheckedChange={() => toggleOne(t.id)}
-                  aria-label={`Selecionar ${t.description}`}
-                />
+                <span className="mt-1 shrink-0 sm:mt-0">
+                  <Checkbox
+                    checked={selected.has(t.id)}
+                    onCheckedChange={() => toggleOne(t.id)}
+                    aria-label={`Selecionar ${t.description}`}
+                  />
+                </span>
                 <IconBadge
                   name={cat?.emoji}
                   color={cat?.color}
                   fallback={t.kind === "income" ? "banknote" : DEFAULT_CATEGORY_ICON}
                 />
                 <button className="min-w-0 flex-1 text-left" onClick={() => edit(t)}>
-                  <p
-                    className={`truncate text-sm font-semibold ${t.status === "paid" ? "text-muted-foreground" : ""}`}
+                  {/*
+                    A descrição fica sozinha na primeira linha do celular.
+
+                    Ela é o que identifica o lançamento, e é a única coisa da
+                    linha que não tem tamanho previsível. Dividir essa linha com
+                    o valor deixava uns cem pixels para ela: "Supermercado Extra
+                    — compra do mês" virava "Su…". O valor desce para a linha da
+                    situação, onde ocupa uma largura que se sabe de antemão.
+                  */}
+                  <span
+                    className={`block truncate text-sm font-semibold ${t.status === "paid" ? "text-muted-foreground" : ""}`}
                   >
                     {t.description}
                     {/* O selo só aparece quando o nome não traz a parcela: o padrão
@@ -524,11 +553,24 @@ function TransactionsPage() {
                       </span>
                     ) : null}
                     <RecurringTag transaction={t} />
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
+                  </span>
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground">
                     {cat?.name ?? "Sem categoria"} · transação {formatDateBR(t.transaction_date)} ·
                     vence {formatDateBR(t.due_date)}
-                  </p>
+                  </span>
+                  <span className="mt-1.5 flex items-center gap-2 sm:hidden">
+                    <StatusPill tone={t.status === "paid" ? "done" : "pending"}>
+                      {t.status === "paid" ? "Pago" : "Pendente"}
+                    </StatusPill>
+                    <span
+                      className={`ml-auto shrink-0 font-mono text-sm font-bold ${
+                        t.kind === "income" ? "text-positive" : "text-negative"
+                      }`}
+                      data-numeric
+                    >
+                      {t.kind === "income" ? "+" : "−"} {brl(t.amount)}
+                    </span>
+                  </span>
                 </button>
                 <span className="hidden sm:block">
                   <StatusPill tone={t.status === "paid" ? "done" : "pending"}>
@@ -536,7 +578,7 @@ function TransactionsPage() {
                   </StatusPill>
                 </span>
                 <span
-                  className={`flex items-center gap-1 font-mono text-sm font-bold ${
+                  className={`hidden items-center gap-1 font-mono text-sm font-bold sm:flex ${
                     t.kind === "income" ? "text-positive" : "text-negative"
                   }`}
                 >
@@ -553,9 +595,15 @@ function TransactionsPage() {
                   da exclusão, que é onde o olho procura por ela.
                 */}
                 <div className="flex shrink-0 items-center gap-1">
+                  {/*
+                    O lápis é do mouse. No celular tocar a linha já abre a
+                    edição, e o botão custava 36px da largura que faltava para
+                    a descrição — dois alvos para a mesma ação, e o texto
+                    pagando a conta.
+                  */}
                   <button
                     onClick={() => edit(t)}
-                    className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-primary-soft hover:text-primary"
+                    className="hidden rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-primary-soft hover:text-primary sm:block"
                     aria-label={`Editar ${t.description}`}
                     title="Editar lançamento"
                   >
@@ -574,7 +622,7 @@ function TransactionsPage() {
             );
           })}
           {filtered.length === 0 && (
-            <p className="px-6 py-12 text-center text-sm text-muted-foreground">
+            <p className="px-4 py-12 text-center text-sm text-muted-foreground sm:px-6">
               Nenhum lançamento encontrado para os filtros atuais.
             </p>
           )}

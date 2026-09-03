@@ -30,17 +30,29 @@ const SheetOverlay = React.forwardRef<
 ));
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
+/**
+ * A gaveta é o menu do celular, então as medidas são as do celular.
+ *
+ * `h-dvh` no lugar de `h-full`: a barra de endereço do navegador móvel entra e
+ * sai da tela, e a altura "cheia" medida com ela escondida deixa o rodapé da
+ * gaveta — onde ficam o perfil e o tema — embaixo da barra quando ela volta.
+ *
+ * A largura sai de `w-3/4` para uma medida absoluta com teto: em telas
+ * estreitas três quartos é pouco (o rótulo "Projetos e Tarefas" não cabe) e em
+ * tablet é demais. `min(20rem, calc(100vw-3rem))` dá 320px onde couber e
+ * sempre deixa uma faixa de véu para tocar e fechar.
+ */
 const sheetVariants = cva(
   "fixed z-50 gap-4 bg-card p-6 shadow-xl transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out",
   {
     variants: {
       side: {
-        top: "inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
+        top: "inset-x-0 top-0 max-h-[92dvh] border-b pt-[max(1.5rem,env(safe-area-inset-top))] data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
         bottom:
-          "inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-        left: "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",
+          "inset-x-0 bottom-0 max-h-[92dvh] rounded-t-2xl border-t pb-[max(1.5rem,env(safe-area-inset-bottom))] data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+        left: "inset-y-0 left-0 h-dvh w-[min(20rem,calc(100vw-3rem))] border-r pb-[max(1.5rem,env(safe-area-inset-bottom))] data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left",
         right:
-          "inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
+          "inset-y-0 right-0 h-dvh w-[min(20rem,calc(100vw-3rem))] border-l pb-[max(1.5rem,env(safe-area-inset-bottom))] data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
       },
     },
     defaultVariants: {
@@ -61,9 +73,10 @@ const SheetContent = React.forwardRef<
   <SheetPortal>
     <SheetOverlay />
     <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
-      <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background cursor-pointer transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
+      {/* Alvo de 40px: o X de 16px é impossível de acertar com o polegar. */}
+      <SheetPrimitive.Close className="absolute right-3 top-3 z-10 flex size-10 cursor-pointer items-center justify-center rounded-full text-muted-foreground ring-offset-background transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+        <X className="size-4" />
+        <span className="sr-only">Fechar</span>
       </SheetPrimitive.Close>
       {children}
     </SheetPrimitive.Content>

@@ -16,7 +16,7 @@ const AlertDialogOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-50 bg-foreground/45 backdrop-blur-[3px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className,
     )}
     {...props}
@@ -25,32 +25,60 @@ const AlertDialogOverlay = React.forwardRef<
 ));
 AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName;
 
+/**
+ * Confirmação — mesma forma do `Dialog`: folha no celular, cartão no desktop.
+ *
+ * Aqui o limite de altura pesa ainda mais do que num diálogo comum, porque não
+ * há X para fechar: a saída são os botões do rodapé. Sem teto de altura, uma
+ * confirmação com texto longo empurrava esses botões para fora da janela, e a
+ * única saída da tela ficava num lugar onde não dava para chegar.
+ */
 const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
->(({ className, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <AlertDialogPortal>
     <AlertDialogOverlay />
     <AlertDialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
+        "fixed z-50 flex flex-col overflow-hidden border border-border bg-card shadow-xl duration-200",
+        "inset-x-0 bottom-0 max-h-[92dvh] rounded-t-2xl px-4 pb-4 pt-3",
+        "sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[calc(100dvh-4rem)] sm:w-[calc(100%-3rem)] sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:p-6",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+        "sm:data-[state=closed]:slide-out-to-bottom-0 sm:data-[state=open]:slide-in-from-bottom-0 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95",
         className,
       )}
       {...props}
-    />
+    >
+      <div
+        aria-hidden
+        className="mx-auto mb-2 h-1.5 w-10 shrink-0 rounded-full bg-border sm:hidden"
+      />
+      <div className="grid min-h-0 flex-1 auto-rows-min gap-4 overflow-y-auto overflow-x-hidden pb-[env(safe-area-inset-bottom)] sm:pb-0">
+        {children}
+      </div>
+    </AlertDialogPrimitive.Content>
   </AlertDialogPortal>
 ));
 AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName;
 
 const AlertDialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col space-y-2 text-center sm:text-left", className)} {...props} />
+  <div className={cn("flex flex-col space-y-2 text-left", className)} {...props} />
 );
 AlertDialogHeader.displayName = "AlertDialogHeader";
 
 const AlertDialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)}
+    className={cn(
+      // Mesmas regras do rodapé de `Dialog`: empilhado e em largura cheia no
+      // celular, lado a lado no desktop, e preso embaixo em qualquer largura —
+      // numa confirmação, os botões do rodapé são a única saída da tela.
+      "sticky bottom-0 flex flex-col-reverse gap-2 border-t border-border bg-card pb-1 pt-3",
+      "sm:flex-row sm:justify-end sm:border-t-0 sm:pb-0",
+      className,
+    )}
     {...props}
   />
 );
@@ -94,7 +122,7 @@ const AlertDialogCancel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Cancel
     ref={ref}
-    className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0", className)}
+    className={cn(buttonVariants({ variant: "outline" }), className)}
     {...props}
   />
 ));

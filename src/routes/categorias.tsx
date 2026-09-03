@@ -252,7 +252,7 @@ function CategoriesPage() {
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{form.id ? "Editar categoria" : "Nova categoria"}</DialogTitle>
           </DialogHeader>

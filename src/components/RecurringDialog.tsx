@@ -171,7 +171,7 @@ export function RecurringDialog({ open, onOpenChange }: Props) {
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Receitas e despesas recorrentes</DialogTitle>
           </DialogHeader>

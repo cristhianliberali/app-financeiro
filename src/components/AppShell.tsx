@@ -6,6 +6,7 @@ import {
   Tags,
   TrendingUp,
   Target,
+  Check,
   ChevronDown,
   Clock3,
   Menu,
@@ -26,6 +27,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -91,7 +94,7 @@ export function AppShell({
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3">
         <span className="size-9 animate-spin rounded-full border-2 border-border border-t-primary" />
         <p className="text-sm text-muted-foreground">Carregando…</p>
       </div>
@@ -169,29 +172,99 @@ export function AppShell({
   );
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    // `min-h-dvh` e não `min-h-screen`: `vh` mede a janela sem a barra de
+    // endereço do navegador móvel, então a tela vazia (ou quase) ficava sempre
+    // alta demais e rolava alguns pixels sem ter o que mostrar.
+    <div className="min-h-dvh bg-background text-foreground">
       <aside className="fixed left-0 top-0 z-10 hidden h-full w-64 flex-col border-r border-sidebar-border bg-sidebar p-5 lg:flex">
         {sidebar}
       </aside>
 
+      {/*
+        A largura da gaveta vem do primitivo (`min(20rem, 100vw - 3rem)`), e não
+        de um `w-72` escrito aqui: num celular estreito o valor fixo encostava
+        na borda oposta e não sobrava véu para tocar e fechar.
+      */}
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-        <SheetContent side="left" className="flex w-72 flex-col overflow-y-auto p-5 lg:hidden">
+        <SheetContent side="left" className="flex flex-col overflow-y-auto p-5 lg:hidden">
           <SheetTitle className="sr-only">Menu</SheetTitle>
           {sidebar}
         </SheetContent>
       </Sheet>
 
       <main className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-background/85 px-4 py-3 backdrop-blur-xl lg:px-8">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <button
-              onClick={() => setMenuOpen(true)}
-              className="rounded-xl border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:hidden"
-              aria-label="Abrir menu"
-            >
-              <Menu className="size-4" />
-            </button>
+        {/*
+          Cabeçalho de uma linha só, também no celular.
 
+          Ele era `flex-wrap` com seis controles dentro — dois seletores, o
+          cronômetro, o sino e os botões da tela. Em 375px isso virava três
+          fileiras de altura fixa, grudadas no topo: metade da janela era
+          cabeçalho antes de a página começar. Aqui o celular fica com o que
+          precisa estar sempre à mão (menu, contexto e avisos) e o resto desce
+          para a barra de ações, que rola na horizontal.
+        */}
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-background/85 px-3 backdrop-blur-xl lg:h-16 lg:gap-3 lg:px-8">
+          <button
+            onClick={() => setMenuOpen(true)}
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:hidden"
+            aria-label="Abrir menu"
+          >
+            <Menu className="size-5" />
+          </button>
+
+          {/*
+            No celular, conta e subconta cabem num controle só.
+
+            São duas escolhas do mesmo assunto — "de quem são os números desta
+            tela" — e no desktop elas ficam lado a lado porque há largura para
+            isso. No celular, dois botões de contexto ocupam a linha inteira e
+            não sobra espaço para o nome de nenhum dos dois. Um botão, dois
+            grupos dentro do menu.
+          */}
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-card px-2.5 py-2 text-left text-sm font-semibold shadow-xs transition-colors hover:border-border-strong hover:bg-accent lg:hidden">
+              <span
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: current?.color ?? "var(--color-primary)" }}
+              />
+              <span className="min-w-0 flex-1 truncate">{current?.name ?? "—"}</span>
+              <ChevronDown className="size-3.5 shrink-0 opacity-50" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-64">
+              {(accounts?.length ?? 0) > 1 && (
+                <>
+                  <DropdownMenuLabel className="label-caps">Conta</DropdownMenuLabel>
+                  {accounts?.map((a) => (
+                    <DropdownMenuItem key={a.id} onClick={() => setAccountId(a.id)}>
+                      <span
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: a.color }}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                      {a.id === accountId && <Check className="size-4 shrink-0 text-primary" />}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuItem onClick={() => navigate({ to: "/conta" })}>
+                    <Plus className="size-4" /> Gerenciar contas
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuLabel className="label-caps">Subconta</DropdownMenuLabel>
+              {profiles?.map((pf) => (
+                <DropdownMenuItem key={pf.id} onClick={() => setProfileId(pf.id)}>
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: pf.color }}
+                  />
+                  <span className="min-w-0 flex-1 truncate">{pf.name}</span>
+                  {pf.id === profileId && <Check className="size-4 shrink-0 text-primary" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <div className="hidden min-w-0 items-center gap-2 lg:flex">
             {/*
               O seletor de contas só existe quando há mais de uma.
               Depois da consolidação, cada pessoa tem uma conta própria e este
@@ -238,35 +311,51 @@ export function AppShell({
                   className="size-2.5 shrink-0 rounded-full"
                   style={{ backgroundColor: current?.color ?? "var(--color-primary)" }}
                 />
-                <span className="max-w-28 truncate sm:max-w-none">
-                  <span className="hidden font-normal text-muted-foreground sm:inline">
-                    Subconta:{" "}
-                  </span>
+                <span className="truncate">
+                  <span className="font-normal text-muted-foreground">Subconta: </span>
                   {current?.name ?? "—"}
                 </span>
                 <ChevronDown className="size-3.5 shrink-0 opacity-50" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-52">
-                {profiles?.map((p) => (
-                  <DropdownMenuItem key={p.id} onClick={() => setProfileId(p.id)}>
+                {profiles?.map((pf) => (
+                  <DropdownMenuItem key={pf.id} onClick={() => setProfileId(pf.id)}>
                     <span
                       className="size-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: p.color }}
+                      style={{ backgroundColor: pf.color }}
                     />
-                    <span className="truncate">{p.name}</span>
+                    <span className="truncate">{pf.name}</span>
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="ml-auto flex shrink-0 items-center gap-1 lg:gap-2">
             <ActiveTimerBar />
             {/* Os lembretes de tarefa também alcançam quem está no Finanças. */}
             <NotificationBell />
-            {actions}
+            {/* No celular estes botões vivem na barra de ações, logo abaixo. */}
+            <div className="hidden items-center gap-2 lg:flex">{actions}</div>
           </div>
         </header>
-        <div className="mx-auto max-w-7xl space-y-6 p-4 lg:p-8">
+
+        <div className="mx-auto max-w-7xl space-y-4 p-3 sm:p-4 lg:space-y-6 lg:p-8">
+          {/*
+            Barra de ações do celular.
+
+            Uma fileira que rola na horizontal, e não uma grade que quebra em
+            linhas: quatro botões empilhados em duas fileiras empurram o
+            conteúdo da tela para baixo toda vez, enquanto a fileira que rola
+            custa sempre a mesma altura. As margens negativas fazem a rolagem
+            começar na borda da tela — um botão cortado ao meio na beirada é o
+            que diz que há mais coisa para o lado.
+          */}
+          {actions && (
+            <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:-mx-4 sm:px-4 lg:hidden [&>*]:shrink-0">
+              {actions}
+            </div>
+          )}
           {/*
             O recorte de período comanda tudo o que as telas de Finanças
             mostram, então ele abre o conteúdo em largura total, em vez de

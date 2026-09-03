@@ -592,7 +592,7 @@ function NewTaskShortcut({ accountId }: { accountId: string | null }) {
       </Button>
 
       <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : close())}>
-        <DialogContent className="max-h-[88vh] max-w-md overflow-y-auto">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Nova tarefa para hoje</DialogTitle>
             <DialogDescription>

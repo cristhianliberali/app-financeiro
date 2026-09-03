@@ -62,7 +62,7 @@ function AuthPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10">
+    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-background px-4 py-10">
       {/*
         Dois halos da marca ao fundo. Ficam atrás do cartão e bem desfocados:
         dão profundidade à tela de entrada sem disputar leitura com o formulário.

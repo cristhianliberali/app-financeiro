@@ -237,7 +237,7 @@ function PreviewDialog({
 }) {
   return (
     <Dialog open={!!attachment} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[92vh] max-w-4xl overflow-hidden p-3">
+      <DialogContent className="p-3 sm:max-w-4xl sm:p-3">
         <DialogTitle className="flex items-center gap-2 truncate pr-8 text-sm">
           <Paperclip className="size-4 shrink-0" />
           <span className="truncate">{attachment?.file_name}</span>

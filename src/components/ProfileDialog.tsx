@@ -112,7 +112,7 @@ export function ProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-lg overflow-y-auto">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Meu perfil</DialogTitle>
         </DialogHeader>

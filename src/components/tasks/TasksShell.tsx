@@ -193,7 +193,7 @@ export function TasksShell({
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3">
         <span className="size-9 animate-spin rounded-full border-2 border-border border-t-primary" />
         <p className="text-sm text-muted-foreground">Carregando…</p>
       </div>
@@ -475,7 +475,11 @@ export function TasksShell({
   );
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+    // `h-dvh`: a casca ocupa exatamente a janela visível. Com `h-screen`, a
+    // altura era a da janela *sem* a barra de endereço do celular — a coluna
+    // rolável ficava mais alta que a tela, e o rodapé do Kanban vivia embaixo
+    // da barra do navegador.
+    <div className="flex h-dvh overflow-hidden bg-background text-foreground">
       <aside
         className={`hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 lg:flex ${
           collapsed ? "w-16" : "w-72"
@@ -492,52 +496,77 @@ export function TasksShell({
       </Sheet>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-background/85 px-4 py-2.5 backdrop-blur-xl lg:px-6">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <button
-              onClick={() => setMenuOpen(true)}
-              className="rounded-xl border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:hidden"
-              aria-label="Abrir menu"
-            >
-              <Menu className="size-4" />
-            </button>
+        {/*
+          Uma linha só, também no celular. Era `flex-wrap` com o caminho
+          hierárquico de um lado e quatro controles do outro: em 375px isso
+          virava três fileiras, e num módulo cuja tela termina num Kanban de
+          altura cheia cada fileira aqui é uma faixa a menos de quadro. O
+          seletor de conta e os botões da tela descem para a barra de ações
+          logo abaixo, que rola na horizontal.
+        */}
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/85 px-3 backdrop-blur-xl lg:h-16 lg:gap-3 lg:px-6">
+          <button
+            onClick={() => setMenuOpen(true)}
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:hidden"
+            aria-label="Abrir menu"
+          >
+            <Menu className="size-5" />
+          </button>
+          <div className="min-w-0 flex-1">
             <TasksBreadcrumb
               spaceId={spaceId}
               boardId={boardId}
               {...(breadcrumbCurrent ? { current: breadcrumbCurrent } : {})}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1 lg:gap-2">
             <ActiveTimerBar />
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-2 rounded-xl border border-border bg-card px-2.5 py-2 text-xs font-semibold shadow-xs transition-colors hover:border-border-strong hover:bg-accent">
-                <span
-                  className="size-2.5 rounded-full"
-                  style={{ backgroundColor: currentAccount?.color ?? "var(--color-primary)" }}
-                />
-                <span className="max-w-32 truncate">{currentAccount?.name ?? "Conta"}</span>
-                <ChevronDown className="size-3 opacity-50" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {accounts?.map((a) => (
-                  <DropdownMenuItem key={a.id} onClick={() => setAccountId(a.id)}>
-                    <span
-                      className="mr-2 size-2 rounded-full"
-                      style={{ backgroundColor: a.color }}
-                    />
-                    {a.name}
+            {/*
+              O nome da conta some no celular, o seletor não: sem ele não há
+              como trocar de conta neste módulo. Fica a bolinha da cor e a
+              seta — o suficiente para reconhecer onde se está e para abrir.
+            */}
+            <div>
+              <DropdownMenu>
+                <DropdownMenuTrigger className="flex items-center gap-2 rounded-xl border border-border bg-card px-2.5 py-2 text-xs font-semibold shadow-xs transition-colors hover:border-border-strong hover:bg-accent">
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: currentAccount?.color ?? "var(--color-primary)" }}
+                  />
+                  <span className="hidden max-w-32 truncate lg:inline">
+                    {currentAccount?.name ?? "Conta"}
+                  </span>
+                  <ChevronDown className="size-3 shrink-0 opacity-50" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {accounts?.map((a) => (
+                    <DropdownMenuItem key={a.id} onClick={() => setAccountId(a.id)}>
+                      <span
+                        className="mr-2 size-2 rounded-full"
+                        style={{ backgroundColor: a.color }}
+                      />
+                      {a.name}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate({ to: "/conta" })}>
+                    Gerenciar contas
                   </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate({ to: "/conta" })}>
-                  Gerenciar contas
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             <NotificationBell />
-            {actions}
+            <div className="hidden items-center gap-2 lg:flex">{actions}</div>
           </div>
         </header>
+
+        {/* Barra de ações do celular: a fileira que rola, em vez da grade que
+            quebra em linhas e empurra o quadro para baixo. */}
+        {actions && (
+          <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-border px-3 py-2 lg:hidden [&>*]:shrink-0">
+            {actions}
+          </div>
+        )}
 
         {/*
           `overflow-x-hidden` não é decoração: sem ele, este contêiner rola

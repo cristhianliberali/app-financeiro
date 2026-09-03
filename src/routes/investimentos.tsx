@@ -232,7 +232,7 @@ function InvestmentsPage() {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{form.id ? "Editar investimento" : "Novo investimento"}</DialogTitle>
           </DialogHeader>

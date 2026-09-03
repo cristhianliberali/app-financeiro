@@ -168,7 +168,7 @@ export function TransactionDialog({ open, onOpenChange, kind, editing }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {editing ? "Editar lançamento" : kind === "income" ? "Nova receita" : "Nova despesa"}

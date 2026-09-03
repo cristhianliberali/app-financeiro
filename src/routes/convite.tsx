@@ -39,7 +39,7 @@ function InvitePage() {
   const accept = useAcceptInvite();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-6">
+    <div className="flex min-h-dvh items-center justify-center bg-background p-6">
       <div className="w-full max-w-md space-y-4 rounded-2xl border border-border bg-card p-8">
         <h1 className="text-xl font-bold tracking-tight">Convite de conta</h1>
 

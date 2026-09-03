@@ -547,17 +547,26 @@
   color: var(--color-muted-foreground);
 }
 
-/** Título de tela: grande, apertado, com peso. */
+/** Título de tela: grande, apertado, com peso — e um pouco menor no celular. */
 @utility title-xl {
-  font-size: 1.6rem;
+  font-size: clamp(1.3rem, 4.5vw, 1.6rem);
   font-weight: 700;
   letter-spacing: -0.025em;
   line-height: 1.15;
 }
 
-/** Número em destaque (saldo, total, contador). */
+/**
+ * Número em destaque (saldo, total, contador).
+ *
+ * O tamanho acompanha a largura da tela em vez de ser fixo. Um valor como
+ * "R$ 128.430,75" tem catorze caracteres: a 28px isso pede uns 250px de linha,
+ * que é mais do que sobra num cartão de celular depois do recuo. O número
+ * quebrava em duas linhas ou estourava o cartão — as duas coisas piores do que
+ * ele ser um pouco menor. O `clamp` desce até 22px no telefone e volta aos 28px
+ * assim que houver largura para eles.
+ */
 @utility stat-figure {
-  font-size: 1.75rem;
+  font-size: clamp(1.375rem, 5.5vw, 1.75rem);
   font-weight: 700;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
@@ -657,5 +666,32 @@
   select,
   textarea {
     font-size: 16px;
+  }
+}
+
+/*
+ * Fileiras que rolam na horizontal, no dedo.
+ *
+ * A barra de ações da casca e a linha do tempo de meses são fileiras que
+ * passam da largura da tela de propósito: rolar para o lado custa sempre a
+ * mesma altura, enquanto quebrar em linhas empurra a página para baixo a cada
+ * botão a mais.
+ *
+ * `overscroll-behavior-x: contain` é o que impede o gesto de vazar: sem ele,
+ * arrastar até o fim da fileira continua no contêiner de trás e, no Chrome do
+ * Android, dispara o "voltar" da navegação — a pessoa queria ver o último
+ * botão e saiu da tela. A barra de rolagem some porque numa fileira de botões
+ * ela é ruído: o que diz que há mais coisa para o lado é o botão cortado ao
+ * meio na beirada.
+ */
+@media (pointer: coarse) {
+  .overflow-x-auto {
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar:horizontal {
+    display: none;
   }
 }
