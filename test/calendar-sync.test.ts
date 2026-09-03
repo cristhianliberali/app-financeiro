@@ -23,11 +23,18 @@ const nextSyncToken: string | undefined = "token-novo";
 /** Query string da última listagem — é como se confere o que foi pedido. */
 let lastListQuery: URLSearchParams | undefined;
 
+/** Como o Google falso responde a um pedido de criação de compromisso. */
+let criarEvento: (corpo: { summary?: string }) => Response = (corpo) =>
+  Response.json({ id: `evento-${corpo.summary}` });
+
 const google = Bun.serve({
   port: 0,
-  fetch(request) {
+  async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname.endsWith("/events")) {
+      if (request.method === "POST") {
+        return criarEvento((await request.json()) as { summary?: string });
+      }
       lastListQuery = url.searchParams;
       return Response.json({ items: googleEvents, nextSyncToken });
     }
@@ -43,9 +50,11 @@ process.env["GOOGLE_API_BASE_URL"] = `http://127.0.0.1:${google.port}`;
 let taskDates: { start_date: Date | null; due_date: Date | null };
 let links: Array<{ task_id: string; event_id: string; synced_at: Date }>;
 let syncToken: string | null;
+/** Tarefas que a fila de envio devolve, na ordem. */
+let fila: Array<{ id: string; title: string }> = [];
 const written: Array<{ sql: string; params: readonly unknown[] }> = [];
 
-function responder(sql: string): unknown[] {
+function responder(sql: string, params: readonly unknown[]): unknown[] {
   if (sql.includes("FROM google_accounts")) {
     return [
       {
@@ -62,6 +71,28 @@ function responder(sql: string): unknown[] {
       },
     ];
   }
+  // A fila de envio, reconhecida pelo JOIN que só ela tem.
+  if (sql.includes("board_statuses")) return fila.map((tarefa) => ({ id: tarefa.id }));
+  // `loadTask`: a tarefa inteira, com quadro e espaço.
+  if (sql.includes("JOIN boards b")) {
+    const tarefa = fila.find((t) => t.id === params[0]);
+    return tarefa
+      ? [
+          {
+            id: tarefa.id,
+            title: tarefa.title,
+            description: null,
+            responsible_user_id: USER,
+            start_date: null,
+            due_date: new Date("2026-09-10T14:00:00"),
+            board_name: "Quadro",
+            space_name: "Espaço",
+          },
+        ]
+      : [];
+  }
+  // Vínculos de uma tarefa só (o envio) — a lista do usuário vem depois.
+  if (sql.includes("FROM task_calendar_events WHERE task_id")) return [];
   if (sql.includes("FROM task_calendar_events")) return links;
   if (sql.includes("FROM tasks WHERE id")) return [taskDates];
   return [];
@@ -74,11 +105,11 @@ mock.module("../src/integrations/postgres/client.server", () => ({
     if (sql.trimStart().toUpperCase().startsWith("UPDATE") || sql.includes("INSERT")) {
       written.push({ sql, params });
     }
-    return responder(sql);
+    return responder(sql, params);
   },
   queryOne: async (sql: string, params: readonly unknown[] = []) => {
     if (sql.trimStart().toUpperCase().startsWith("UPDATE")) written.push({ sql, params });
-    return responder(sql)[0] ?? null;
+    return responder(sql, params)[0] ?? null;
   },
   withTransaction: async (fn: (client: unknown) => Promise<unknown>) =>
     fn({ query: async () => ({ rows: [], rowCount: 0 }) }),
@@ -118,6 +149,9 @@ function cenario({ comToken }: { comToken: boolean }) {
   links = [{ task_id: TASK, event_id: EVENT, synced_at: new Date("2026-09-09T08:00:00") }];
   syncToken = comToken ? "token-anterior" : null;
   googleEvents = [];
+  fila = [];
+  lastListQuery = undefined;
+  criarEvento = (corpo) => Response.json({ id: `evento-${corpo.summary}` });
 }
 
 const datasGravadas = () => written.find((w) => w.sql.includes("UPDATE tasks SET start_date"));
@@ -135,6 +169,58 @@ describe("syncUser", () => {
 
     expect(resultado.updated).toBe(1);
     expect(datasGravadas()!.params[2]).toEqual(new Date("2026-09-11T16:00:00"));
+  });
+});
+
+describe("pushPendingTasks", () => {
+  test("tarefa recusada pelo Google não derruba as outras da fila", async () => {
+    cenario({ comToken: true });
+    // Era este o defeito em produção: a segunda tarefa parava a fila, e a
+    // terceira — e todas as criadas depois dela — nunca ganhavam compromisso.
+    fila = [
+      { id: "aaaaaaaa-0000-0000-0000-000000000001", title: "boa 1" },
+      { id: "aaaaaaaa-0000-0000-0000-000000000002", title: "ruim" },
+      { id: "aaaaaaaa-0000-0000-0000-000000000003", title: "boa 2" },
+    ];
+    criarEvento = (corpo) =>
+      corpo.summary === "ruim"
+        ? Response.json({ error: { message: "Invalid value for: start" } }, { status: 400 })
+        : Response.json({ id: `evento-${corpo.summary}` });
+
+    const resultado = await googleServer.pushPendingTasks(USER);
+
+    expect(resultado.pushed).toBe(2);
+    expect(resultado.refused).toBe(1);
+    // O erro devolvido é o que mantém o aviso do perfil de pé, e ele precisa
+    // nomear a tarefa: a mensagem do Google sozinha não diz o que corrigir.
+    expect(resultado.error).toContain("ruim");
+  });
+
+  test("a tarefa recusada fica registrada na trilha, para sair da fila", async () => {
+    cenario({ comToken: true });
+    fila = [{ id: "aaaaaaaa-0000-0000-0000-000000000002", title: "ruim" }];
+    criarEvento = () => Response.json({ error: {} }, { status: 400 });
+
+    await googleServer.pushPendingTasks(USER);
+
+    expect(written.some((w) => w.params.includes("calendar_event_failed"))).toBe(true);
+  });
+
+  test("recusa que vale para todos (401) para a rodada na primeira tarefa", async () => {
+    cenario({ comToken: true });
+    fila = [
+      { id: "aaaaaaaa-0000-0000-0000-000000000001", title: "boa 1" },
+      { id: "aaaaaaaa-0000-0000-0000-000000000003", title: "boa 2" },
+    ];
+    criarEvento = () => new Response("unauthorized", { status: 401 });
+
+    const resultado = await googleServer.pushPendingTasks(USER);
+
+    expect(resultado.pushed).toBe(0);
+    expect(resultado.refused).toBe(0);
+    expect(resultado.error).toBeDefined();
+    // Acesso revogado não é defeito da tarefa: ela não pode ser tirada da fila.
+    expect(written.some((w) => w.params.includes("calendar_event_failed"))).toBe(false);
   });
 });
 
@@ -249,5 +335,54 @@ describe("pullCalendarChanges", () => {
 
     expect(resultado.updated).toBe(0);
     expect(datasGravadas()).toBeUndefined();
+  });
+});
+
+/**
+ * A rodada acionada por HTTP: é o que garante a sincronização quando o
+ * `setInterval` de dentro do processo não sobe — sem tráfego autenticado, ou
+ * com o processo reiniciado.
+ */
+describe("handleSyncRequest", () => {
+  const pedido = (headers?: Record<string, string>) =>
+    new Request("http://local/api/google/sync", { method: "POST", headers });
+
+  async function rota() {
+    return import("../src/integrations/postgres/calendar-scheduler.server");
+  }
+
+  test("sem GOOGLE_SYNC_TOKEN a rota fica fechada", async () => {
+    cenario({ comToken: true });
+    delete process.env["GOOGLE_SYNC_TOKEN"];
+
+    const resposta = await (await rota()).handleSyncRequest(pedido());
+
+    expect(resposta.status).toBe(503);
+  });
+
+  test("segredo errado não dispara rodada nenhuma", async () => {
+    cenario({ comToken: true });
+    process.env["GOOGLE_SYNC_TOKEN"] = "segredo-do-cron";
+
+    const resposta = await (
+      await rota()
+    ).handleSyncRequest(pedido({ authorization: "Bearer outro-segredo" }));
+
+    expect(resposta.status).toBe(401);
+    expect(lastListQuery).toBeUndefined();
+  });
+
+  test("com o segredo, roda e devolve o resumo", async () => {
+    cenario({ comToken: true });
+    process.env["GOOGLE_SYNC_TOKEN"] = "segredo-do-cron";
+
+    const resposta = await (
+      await rota()
+    ).handleSyncRequest(pedido({ authorization: "Bearer segredo-do-cron" }));
+
+    expect(resposta.status).toBe(200);
+    const resumo = (await resposta.json()) as { usuarios: number; falhas: unknown[] };
+    expect(resumo.usuarios).toBe(1);
+    expect(resumo.falhas).toEqual([]);
   });
 });

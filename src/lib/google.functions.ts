@@ -83,6 +83,7 @@ export const syncGoogleNow = createServerFn({ method: "POST" })
       updated: number;
       read: number;
       pushed: number;
+      refused: number;
       error?: string;
     }> => {
       const { syncUser } = await import("@/integrations/postgres/google.server");

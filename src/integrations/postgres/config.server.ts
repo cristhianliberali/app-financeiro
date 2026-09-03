@@ -398,6 +398,17 @@ export function getGoogleTokenSecret(): string {
   return readEnv("GOOGLE_TOKEN_SECRET") ?? getGoogleSettings().clientSecret;
 }
 
+/**
+ * Segredo que libera a rodada de sincronização por HTTP.
+ *
+ * Sem valor, a rota não existe: um endereço que dispara trabalho para todos os
+ * usuários conectados não pode ficar aberto, e não há aqui nenhum padrão
+ * razoável para inventar.
+ */
+export function getGoogleSyncToken(): string | undefined {
+  return readEnv("GOOGLE_SYNC_TOKEN");
+}
+
 /** Nome do cookie que carrega o token de sessão. */
 export function getSessionCookieName(): string {
   return readEnv("SESSION_COOKIE_NAME") ?? "aura_session";

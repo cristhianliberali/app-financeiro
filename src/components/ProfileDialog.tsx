@@ -343,13 +343,26 @@ export function ProfileDialog({
                             `conectado: ${d.conectado ? d.email : "não"}`,
                             `agenda: ${d.calendarId ?? "—"}`,
                             `marcador incremental: ${d.temMarcador ? "sim" : "não"}`,
-                            `última sincronização: ${d.ultimaSync ?? "nunca"}`,
+                            `última sincronização: ${d.ultimaSync ?? "nunca"}` +
+                              (d.minutosDesdeSync === null
+                                ? ""
+                                : ` (há ${d.minutosDesdeSync} min)`),
                             `último erro: ${d.ultimoErro ?? "nenhum"}`,
                             `vínculos no banco: ${d.vinculos}`,
+                            `tarefas esperando para subir: ${d.pendentesDeEnvio}`,
                             `eventos lidos: ${d.eventosLidos}`,
                             `com marca de tarefa: ${d.comMarcaDeTarefa}`,
                             `com vínculo reconhecido: ${d.comVinculo}`,
                             ...(d.erro ? [`ERRO NA LEITURA: ${d.erro}`] : []),
+                            ...(d.recusadas.length
+                              ? [
+                                  "",
+                                  "tarefas recusadas pelo Google:",
+                                  ...d.recusadas.map(
+                                    (r) => `• ${r.titulo} (${r.quando}): ${r.motivo}`,
+                                  ),
+                                ]
+                              : []),
                             "",
                             ...d.amostra.flatMap((a) => [
                               `• ${a.titulo}`,
