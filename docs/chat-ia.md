@@ -1,7 +1,7 @@
 # Chat com IA (assistente do Finanças)
 
 Uma bolha flutuante no canto inferior direito — em todas as telas do módulo
-Finanças, no computador e no celular — abre uma gaveta onde a pessoa escreve em
+Finanças, no computador e no celular — abre um painel de chat onde a pessoa escreve em
 português o que quer consultar ou lançar:
 
 - *"Quanto gastei este mês em alimentação?"* → **Você gastou R$ 100,00 do seu
@@ -72,7 +72,7 @@ sistema: trocar o modelo de visão ou o de fala não toca em nada do contrato.
 | `src/integrations/ai/chat/chat.server.ts` | Orquestração das etapas acima. |
 | `src/lib/chat.functions.ts` | As duas server functions (`getChatConfig`, `sendChatMessage`). |
 | `src/lib/chat.ts` | Hooks da tela, incluindo a gravação do rascunho confirmado. |
-| `src/components/chat/` | A gaveta, o cartão de consulta e o cartão de confirmação. |
+| `src/components/chat/` | O widget (bolha e painel), o cartão de consulta e o de confirmação. |
 
 ## O que o assistente sabe fazer
 

@@ -20,7 +20,7 @@ import { PeriodBar } from "@/components/PeriodBar";
 import { ModuleSwitcher } from "@/components/ModuleSwitcher";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { AiChatLauncher } from "@/components/chat/AiChatSheet";
+import { AiChatLauncher } from "@/components/chat/AiChatWidget";
 import { ActiveTimerBar } from "@/components/tasks/ActiveTimerBar";
 import { NotificationBell } from "@/components/tasks/NotificationBell";
 import {
