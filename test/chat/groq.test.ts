@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { ChatProviderError, completarChat } from "@/integrations/ai/chat/groq.server";
+import {
+  ChatProviderError,
+  completarChat,
+  transcreverAudio,
+  transcreverImagem,
+} from "@/integrations/ai/chat/groq.server";
 
 /**
  * O cliente do provedor, com a rede substituída.
@@ -31,6 +36,8 @@ function completar() {
 beforeEach(() => {
   process.env["GROQ_API_KEY"] = "chave-de-teste";
   process.env["MODELO_IA_CHAT"] = "modelo-de-teste";
+  process.env["MODELO_IA_VISAO"] = "modelo-de-visao";
+  process.env["MODELO_IA_AUDIO"] = "modelo-de-audio";
   // O log do chat obedece às variáveis LOG_IA*; desligado, o teste não polui a saída.
   process.env["LOG_IA"] = "false";
 });
@@ -39,6 +46,8 @@ afterEach(() => {
   globalThis.fetch = fetchOriginal;
   delete process.env["GROQ_API_KEY"];
   delete process.env["MODELO_IA_CHAT"];
+  delete process.env["MODELO_IA_VISAO"];
+  delete process.env["MODELO_IA_AUDIO"];
   delete process.env["LOG_IA"];
 });
 
@@ -110,5 +119,108 @@ describe("completarChat", () => {
 
     await expect(completar()).rejects.toThrow(/GROQ_API_KEY/);
     expect(chamou).toBe(false);
+  });
+});
+
+describe("transcreverImagem", () => {
+  test("manda a imagem como data URL no modelo de visão, sem mensagem de sistema", async () => {
+    let corpo: Record<string, unknown> = {};
+    globalThis.fetch = (async (_url: string, init: RequestInit) => {
+      corpo = JSON.parse(String(init.body)) as Record<string, unknown>;
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "PADARIA CENTRAL\nR$ 23,90" }, finish_reason: "stop" }],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as unknown as typeof fetch;
+
+    const leitura = await transcreverImagem({
+      base64: "QUJD",
+      mime: "image/jpeg",
+      prompt: "transcreva",
+      userId: "usuario-de-teste",
+    });
+
+    expect(leitura.texto).toBe("PADARIA CENTRAL\nR$ 23,90");
+    expect(corpo["model"]).toBe("modelo-de-visao");
+
+    const messages = corpo["messages"] as Array<{ role: string; content: unknown }>;
+    // Parte dos modelos de visão da Groq recusa a requisição quando ela traz
+    // mensagem de sistema junto da imagem.
+    expect(messages).toHaveLength(1);
+    expect(messages[0]!.role).toBe("user");
+    const partes = messages[0]!.content as Array<Record<string, unknown>>;
+    expect(partes[0]).toEqual({ type: "text", text: "transcreva" });
+    expect(partes[1]).toEqual({
+      type: "image_url",
+      image_url: { url: "data:image/jpeg;base64,QUJD" },
+    });
+  });
+
+  test("modelo de visão inexistente aponta MODELO_IA_VISAO, não MODELO_IA_CHAT", async () => {
+    responderCom(404, { error: { message: "model not found" } });
+    await expect(
+      transcreverImagem({
+        base64: "QUJD",
+        mime: "image/jpeg",
+        prompt: "transcreva",
+        userId: "usuario-de-teste",
+      }),
+    ).rejects.toThrow(/MODELO_IA_VISAO/);
+  });
+
+  test("imagem ilegível vira uma frase, não uma resposta vazia", async () => {
+    responderCom(200, { choices: [{ message: { content: "   " }, finish_reason: "stop" }] });
+    await expect(
+      transcreverImagem({
+        base64: "QUJD",
+        mime: "image/jpeg",
+        prompt: "transcreva",
+        userId: "usuario-de-teste",
+      }),
+    ).rejects.toThrow(/não conseguiu ler/i);
+  });
+});
+
+describe("transcreverAudio", () => {
+  test("sobe o arquivo em multipart e devolve o texto falado", async () => {
+    let form: FormData | null = null;
+    let caminho = "";
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      caminho = url;
+      form = init.body as FormData;
+      return new Response(JSON.stringify({ text: " gastei 158 no mercado " }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+
+    const transcricao = await transcreverAudio({
+      base64: Buffer.from("audio-falso").toString("base64"),
+      mime: "audio/webm",
+      nome: "audio.webm",
+      userId: "usuario-de-teste",
+    });
+
+    expect(transcricao.texto).toBe("gastei 158 no mercado");
+    expect(caminho).toBe("https://api.groq.com/openai/v1/audio/transcriptions");
+    expect(form!.get("model")).toBe("modelo-de-audio");
+    // O app é em português; sem isso, uma gravação curta e com ruído às vezes
+    // volta transcrita em outra língua.
+    expect(form!.get("language")).toBe("pt");
+    expect(form!.get("file")).toBeInstanceOf(Blob);
+  });
+
+  test("áudio sem fala reconhecível pede uma nova gravação", async () => {
+    responderCom(200, { text: "" });
+    await expect(
+      transcreverAudio({
+        base64: "QUJD",
+        mime: "audio/webm",
+        nome: "audio.webm",
+        userId: "usuario-de-teste",
+      }),
+    ).rejects.toThrow(/não consegui entender o áudio/i);
   });
 });

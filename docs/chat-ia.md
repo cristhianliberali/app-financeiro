@@ -42,7 +42,10 @@ revisão, editável, antes de qualquer gravação.
 ## Camadas
 
 ```
-frase da pessoa
+frase da pessoa ─────────────────────────────────┐
+imagem  ─ modelo de visão ─ texto do comprovante ─┤
+áudio   ─ modelo de fala  ─ transcrição ──────────┤
+                                                  ▼
   └─ chat.server.ts     monta o prompt com as categorias da subconta
      └─ groq.server.ts  chamada HTTP ao provedor (modo JSON)
         └─ parseIntent  valida contra o contrato; o que não bate é recusado
@@ -51,11 +54,18 @@ frase da pessoa
                                    └─ [confirmação] -> upsertRows
 ```
 
+Imagem e áudio viram texto **antes** de qualquer interpretação, e daí em diante
+o caminho é idêntico ao de uma frase digitada. É o que mantém uma regra só no
+sistema: trocar o modelo de visão ou o de fala não toca em nada do contrato.
+
 | Arquivo | Papel |
 | --- | --- |
 | `src/lib/chat-contract.ts` | Tipos, validador, resolução de datas e a frase da resposta. Puro e testado. |
 | `src/integrations/ai/chat/prompt.ts` | O prompt e o contrato de saída. Puro. |
-| `src/integrations/ai/chat/groq.server.ts` | A chamada HTTP e a tradução dos erros do provedor. |
+| `src/integrations/ai/chat/groq.server.ts` | As chamadas HTTP (texto, imagem, áudio) e a tradução dos erros do provedor. |
+| `src/integrations/ai/chat/midia.server.ts` | Formato e tamanho aceitos nos anexos. Testado. |
+| `src/lib/chat-midia.ts` | Preparo do anexo no navegador (redução da foto, base64). |
+| `src/hooks/use-audio-recorder.ts` | Gravação pelo `MediaRecorder`, com liberação do microfone. |
 | `src/integrations/ai/chat/categorias.ts` | Casamento de nome de categoria com a subconta. Puro e testado. |
 | `src/integrations/ai/chat/consulta.server.ts` | A consulta agregada no Postgres. |
 | `src/integrations/ai/chat/chat.server.ts` | Orquestração das etapas acima. |
@@ -82,6 +92,61 @@ O que ele **não** faz: apagar, editar ou dar baixa em lançamento existente.
 Esses pedidos caem na ação `conversar`, que explica onde fazer isso na tela. É
 deliberado — a IA propõe criação, e destruição não se propõe por conversa.
 
+## Imagem e áudio
+
+**Foto de comprovante.** A pessoa anexa (ou fotografa) um cupom, boleto ou print
+de pix. A imagem é reduzida no navegador — 1600 px no maior lado, JPEG — e sobe
+em base64. O servidor chama `MODELO_IA_VISAO` com um prompt que pede
+**transcrição, não interpretação**: nada de categoria, nada de `expense` ou
+`income`, nada de JSON. O texto que volta entra marcado numa segunda requisição,
+agora a `MODELO_IA_CHAT`, com o contrato de sempre — e o resultado é o mesmo
+rascunho editável de qualquer outro lançamento.
+
+Separar as duas etapas é o que mantém uma regra só no sistema. Se o modelo de
+visão também classificasse, existiriam dois lugares decidindo o que é um
+lançamento, e o de imagem seria justamente o menos testável dos dois.
+
+**Áudio.** O `MediaRecorder` grava no contêiner que o navegador oferecer
+(webm/opus no Chrome e no Firefox, mp4 no Safari — os dois na lista que o modelo
+aceita, então não há conversão no cliente). Parar de gravar **envia**: é o que
+"entrada automática" quer dizer, e uma confirmação no meio transformaria dois
+toques em três. A transcrição sai de `/audio/transcriptions` com
+`MODELO_IA_AUDIO` — um modelo de fala, não o de chat — e entra no fluxo como se
+tivesse sido digitada. Ditar "gastei 158 no mercado" dá exatamente o mesmo
+resultado que escrever a mesma frase.
+
+### O log visível do que foi extraído
+
+Toda resposta que nasceu de uma imagem traz, no rodapé, uma linha pequena e
+apagada: **"Lido da imagem"** seguida do começo do texto, que abre por inteiro
+ao ser clicada. No áudio não há linha nenhuma — a transcrição toma o lugar do
+balão da própria pessoa, que é o que ela disse.
+
+Isso não é enfeite, e é por isso que fica visível em vez de só no log do
+servidor. O valor de um comprovante passa por um modelo antes de virar rascunho,
+e quando o lançamento sair estranho essa linha é a única forma de saber em qual
+etapa corrigir: se o papel foi lido errado, ou se foi o pedido que foi entendido
+errado. Sem ela, a leitura da imagem seria uma caixa-preta.
+
+No servidor, as três chamadas aparecem separadas por canal —
+`[chat-ia:chat]`, `[chat-ia:visão]`, `[chat-ia:áudio]` —, cada uma com o que foi
+enviado e o que voltou, sob as mesmas variáveis `LOG_IA*`.
+
+### O que isso custa à regra da casa
+
+O modelo de visão **transcreve** — ele emite valores e datas. É a mesma exceção
+que o texto digitado já abria, pelo mesmo motivo: o dado nasce ali, e não há
+parser determinístico de foto de cupom. As mitigações são as de sempre, e uma a
+mais:
+
+1. o valor lido aparece por extenso no cartão de revisão, editável;
+2. nada é gravado sem a confirmação;
+3. o texto extraído fica à vista, então dá para conferir a leitura contra o papel.
+
+O que **não** mudou: a etapa de visão não escolhe categoria, não decide se é
+entrada ou saída, não calcula data e não responde consulta. Tudo isso continua
+saindo do contrato, do banco e do calendário do servidor.
+
 ## Configuração
 
 Tudo em `.env.example`, na seção *Chat com IA*. O mínimo é `GROQ_API_KEY`
@@ -95,6 +160,11 @@ resto do app segue igual.
 | `GROQ_BASE_URL` | `https://api.groq.com/openai/v1` | Aponta para qualquer serviço compatível com `/chat/completions`. |
 | `CHAT_IA_HISTORICO` | `6` | Mensagens anteriores enviadas junto. |
 | `CHAT_IA_MAX_TOKENS` | `800` | Trava de tamanho da resposta. |
+| `MODELO_IA_VISAO` | `meta-llama/llama-4-scout-17b-16e-instruct` | Modelo que lê imagens. Precisa ser multimodal. |
+| `MODELO_IA_AUDIO` | `whisper-large-v3-turbo` | Modelo que transcreve áudio. |
+| `CHAT_IA_VISAO_MAX_TOKENS` | `1500` | Trava de tamanho da leitura da imagem. |
+| `CHAT_IA_MAX_IMAGEM_MB` | `4` | Teto da imagem (é também o que a Groq aceita em base64). |
+| `CHAT_IA_MAX_AUDIO_MB` | `15` | Teto do áudio. |
 | `PROVEDOR_IA_CHAT` | `groq` | Existe para quando houver um segundo provedor. |
 
 É configuração separada da importação de faturas (`PROVEDOR_IA`, `MODELO_IA`,
@@ -121,5 +191,8 @@ bun test test/chat
 
 Cobrem o validador do contrato (incluindo o que ele precisa **recusar**), a
 resolução de datas nas viradas de mês e ano, o rateio do teto por período, as
-frases de resposta, o casamento de categorias e a tradução dos erros do provedor
-(cota estourada, chave recusada, modelo inexistente). Nenhum deles chama a API.
+frases de resposta, o casamento de categorias, a portaria dos anexos (formato,
+tamanho, o `video/webm` com que alguns navegadores rotulam áudio puro) e a
+tradução dos erros do provedor — inclusive a que aponta `MODELO_IA_VISAO` em vez
+de `MODELO_IA_CHAT` quando é o modelo de imagem que não existe. Nenhum deles
+chama a API: o `fetch` é substituído.

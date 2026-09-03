@@ -69,7 +69,20 @@ Se uma decisão de design fizer o chat responder um número que o modelo escreve
 ou gravar algo sem passar pela confirmação, essa decisão está errada.
 
 A única transcrição aceita é o valor de um lançamento novo — ele nasce no texto
-que a pessoa escreveu, e a mitigação é o cartão de revisão editável.
+que a pessoa escreveu (ou na foto do comprovante), e a mitigação é o cartão de
+revisão editável.
+
+Imagem e áudio entram por uma etapa a mais, sempre **antes** da interpretação:
+o anexo vira texto numa requisição própria (`MODELO_IA_VISAO` para imagem,
+`MODELO_IA_AUDIO` para áudio) e esse texto segue para o modelo de chat com o
+contrato de sempre. A etapa de visão **transcreve e nada mais** — não escolhe
+categoria, não decide entrada/saída, não calcula data, não responde consulta.
+Se ela passar a classificar, existirão dois lugares decidindo o que é um
+lançamento, e o de imagem é o menos testável dos dois.
+
+O texto extraído da imagem fica visível na tela, discreto, junto da resposta: é
+o que permite saber se um lançamento estranho veio de leitura errada do papel ou
+de interpretação errada do pedido.
 
 Ver `docs/chat-ia.md`. Configuração: `GROQ_API_KEY` e `MODELO_IA_CHAT`
 (`.env.example`, seção *Chat com IA*).

@@ -119,3 +119,42 @@ export function buildChatSystemPrompt(input: {
     listaCategorias(input.categorias),
   ].join("\n");
 }
+
+/**
+ * O prompt de leitura de imagem.
+ *
+ * Ele pede **transcrição**, não interpretação: nada de categoria, nada de
+ * "expense ou income", nada de JSON. O modelo de visão devolve o que está
+ * escrito no papel, e a decisão sobre esse texto é da segunda requisição, ao
+ * modelo de texto padrão, com o contrato de sempre.
+ *
+ * Essa separação é o que mantém uma regra só no sistema. Se o modelo de visão
+ * também classificasse, existiriam dois lugares decidindo o que é um
+ * lançamento — e o de imagem seria justamente o menos testável dos dois.
+ *
+ * O pedido de "não invente" no fim não é decorativo: é o caso de erro real de
+ * um modelo de visão, que preenche um campo ilegível com o que costuma estar
+ * ali. Uma linha ilegível marcada como ilegível vira uma pergunta na tela;
+ * uma linha inventada vira um lançamento errado.
+ */
+export function buildTranscricaoImagemPrompt(hoje: string): string {
+  return [
+    "Transcreva o que está escrito nesta imagem de comprovante, cupom fiscal, boleto,",
+    "recibo ou print de transferência.",
+    "",
+    `Para referência, hoje é ${hoje}.`,
+    "",
+    "Devolva texto simples, em português, contendo apenas o que a imagem mostra:",
+    "- o estabelecimento ou quem recebeu o pagamento;",
+    "- o valor total, exatamente como aparece;",
+    "- a data e a hora, se houver;",
+    "- a forma de pagamento (pix, débito, crédito, dinheiro), se houver;",
+    "- o parcelamento, se houver (ex.: 3x de 50,00);",
+    "- os itens, quando forem poucos e legíveis.",
+    "",
+    "Não classifique, não escolha categoria, não calcule nada e não devolva JSON.",
+    "Não invente nenhum dado: se um campo estiver ilegível ou não existir na imagem,",
+    'escreva "ilegível" ou simplesmente não o mencione.',
+    "Se a imagem não for um documento financeiro, descreva em uma linha o que ela é.",
+  ].join("\n");
+}

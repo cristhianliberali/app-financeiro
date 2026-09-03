@@ -451,7 +451,32 @@ export type RascunhoLancamento = {
   parcelas: number;
 };
 
-export type ChatReply =
+/**
+ * De onde veio a mensagem, quando não foi digitada.
+ *
+ * Uma imagem ou um áudio passam por uma etapa a mais — transcrição — antes de
+ * o pedido virar intenção. `extraido` é o texto que saiu dessa etapa, e a tela
+ * o mostra discretamente junto da resposta.
+ *
+ * Isso não é enfeite: é a única forma de a pessoa conferir *o que o sistema
+ * entendeu do papel* quando o lançamento sair estranho. Sem esse texto à vista,
+ * um valor lido errado no cupom é indistinguível de um valor interpretado
+ * errado na frase, e não há como saber em qual das duas etapas corrigir.
+ */
+export type OrigemMidia = {
+  tipo: "imagem" | "audio";
+  /** O texto lido da imagem, ou a transcrição do áudio. */
+  extraido: string;
+  /** Modelo que fez a extração — o log diz de onde o texto veio. */
+  modelo: string;
+};
+
+type ChatRespostaBase =
   | { tipo: "consulta"; texto: string; consulta: ConsultaResult }
   | { tipo: "rascunho"; texto: string; rascunho: RascunhoLancamento }
   | { tipo: "conversa"; texto: string };
+
+export type ChatReply = ChatRespostaBase & {
+  /** Preenchido só quando a mensagem nasceu de uma imagem ou de um áudio. */
+  origem?: OrigemMidia;
+};

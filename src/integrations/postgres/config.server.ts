@@ -184,18 +184,35 @@ export function isAiConfigured(): boolean {
 export type ChatSettings = {
   provider: "groq";
   model: string;
+  /**
+   * Modelo que lê imagens (comprovante, cupom, print). Só transcreve o que está
+   * escrito; quem interpreta o texto é `model`, numa segunda requisição.
+   */
+  visionModel: string;
+  /** Modelo de fala que transcreve o áudio gravado no chat. */
+  audioModel: string;
   apiKey: string;
   baseUrl: string;
   /** Quantas mensagens anteriores acompanham a pergunta atual. */
   historyLimit: number;
   /** Teto de tokens da resposta. O contrato é curto; isto é só uma trava. */
   maxTokens: number;
+  /** Teto de tokens da leitura da imagem — um cupom longo precisa de mais. */
+  visionMaxTokens: number;
+  /** Teto do arquivo de imagem aceito, em MB (a Groq recusa base64 acima de 4). */
+  maxImageMb: number;
+  /** Teto do arquivo de áudio aceito, em MB. */
+  maxAudioMb: number;
 };
 
 const CHAT_PROVIDERS = ["groq"] as const;
 
 /** Modelo gratuito da Groq que dá conta do contrato; trocável por MODELO_IA_CHAT. */
 const DEFAULT_CHAT_MODEL = "llama-3.3-70b-versatile";
+/** Modelo multimodal da Groq; trocável por MODELO_IA_VISAO. */
+const DEFAULT_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+/** Modelo de transcrição da Groq; trocável por MODELO_IA_AUDIO. */
+const DEFAULT_AUDIO_MODEL = "whisper-large-v3-turbo";
 const DEFAULT_GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 
 export function getChatSettings(): ChatSettings {
@@ -220,10 +237,15 @@ export function getChatSettings(): ChatSettings {
   return {
     provider: provider as "groq",
     model: readEnv("MODELO_IA_CHAT") ?? DEFAULT_CHAT_MODEL,
+    visionModel: readEnv("MODELO_IA_VISAO") ?? DEFAULT_VISION_MODEL,
+    audioModel: readEnv("MODELO_IA_AUDIO") ?? DEFAULT_AUDIO_MODEL,
     apiKey,
     baseUrl,
     historyLimit: readInt("CHAT_IA_HISTORICO", 6),
     maxTokens: readInt("CHAT_IA_MAX_TOKENS", 800),
+    visionMaxTokens: readInt("CHAT_IA_VISAO_MAX_TOKENS", 1500),
+    maxImageMb: readInt("CHAT_IA_MAX_IMAGEM_MB", 4),
+    maxAudioMb: readInt("CHAT_IA_MAX_AUDIO_MB", 15),
   };
 }
 

@@ -1,11 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { getChatConfig, sendChatMessage, type HistoricoChat } from "./chat.functions";
+import {
+  getChatConfig,
+  sendChatMessage,
+  type HistoricoChat,
+  type MidiaChat,
+} from "./chat.functions";
 import { upsertRows } from "./data.functions";
 import { buildInstallments, installmentLabel } from "./installments";
-import type { ChatReply, RascunhoLancamento } from "./chat-contract";
+import type { ChatReply, OrigemMidia, RascunhoLancamento } from "./chat-contract";
 
-export type { ChatReply, RascunhoLancamento, HistoricoChat };
+export type { ChatReply, OrigemMidia, RascunhoLancamento, HistoricoChat, MidiaChat };
 
 /** Está configurado neste ambiente? A tela esconde o assistente quando não. */
 export function useChatConfig() {
@@ -18,12 +23,22 @@ export function useChatConfig() {
   });
 }
 
+/**
+ * Envia a mensagem — texto, ou texto com um anexo.
+ *
+ * Com imagem ou áudio, o servidor faz uma requisição a mais antes de
+ * interpretar: o anexo vira texto, e é esse texto que o modelo de chat recebe.
+ * A tela não precisa saber disso; ela só ganha `origem` na resposta, com o que
+ * foi extraído, para mostrar à pessoa.
+ */
 export function useChatMessage() {
   return useMutation({
     mutationFn: (input: {
       profileId: string;
       mensagem: string;
       historico: HistoricoChat[];
+      imagem?: MidiaChat;
+      audio?: MidiaChat;
     }): Promise<ChatReply> => sendChatMessage({ data: input }),
   });
 }
