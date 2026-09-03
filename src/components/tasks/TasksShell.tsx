@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Layers,
   LayoutDashboard,
+  ListChecks,
   Menu,
   MoreVertical,
   PanelLeft,
@@ -58,9 +59,14 @@ const EXPANDED_STORAGE_KEY = "aura.tasks.expandedSpaces";
  * "Meu dia" e "Minha Agenda" eram abas dentro da visão geral, o que obrigava a
  * abrir o panorama para chegar no recorte de hoje. Como entradas do menu, cada
  * um abre direto.
+ *
+ * "Tarefas" fica logo abaixo do panorama porque é o mesmo assunto sem o
+ * recorte: as três visões do quadro — Kanban, lista e calendário — aplicadas à
+ * conta inteira, sem precisar entrar quadro por quadro.
  */
 const NAV = [
   { to: "/tarefas", label: "Visão geral", icon: LayoutDashboard, exact: true },
+  { to: "/tarefas/todas", label: "Tarefas", icon: ListChecks, exact: false },
   { to: "/tarefas/meu-dia", label: "Meu dia", icon: Sun, exact: false },
   { to: "/tarefas/agenda", label: "Minha Agenda", icon: CalendarSync, exact: false },
   { to: "/tarefas/espacos", label: "Espaços", icon: Layers, exact: false },

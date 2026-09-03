@@ -26,6 +26,7 @@ import { Route as TarefasAgendaRouteImport } from './routes/tarefas/agenda'
 import { Route as TarefasCalendarioRouteImport } from './routes/tarefas/calendario'
 import { Route as TarefasMeuDiaRouteImport } from './routes/tarefas/meu-dia'
 import { Route as TarefasMinhasRouteImport } from './routes/tarefas/minhas'
+import { Route as TarefasTodasRouteImport } from './routes/tarefas/todas'
 import { Route as ApiGoogleCallbackRouteImport } from './routes/api/google/callback'
 import { Route as ApiGoogleSyncRouteImport } from './routes/api/google/sync'
 import { Route as TarefasEspacosIndexRouteImport } from './routes/tarefas/espacos/index'
@@ -117,6 +118,11 @@ const TarefasMinhasRoute = TarefasMinhasRouteImport.update({
   path: '/tarefas/minhas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TarefasTodasRoute = TarefasTodasRouteImport.update({
+  id: '/tarefas/todas',
+  path: '/tarefas/todas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGoogleCallbackRoute = ApiGoogleCallbackRouteImport.update({
   id: '/api/google/callback',
   path: '/api/google/callback',
@@ -160,6 +166,7 @@ export interface FileRoutesByFullPath {
   '/tarefas/calendario': typeof TarefasCalendarioRoute
   '/tarefas/meu-dia': typeof TarefasMeuDiaRoute
   '/tarefas/minhas': typeof TarefasMinhasRoute
+  '/tarefas/todas': typeof TarefasTodasRoute
   '/tarefas/': typeof TarefasIndexRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
   '/api/google/sync': typeof ApiGoogleSyncRoute
@@ -184,6 +191,7 @@ export interface FileRoutesByTo {
   '/tarefas/calendario': typeof TarefasCalendarioRoute
   '/tarefas/meu-dia': typeof TarefasMeuDiaRoute
   '/tarefas/minhas': typeof TarefasMinhasRoute
+  '/tarefas/todas': typeof TarefasTodasRoute
   '/tarefas': typeof TarefasIndexRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
   '/api/google/sync': typeof ApiGoogleSyncRoute
@@ -209,6 +217,7 @@ export interface FileRoutesById {
   '/tarefas/calendario': typeof TarefasCalendarioRoute
   '/tarefas/meu-dia': typeof TarefasMeuDiaRoute
   '/tarefas/minhas': typeof TarefasMinhasRoute
+  '/tarefas/todas': typeof TarefasTodasRoute
   '/tarefas/': typeof TarefasIndexRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
   '/api/google/sync': typeof ApiGoogleSyncRoute
@@ -235,6 +244,7 @@ export interface FileRouteTypes {
     | '/tarefas/calendario'
     | '/tarefas/meu-dia'
     | '/tarefas/minhas'
+    | '/tarefas/todas'
     | '/tarefas/'
     | '/api/google/callback'
     | '/api/google/sync'
@@ -259,6 +269,7 @@ export interface FileRouteTypes {
     | '/tarefas/calendario'
     | '/tarefas/meu-dia'
     | '/tarefas/minhas'
+    | '/tarefas/todas'
     | '/tarefas'
     | '/api/google/callback'
     | '/api/google/sync'
@@ -283,6 +294,7 @@ export interface FileRouteTypes {
     | '/tarefas/calendario'
     | '/tarefas/meu-dia'
     | '/tarefas/minhas'
+    | '/tarefas/todas'
     | '/tarefas/'
     | '/api/google/callback'
     | '/api/google/sync'
@@ -308,6 +320,7 @@ export interface RootRouteChildren {
   TarefasCalendarioRoute: typeof TarefasCalendarioRoute
   TarefasMeuDiaRoute: typeof TarefasMeuDiaRoute
   TarefasMinhasRoute: typeof TarefasMinhasRoute
+  TarefasTodasRoute: typeof TarefasTodasRoute
   TarefasIndexRoute: typeof TarefasIndexRoute
   ApiGoogleCallbackRoute: typeof ApiGoogleCallbackRoute
   ApiGoogleSyncRoute: typeof ApiGoogleSyncRoute
@@ -437,6 +450,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TarefasMinhasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tarefas/todas': {
+      id: '/tarefas/todas'
+      path: '/tarefas/todas'
+      fullPath: '/tarefas/todas'
+      preLoaderRoute: typeof TarefasTodasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/google/callback': {
       id: '/api/google/callback'
       path: '/api/google/callback'
@@ -492,6 +512,7 @@ const rootRouteChildren: RootRouteChildren = {
   TarefasCalendarioRoute: TarefasCalendarioRoute,
   TarefasMeuDiaRoute: TarefasMeuDiaRoute,
   TarefasMinhasRoute: TarefasMinhasRoute,
+  TarefasTodasRoute: TarefasTodasRoute,
   TarefasIndexRoute: TarefasIndexRoute,
   ApiGoogleCallbackRoute: ApiGoogleCallbackRoute,
   ApiGoogleSyncRoute: ApiGoogleSyncRoute,

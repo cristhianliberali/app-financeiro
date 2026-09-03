@@ -11,6 +11,7 @@ import {
   deleteSubtask,
   deleteTask,
   deleteTimeEntry,
+  fetchAccountStatuses,
   fetchAccountTimeEntries,
   fetchAccountUsers,
   fetchActiveTimer,
@@ -440,6 +441,16 @@ export function useSpaceStatuses(spaceId: string | null) {
     enabled: !!spaceId,
     queryFn: async (): Promise<BoardStatus[]> =>
       (await fetchSpaceStatuses({ data: { spaceId: spaceId! } })) as BoardStatus[],
+  });
+}
+
+/** Status de todos os quadros da conta — base do Kanban da tela "Tarefas". */
+export function useAccountStatuses(accountId: string | null) {
+  return useQuery({
+    queryKey: [KEY, "account-statuses", accountId],
+    enabled: !!accountId,
+    queryFn: async (): Promise<BoardStatus[]> =>
+      (await fetchAccountStatuses({ data: { accountId: accountId! } })) as BoardStatus[],
   });
 }
 
