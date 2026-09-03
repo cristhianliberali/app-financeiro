@@ -398,6 +398,29 @@ export function getGoogleTokenSecret(): string {
   return readEnv("GOOGLE_TOKEN_SECRET") ?? getGoogleSettings().clientSecret;
 }
 
+export type CalendarLogSettings = {
+  /** Uma linha por evento que diz respeito a uma tarefa, com a decisão tomada. */
+  enabled: boolean;
+  /** Também os eventos que não são espelho de tarefa nenhuma. Barulhento. */
+  todosOsEventos: boolean;
+};
+
+/**
+ * O log da sincronização da agenda.
+ *
+ * Ligado por padrão, e de propósito: "a agenda não está sincronizando" tem meia
+ * dúzia de causas que, sem o registro do que a leitura viu e do que ela decidiu,
+ * são indistinguíveis umas das outras. O volume é baixo porque só os eventos
+ * ligados a tarefas entram — a agenda alheia da pessoa fica de fora, a menos
+ * que `LOG_AGENDA_TODOS` peça o contrário.
+ */
+export function getCalendarLogSettings(): CalendarLogSettings {
+  return {
+    enabled: readBool("LOG_AGENDA", true),
+    todosOsEventos: readBool("LOG_AGENDA_TODOS", false),
+  };
+}
+
 /**
  * Segredo que libera a rodada de sincronização por HTTP.
  *

@@ -160,7 +160,9 @@ interna `5432` — assim o tráfego não sai para a internet.
 | `GOOGLE_CLIENT_SECRET` | runtime | não | Segredo do cliente OAuth. **Segredo** |
 | `GOOGLE_CALENDAR_TIMEZONE` | runtime | não | Fuso dos compromissos criados (padrão `America/Sao_Paulo`) |
 | `GOOGLE_SYNC_INTERVALO_MINUTOS` | runtime | não | Intervalo da sincronização automática (padrão `10`) |
-| `GOOGLE_MAX_EVENTOS_SYNC` | runtime | não | Teto de eventos lidos por sincronização (padrão `500`) |
+| `GOOGLE_MAX_EVENTOS_SYNC` | runtime | não | Teto de segurança de eventos por leitura (padrão `500`); não interrompe a paginação no meio |
+| `LOG_AGENDA` | runtime | não | Uma linha por evento lido que diz respeito a uma tarefa, com a decisão tomada (padrão `true`) |
+| `LOG_AGENDA_TODOS` | runtime | não | Também os eventos que não nasceram de tarefas. Barulhento (padrão `false`) |
 | `GOOGLE_TOKEN_SECRET` | runtime | não | Chave que cifra os tokens no banco; sem valor, deriva de `GOOGLE_CLIENT_SECRET` |
 | `GOOGLE_SYNC_TOKEN` | runtime | não | Segredo que libera `POST /api/google/sync`. Sem valor, a rota fica fechada. **Segredo** |
 | `PORT` | runtime | não | Porta do servidor (padrão `3000`) |

@@ -350,7 +350,8 @@ export function ProfileDialog({
                             `último erro: ${d.ultimoErro ?? "nenhum"}`,
                             `vínculos no banco: ${d.vinculos}`,
                             `tarefas esperando para subir: ${d.pendentesDeEnvio}`,
-                            `eventos lidos: ${d.eventosLidos}`,
+                            `eventos lidos: ${d.eventosLidos}` +
+                              (d.leituraTruncada ? " (LEITURA TRUNCADA NO TETO)" : ""),
                             `com marca de tarefa: ${d.comMarcaDeTarefa}`,
                             `com vínculo reconhecido: ${d.comVinculo}`,
                             ...(d.erro ? [`ERRO NA LEITURA: ${d.erro}`] : []),
