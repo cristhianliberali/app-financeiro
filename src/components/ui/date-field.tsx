@@ -3,7 +3,7 @@ import { CalendarDays, Clock, Eraser } from "lucide-react";
 import { ptBR } from "date-fns/locale";
 
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 /**
@@ -142,6 +142,25 @@ function nextHalfHour(): string {
 // Campo
 // ---------------------------------------------------------------------------
 
+/**
+ * O ponteiro é um dedo?
+ *
+ * Não dá para saber isso no servidor, e chutar "mouse" na primeira pintura é o
+ * chute certo: o desktop é quem depende do comportamento antigo, e o celular
+ * corrige-se no primeiro efeito, antes de qualquer toque.
+ */
+function useCoarsePointer(): boolean {
+  const [coarse, setCoarse] = React.useState(false);
+  React.useEffect(() => {
+    const query = window.matchMedia("(pointer: coarse)");
+    const apply = () => setCoarse(query.matches);
+    apply();
+    query.addEventListener("change", apply);
+    return () => query.removeEventListener("change", apply);
+  }, []);
+  return coarse;
+}
+
 export type DateFieldProps = {
   type?: DateFieldType;
   value?: string;
@@ -185,6 +204,21 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(func
   const [open, setOpen] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
   React.useImperativeHandle(ref, () => inputRef.current as HTMLInputElement);
+  const coarsePointer = useCoarsePointer();
+
+  /*
+   * No dedo, o campo inteiro abre o calendário.
+   *
+   * O ícone tem uns 32px ao lado de um campo que ocupa o resto da linha: no
+   * celular o toque quase sempre cai no campo, o teclado numérico sobe e o
+   * calendário nunca aparece. E digitar "10/09/2026" num teclado de telefone é
+   * pior do que escolher o dia — é por isso que o campo de data nativo também
+   * abre o seletor ao toque, em vez de deixar digitar.
+   *
+   * No mouse nada muda: clicar no campo continua pondo o cursor para digitar, e
+   * o ícone continua sendo quem abre o calendário.
+   */
+  const tapToOpen = coarsePointer && masked !== "time" && !disabled && !readOnly;
 
   // O valor pode mudar por fora (rascunho carregado, atalho do calendário,
   // outra linha da importação). Reescrevemos o texto sempre que ele não for
@@ -267,7 +301,7 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(func
   const selected = valueToDate(value, masked);
   const time = withTime ? (value.split("T")[1]?.slice(0, 5) ?? "") : "";
 
-  return (
+  const field = (
     <div
       data-disabled={disabled || undefined}
       className={cn(
@@ -280,30 +314,60 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(func
       <input
         ref={inputRef}
         type="text"
-        inputMode="numeric"
+        // `none` cala o teclado no celular: ali o campo abre o calendário, e um
+        // teclado numérico subindo por cima dele só atrapalharia.
+        inputMode={tapToOpen ? "none" : "numeric"}
         autoComplete="off"
         value={text}
         disabled={disabled}
-        readOnly={readOnly}
+        // Só de leitura no dedo — quem escolhe a data é o calendário. Limpar
+        // continua possível, pelo atalho dentro dele.
+        readOnly={readOnly || tapToOpen}
         autoFocus={autoFocus}
         placeholder={placeholder ?? PLACEHOLDER[masked]}
         onChange={(e) => handleType(e.target.value)}
         onBlur={handleBlur}
-        className="h-full min-w-0 flex-1 rounded-l-[inherit] bg-transparent px-3 font-mono text-[0.9em] tracking-tight text-foreground outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-muted-foreground/70 disabled:cursor-not-allowed"
+        {...(tapToOpen
+          ? {
+              onClick: () => setOpen(true),
+              // O toque costuma virar `focus` antes de `click` — abrir nos dois
+              // cobre o campo alcançado pelo teclado do sistema também.
+              onFocus: () => setOpen(true),
+            }
+          : {})}
+        className={cn(
+          "h-full min-w-0 flex-1 rounded-l-[inherit] bg-transparent px-3 font-mono text-[0.9em] tracking-tight text-foreground outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-muted-foreground/70 disabled:cursor-not-allowed",
+          tapToOpen && "cursor-pointer",
+        )}
         {...rest}
       />
 
       {masked === "time" ? null : (
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger
-            type="button"
-            disabled={disabled || readOnly}
-            aria-label="Abrir calendário"
-            className="mr-1 flex h-[calc(100%-0.5rem)] items-center rounded-lg px-2 text-muted-foreground transition-colors hover:bg-primary-soft hover:text-primary disabled:pointer-events-none"
-          >
-            <CalendarDays className="size-4" />
-          </PopoverTrigger>
-          {/*
+        <PopoverTrigger
+          type="button"
+          disabled={disabled || readOnly}
+          aria-label="Abrir calendário"
+          // No dedo o alvo cresce para os 44px de sempre; no mouse continua justo.
+          className="mr-1 flex h-[calc(100%-0.5rem)] min-w-11 items-center justify-center rounded-lg px-2 text-muted-foreground transition-colors hover:bg-primary-soft hover:text-primary disabled:pointer-events-none sm:min-w-0 sm:justify-start"
+        >
+          <CalendarDays className="size-4" />
+        </PopoverTrigger>
+      )}
+    </div>
+  );
+
+  // Campo de hora não tem calendário: ele é só o campo.
+  if (masked === "time") return field;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      {/*
+        A âncora é o campo inteiro, e não o ícone: o painel se alinha à caixa
+        que a pessoa tocou, que é o que o olho espera, e o cálculo de espaço
+        passa a considerar a linha toda.
+      */}
+      <PopoverAnchor asChild>{field}</PopoverAnchor>
+      {/*
             No celular o painel abria maior que a tela.
             Empilhado — calendário em cima, atalhos embaixo —, ele passa de 550px
             de altura; num telefone com o campo no meio de um diálogo, o Radix
@@ -316,87 +380,85 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(func
             rola por dentro se precisar), e os atalhos viram uma faixa deitada
             no celular, que é o que devolve os ~180px que faltavam.
           */}
-          <PopoverContent
-            align="end"
-            collisionPadding={12}
-            className="max-h-(--radix-popover-content-available-height) w-auto max-w-[calc(100vw-1.5rem)] overflow-y-auto p-0 sm:max-w-none"
-          >
-            <div className="flex flex-col sm:flex-row">
-              <div className="p-2">
-                <Calendar
-                  mode="single"
-                  locale={ptBR}
-                  onSelect={pickDate}
-                  autoFocus
-                  {...(selected ? { selected, defaultMonth: selected } : {})}
-                />
-              </div>
-              <div className="flex w-full min-w-0 flex-wrap gap-1 border-t border-border p-2 sm:w-44 sm:flex-col sm:flex-nowrap sm:border-l sm:border-t-0">
-                <p className="label-caps w-full px-1 pb-1">Atalhos</p>
-                {SHORTCUTS.map((shortcut) => (
-                  <button
-                    key={shortcut.label}
-                    type="button"
-                    onClick={() => {
-                      pickDate(shortcut.date());
-                      if (!withTime) setOpen(false);
+      <PopoverContent
+        align="end"
+        collisionPadding={12}
+        className="max-h-(--radix-popover-content-available-height) w-auto max-w-[calc(100vw-1.5rem)] overflow-y-auto p-0 sm:max-w-none"
+      >
+        <div className="flex flex-col sm:flex-row">
+          <div className="p-2">
+            <Calendar
+              mode="single"
+              locale={ptBR}
+              onSelect={pickDate}
+              autoFocus
+              {...(selected ? { selected, defaultMonth: selected } : {})}
+            />
+          </div>
+          <div className="flex w-full min-w-0 flex-wrap gap-1 border-t border-border p-2 sm:w-44 sm:flex-col sm:flex-nowrap sm:border-l sm:border-t-0">
+            <p className="label-caps w-full px-1 pb-1">Atalhos</p>
+            {SHORTCUTS.map((shortcut) => (
+              <button
+                key={shortcut.label}
+                type="button"
+                onClick={() => {
+                  pickDate(shortcut.date());
+                  if (!withTime) setOpen(false);
+                }}
+                className="rounded-lg border border-border px-2 py-1.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:border-transparent"
+              >
+                {shortcut.label}
+              </button>
+            ))}
+
+            {withTime && (
+              <div className="mt-1 w-full border-t border-border pt-2">
+                <p className="label-caps px-1 pb-1.5">Horário</p>
+                <div className="flex items-center gap-2 rounded-lg border border-input px-2">
+                  <Clock className="size-3.5 shrink-0 text-muted-foreground" />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="hh:mm"
+                    value={time}
+                    onChange={(e) => {
+                      const digits = digitsOf(e.target.value, "time");
+                      const parsed = digitsToValue(digits, "time");
+                      if (parsed) pickTime(parsed);
+                      else if (digits.length === 0 && selected) pickTime("00:00");
                     }}
-                    className="rounded-lg border border-border px-2 py-1.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:border-transparent"
-                  >
-                    {shortcut.label}
-                  </button>
-                ))}
-
-                {withTime && (
-                  <div className="mt-1 w-full border-t border-border pt-2">
-                    <p className="label-caps px-1 pb-1.5">Horário</p>
-                    <div className="flex items-center gap-2 rounded-lg border border-input px-2">
-                      <Clock className="size-3.5 shrink-0 text-muted-foreground" />
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="hh:mm"
-                        value={time}
-                        onChange={(e) => {
-                          const digits = digitsOf(e.target.value, "time");
-                          const parsed = digitsToValue(digits, "time");
-                          if (parsed) pickTime(parsed);
-                          else if (digits.length === 0 && selected) pickTime("00:00");
-                        }}
-                        className="h-8 w-full bg-transparent font-mono text-xs outline-none placeholder:font-sans placeholder:text-muted-foreground/70"
-                      />
-                    </div>
-                    <div className="mt-1.5 grid grid-cols-3 gap-1">
-                      {["08:00", "12:00", "18:00"].map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => pickTime(preset)}
-                          className="rounded-md border border-border py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary hover:bg-primary-soft hover:text-primary"
-                        >
-                          {preset}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    emit("");
-                    setOpen(false);
-                  }}
-                  className="mt-1 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-negative-soft hover:text-negative-soft-foreground"
-                >
-                  <Eraser className="size-3.5" /> Limpar
-                </button>
+                    className="h-8 w-full bg-transparent font-mono text-xs outline-none placeholder:font-sans placeholder:text-muted-foreground/70"
+                  />
+                </div>
+                <div className="mt-1.5 grid grid-cols-3 gap-1">
+                  {["08:00", "12:00", "18:00"].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => pickTime(preset)}
+                      className="rounded-md border border-border py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary hover:bg-primary-soft hover:text-primary"
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-      )}
-    </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                emit("");
+                setOpen(false);
+              }}
+              className="mt-1 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-negative-soft hover:text-negative-soft-foreground"
+            >
+              <Eraser className="size-3.5" /> Limpar
+            </button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 });
 
