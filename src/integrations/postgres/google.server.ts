@@ -21,6 +21,7 @@ import { getGoogleSettings } from "./config.server";
 import { decryptToken, encryptToken } from "../google/crypto.server";
 import { refreshAccessToken, type GoogleTokens } from "../google/oauth.server";
 import {
+  GoogleApiError,
   GoogleAuthError,
   SyncTokenExpiredError,
   TASK_ID_PROPERTY,
@@ -226,7 +227,15 @@ async function dropEvent(
  * o evento. É chamada depois de criar, editar e excluir uma tarefa, e também
  * pela sincronização periódica.
  */
-export type TaskSyncResult = { ok: true } | { ok: false; error: string };
+export type TaskSyncResult =
+  | { ok: true }
+  /**
+   * `fatal` distingue as duas recusas que antes eram uma só: a que vale para a
+   * rodada inteira (conta, cota, Google fora do ar) e a que é daquele evento
+   * (o Google não aceitou o corpo). Sem a distinção, a segunda parava a fila e
+   * deixava todas as tarefas seguintes sem compromisso.
+   */
+  | { ok: false; fatal: boolean; error: string };
 
 export async function syncTaskToCalendar(taskId: string): Promise<TaskSyncResult> {
   const task = await loadTask(taskId);
@@ -298,12 +307,22 @@ export async function syncTaskToCalendar(taskId: string): Promise<TaskSyncResult
     await logCalendar(taskId, owner, "calendar_event_created", { event_id: created.id });
     return { ok: true };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const detail = error instanceof Error ? error.message : String(error);
+    // Só o erro tipado sabe dizer se a recusa é daquele evento. Qualquer outra
+    // coisa conta como global: parar a rodada por precaução é o lado seguro de
+    // errar, porque insistir numa recusa global só queima cota.
+    const fatal = error instanceof GoogleApiError ? error.fatal : true;
+    // O aviso vermelho do perfil mostra esta mensagem. A resposta do Google
+    // sozinha não diz qual registro corrigir — daí o título e o id junto.
+    const message = `${detail} — tarefa "${task.title}" (${taskId})`;
     await markError(owner, message);
+    // A trilha só recebe a recusa do próprio evento: uma queda do Google não é
+    // defeito da tarefa, e marcá-la aqui a tiraria da fila sem motivo.
+    if (!fatal) await logCalendar(taskId, owner, "calendar_event_failed", { error: detail });
     if (!(error instanceof GoogleAuthError)) {
       console.error(`[agenda] falha ao sincronizar a tarefa ${taskId}:`, message);
     }
-    return { ok: false, error: message };
+    return { ok: false, fatal, error: message };
   }
 }
 
@@ -394,6 +413,8 @@ export type SyncResult = {
   read: number;
   /** Tarefas que ainda não tinham compromisso e foram para a agenda agora. */
   pushed: number;
+  /** Tarefas que o Google recusou — a fila seguiu sem elas. */
+  refused: number;
   /** O que o Google respondeu quando alguma coisa não deu certo. */
   error?: string;
 };
@@ -405,7 +426,7 @@ export type SyncResult = {
  */
 export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
   const connection = await getConnection(userId);
-  if (!connection) return { cleared: 0, updated: 0, read: 0, pushed: 0 };
+  if (!connection) return { cleared: 0, updated: 0, read: 0, pushed: 0, refused: 0 };
 
   const accessToken = await accessTokenFor(connection);
   const janela = () => {
@@ -547,7 +568,7 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
     [userId, page.nextSyncToken ?? connection.sync_token],
   );
 
-  return { cleared, updated, read: page.events.length, pushed: 0 };
+  return { cleared, updated, read: page.events.length, pushed: 0, refused: 0 };
 }
 
 /** Compromissos da agenda numa janela, para o calendário do painel. */
@@ -596,8 +617,44 @@ export async function syncUser(userId: string): Promise<SyncResult> {
   const push = await pushPendingTasks(userId);
   if (!push.error)
     await query(`UPDATE google_accounts SET last_error = NULL WHERE user_id = $1`, [userId]);
-  return { ...result, pushed: push.pushed, ...(push.error ? { error: push.error } : {}) };
+  return {
+    ...result,
+    pushed: push.pushed,
+    refused: push.refused,
+    ...(push.error ? { error: push.error } : {}),
+  };
 }
+
+/**
+ * Quem entra na fila de envio, em SQL, com o usuário em `$1`.
+ *
+ * Fica numa constante porque o diagnóstico conta exatamente a mesma fila: se as
+ * duas condições divergirem, o relatório passa a mentir justamente quando
+ * alguém for conferir por que uma tarefa não subiu.
+ */
+const FILA_DE_ENVIO = `
+    FROM tasks t
+    JOIN board_statuses s ON s.id = t.status_id
+   WHERE t.responsible_user_id = $1
+     AND (t.start_date IS NOT NULL OR t.due_date IS NOT NULL)
+     AND coalesce(s.polarity, '') <> 'SUCCESS'
+     AND COALESCE(t.due_date, t.start_date) BETWEEN now() - interval '7 days'
+                                                AND now() + interval '180 days'
+     AND NOT EXISTS (
+       SELECT 1 FROM task_calendar_events e
+        WHERE e.task_id = t.id AND e.user_id = $1
+     )
+     -- A tarefa que o Google recusou sai da fila até ser editada — que é como a
+     -- recusa costuma ser corrigida — ou até o dia seguinte, para o caso de ter
+     -- sido engano passageiro. Sem isso ela consome uma chamada por rodada,
+     -- para sempre, e some no meio dos erros de cota.
+     AND NOT EXISTS (
+       SELECT 1 FROM task_activity a
+        WHERE a.task_id = t.id
+          AND a.user_id = $1
+          AND a.action = 'calendar_event_failed'
+          AND a.created_at > GREATEST(t.updated_at, now() - interval '1 day')
+     )`;
 
 /**
  * Sobe para a agenda as tarefas que ainda não têm compromisso.
@@ -613,42 +670,52 @@ export async function syncUser(userId: string): Promise<SyncResult> {
  */
 export async function pushPendingTasks(
   userId: string,
-): Promise<{ pushed: number; error?: string }> {
+): Promise<{ pushed: number; refused: number; error?: string }> {
   const { maxEventsPerSync } = getGoogleSettings();
 
   let pending: Array<{ id: string }>;
   try {
     pending = await query<{ id: string }>(
-      `SELECT t.id
-         FROM tasks t
-         JOIN board_statuses s ON s.id = t.status_id
-        WHERE t.responsible_user_id = $1
-          AND (t.start_date IS NOT NULL OR t.due_date IS NOT NULL)
-          AND coalesce(s.polarity, '') <> 'SUCCESS'
-          AND COALESCE(t.due_date, t.start_date) BETWEEN now() - interval '7 days'
-                                                     AND now() + interval '180 days'
-          AND NOT EXISTS (
-            SELECT 1 FROM task_calendar_events e
-             WHERE e.task_id = t.id AND e.user_id = $1
-          )
+      `SELECT t.id ${FILA_DE_ENVIO}
         ORDER BY COALESCE(t.due_date, t.start_date)
         LIMIT $2`,
       [userId, maxEventsPerSync],
     );
   } catch (error) {
-    if (isMissingTable(error)) return { pushed: 0 };
+    if (isMissingTable(error)) return { pushed: 0, refused: 0 };
     throw error;
   }
 
   let pushed = 0;
+  let refused = 0;
+  let ultimaRecusa = "";
   for (const task of pending) {
     const result = await syncTaskToCalendar(task.id);
-    // Uma recusa do Google vale para todas as próximas: parar aqui devolve o
-    // motivo para quem pediu a sincronização, em vez de repetir o erro N vezes.
-    if (!result.ok) return { pushed, error: result.error };
-    pushed += 1;
+    if (result.ok) {
+      pushed += 1;
+      continue;
+    }
+
+    // Recusa global — conta, cota, Google fora do ar: as próximas falhariam
+    // igual, então a rodada para aqui e devolve o motivo a quem a pediu.
+    if (result.fatal) return { pushed, refused, error: result.error };
+
+    // Recusa daquela tarefa. Ela já ficou registrada na trilha e no aviso do
+    // perfil; a fila segue, senão um registro ruim deixaria todos os outros
+    // sem compromisso — que foi exatamente o que aconteceu em produção.
+    refused += 1;
+    ultimaRecusa = result.error;
   }
-  return { pushed };
+
+  return {
+    pushed,
+    refused,
+    // O erro devolvido é o que impede `syncUser` de apagar o aviso do perfil:
+    // a rodada não terminou limpa, e a pessoa precisa ver qual tarefa corrigir.
+    ...(refused > 0
+      ? { error: `${refused} tarefa(s) recusada(s) pelo Google. Última: ${ultimaRecusa}` }
+      : {}),
+  };
 }
 
 /**
@@ -670,9 +737,19 @@ export type CalendarDiagnostic = {
   /** Já existe marcador incremental? Sem ele, toda rodada relê a janela. */
   temMarcador: boolean;
   ultimaSync: string | null;
+  /**
+   * Há quantos minutos foi a última leitura. É o que separa "o agendador não
+   * rodou" de "rodou e não achou nada para gravar" — as duas se parecem de
+   * fora, e só esta contagem distingue uma da outra.
+   */
+  minutosDesdeSync: number | null;
   ultimoErro: string | null;
   /** Vínculos evento↔tarefa no banco para esta pessoa. */
   vinculos: number;
+  /** Tarefas esperando para virar compromisso agora. */
+  pendentesDeEnvio: number;
+  /** As últimas tarefas que o Google recusou, com o motivo. */
+  recusadas: Array<{ titulo: string; quando: string; motivo: string }>;
   eventosLidos: number;
   /** Dos lidos, quantos carregam a marca que só o app escreve. */
   comMarcaDeTarefa: number;
@@ -697,8 +774,11 @@ export async function diagnoseCalendar(userId: string): Promise<CalendarDiagnost
     calendarId: null,
     temMarcador: false,
     ultimaSync: null,
+    minutosDesdeSync: null,
     ultimoErro: null,
     vinculos: 0,
+    pendentesDeEnvio: 0,
+    recusadas: [],
     eventosLidos: 0,
     comMarcaDeTarefa: 0,
     comVinculo: 0,
@@ -708,15 +788,42 @@ export async function diagnoseCalendar(userId: string): Promise<CalendarDiagnost
   const connection = await getConnection(userId);
   if (!connection) return vazio;
 
+  const ultimaSync = connection.last_sync_at ? new Date(connection.last_sync_at) : null;
+
   const base: CalendarDiagnostic = {
     ...vazio,
     conectado: true,
     email: connection.google_email,
     calendarId: connection.calendar_id,
     temMarcador: !!connection.sync_token,
-    ultimaSync: connection.last_sync_at ? new Date(connection.last_sync_at).toISOString() : null,
+    ultimaSync: ultimaSync ? ultimaSync.toISOString() : null,
+    minutosDesdeSync: ultimaSync ? Math.round((Date.now() - ultimaSync.getTime()) / 60_000) : null,
     ultimoErro: connection.last_error,
   };
+
+  // O lado do envio, que o relatório não enxergava: quantas tarefas esperam
+  // para subir e quais o Google recusou. Sem isso, "a agenda não recebe nada"
+  // ficava indistinguível de "não há nada para mandar".
+  const [fila] = await query<{ total: string }>(`SELECT count(*)::text AS total ${FILA_DE_ENVIO}`, [
+    userId,
+  ]);
+  base.pendentesDeEnvio = Number(fila?.total ?? 0);
+
+  base.recusadas = (
+    await query<{ titulo: string; quando: Date; motivo: string | null }>(
+      `SELECT t.title AS titulo, a.created_at AS quando, a.meta->>'error' AS motivo
+         FROM task_activity a
+         JOIN tasks t ON t.id = a.task_id
+        WHERE a.user_id = $1 AND a.action = 'calendar_event_failed'
+        ORDER BY a.created_at DESC
+        LIMIT 5`,
+      [userId],
+    )
+  ).map((linha) => ({
+    titulo: linha.titulo,
+    quando: new Date(linha.quando).toISOString(),
+    motivo: linha.motivo ?? "(motivo não registrado)",
+  }));
 
   const links = await query<{ task_id: string; event_id: string }>(
     `SELECT task_id, event_id FROM task_calendar_events WHERE user_id = $1`,

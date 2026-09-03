@@ -105,6 +105,7 @@ GOOGLE_CLIENT_ID=<opcional>
 GOOGLE_CLIENT_SECRET=<opcional, segredo>
 GOOGLE_CALENDAR_TIMEZONE=America/Sao_Paulo
 GOOGLE_SYNC_INTERVALO_MINUTOS=10
+GOOGLE_SYNC_TOKEN=<opcional, segredo>
 PORT=3000
 HOST=0.0.0.0
 NODE_ENV=production
@@ -161,6 +162,7 @@ interna `5432` — assim o tráfego não sai para a internet.
 | `GOOGLE_SYNC_INTERVALO_MINUTOS` | runtime | não | Intervalo da sincronização automática (padrão `10`) |
 | `GOOGLE_MAX_EVENTOS_SYNC` | runtime | não | Teto de eventos lidos por sincronização (padrão `500`) |
 | `GOOGLE_TOKEN_SECRET` | runtime | não | Chave que cifra os tokens no banco; sem valor, deriva de `GOOGLE_CLIENT_SECRET` |
+| `GOOGLE_SYNC_TOKEN` | runtime | não | Segredo que libera `POST /api/google/sync`. Sem valor, a rota fica fechada. **Segredo** |
 | `PORT` | runtime | não | Porta do servidor (padrão `3000`) |
 | `HOST` | runtime | sim | Precisa ser `0.0.0.0` para o proxy alcançar |
 
@@ -309,6 +311,8 @@ docker run --rm -p 3000:3000 \
 | "A integração não está configurada" no perfil | Faltam `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` |
 | `redirect_uri_mismatch` ao conectar a agenda | O URI cadastrado no Google Cloud não é exatamente `APP_URL` + `/api/google/callback` |
 | "O Google não devolveu a autorização de longa duração" | A conta já havia autorizado antes; remova o acesso em myaccount.google.com/permissions e conecte de novo |
+| Tarefas param de virar compromisso, e o Google Console acusa erro em `Events.Insert` | Alguma tarefa foi recusada pelo Google. O aviso no perfil nomeia qual; corrija as datas dela. As demais continuam subindo |
+| A agenda só sincroniza quando alguém abre o app | O agendador vive no processo web. Defina `GOOGLE_SYNC_TOKEN` e chame `POST /api/google/sync` por um cron — veja "Garantir que a sincronização roda" |
 | "O armazenamento de arquivos não está configurado" na tarefa | Faltam `S3_BUCKET`, `S3_ACCESS_KEY_ID` ou `S3_SECRET_ACCESS_KEY` |
 | "O navegador não conseguiu enviar o arquivo ao armazenamento" | CORS do bucket não libera o domínio do app — veja a seção CORS acima |
 | Anexo envia mas não aparece a miniatura | Endpoint acessível pelo servidor mas não pelo navegador, ou `S3_FORCE_PATH_STYLE` errado |
@@ -339,6 +343,34 @@ sete dias. Para uso contínuo, publique o app.
 mudou — uma chamada por usuário conectado a cada `GOOGLE_SYNC_INTERVALO_MINUTOS`.
 Nos erros de limite (403 de cota, 429) e nas falhas temporárias, a chamada é
 repetida com espera crescente, até três vezes.
+
+### Garantir que a sincronização roda
+
+O agendador é um laço dentro do próprio processo web, levantado no primeiro
+acesso autenticado depois de o servidor subir. Sem ninguém usando o app ele não
+sobe; com mais de uma réplica, cada uma roda o seu. Para não depender disso,
+defina `GOOGLE_SYNC_TOKEN` e aponte um cron para a rota:
+
+```bash
+curl -fsS -X POST \
+  -H "authorization: Bearer $GOOGLE_SYNC_TOKEN" \
+  https://SEU-DOMINIO/api/google/sync
+```
+
+A resposta é o resumo da rodada em JSON — quantos usuários foram varridos,
+quantos eventos foram lidos, quantas datas mudaram, quantas tarefas subiram e
+quantas o Google recusou. É também a forma de responder, de fora, se a
+sincronização está mesmo acontecendo. Chamar duas vezes ao mesmo tempo é seguro:
+a segunda volta com `emAndamento: true` sem fazer nada.
+
+### Quando uma tarefa não vira compromisso
+
+O Google recusa o evento de uma tarefa em particular quando não aceita o que foi
+enviado — uma data fora de faixa, por exemplo. Essa tarefa fica registrada na
+trilha e sai da fila até ser editada, ou até o dia seguinte, e **as demais
+continuam subindo**. O aviso no perfil nomeia a tarefa recusada, e o botão
+*Diagnosticar sincronização* lista as últimas recusas com o motivo, quantas
+tarefas esperam para subir e há quantos minutos foi a última leitura.
 
 ---
 

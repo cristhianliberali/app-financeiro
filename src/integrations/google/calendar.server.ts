@@ -40,6 +40,36 @@ export class GoogleAuthError extends Error {}
 /** O marcador de sincronização venceu: é preciso recomeçar do zero. */
 export class SyncTokenExpiredError extends Error {}
 
+/**
+ * Status que o Google devolve quando o problema está no que foi enviado, e não
+ * na conta nem na cota. Só eles dizem respeito a um evento em particular: o
+ * próximo, com outros dados, pode passar sem problema.
+ */
+const TASK_LEVEL_STATUS = new Set([400, 409, 412, 422]);
+
+/** Recusa do Google que não é de autenticação, com o status para quem decidir. */
+export class GoogleApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly detail: string,
+  ) {
+    super(`Google Agenda recusou a chamada: ${status} ${detail}`);
+    this.name = "GoogleApiError";
+  }
+
+  /**
+   * A recusa vale para tudo o que vier depois nesta rodada?
+   *
+   * Cota, permissão e indisponibilidade valem: insistir com o evento seguinte
+   * só queima chamada. Já um corpo que o Google não aceitou é problema daquele
+   * evento — parar a fila por causa dele deixaria todos os outros sem
+   * compromisso, que é o que acontecia antes desta distinção existir.
+   */
+  get fatal(): boolean {
+    return !TASK_LEVEL_STATUS.has(this.status);
+  }
+}
+
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const MAX_ATTEMPTS = 3;
 
@@ -58,7 +88,8 @@ async function call(
     if (value !== undefined) url.searchParams.set(key, value);
   }
 
-  let lastError = "";
+  let lastDetail = "";
+  let lastStatus = 0;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     const response = await fetch(url, {
       ...init,
@@ -73,7 +104,8 @@ async function call(
     if (response.ok) return response.json().catch(() => null);
 
     const body = await response.text().catch(() => "");
-    lastError = `${response.status} ${body.slice(0, 300)}`;
+    lastDetail = body.slice(0, 300);
+    lastStatus = response.status;
 
     if (response.status === 401)
       throw new GoogleAuthError("Acesso à agenda expirou ou foi revogado.");
@@ -84,12 +116,17 @@ async function call(
     // 403 tanto pode ser cota (passa) quanto permissão (não adianta insistir).
     const rateLimited = response.status === 403 && /rateLimit|quota|userRateLimit/i.test(body);
     if (!RETRYABLE_STATUS.has(response.status) && !rateLimited) {
-      throw new Error(`Google Agenda recusou a chamada: ${lastError}`);
+      throw new GoogleApiError(response.status, lastDetail);
     }
     if (attempt < MAX_ATTEMPTS) await sleep(2 ** attempt * 500);
   }
 
-  throw new Error(`Google Agenda indisponível depois de ${MAX_ATTEMPTS} tentativas: ${lastError}`);
+  // Esgotar as tentativas é sempre passageiro (cota ou indisponibilidade): vale
+  // para a rodada inteira, e `GoogleApiError.fatal` já responde isso pelo status.
+  throw new GoogleApiError(
+    lastStatus,
+    `${lastDetail} (depois de ${MAX_ATTEMPTS} tentativas)`.trim(),
+  );
 }
 
 function body(input: CalendarEventInput) {

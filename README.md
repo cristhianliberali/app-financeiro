@@ -170,6 +170,14 @@ rodada de sincronização recolhe o que tiver ficado para trás.
   com leitura incremental para caber na cota, e um botão de sincronizar na hora
   no calendário do painel. É polling, não webhook: uma mudança feita no Google
   aparece aqui na rodada seguinte, ou na hora se a pessoa pedir a sincronização.
+  O laço vive no processo web e sobe no primeiro acesso autenticado — para não
+  depender disso, defina `GOOGLE_SYNC_TOKEN` e chame `POST /api/google/sync` por
+  um cron, que roda a rodada e devolve em JSON o que ela fez;
+- Uma tarefa que o Google recusar (uma data fora de faixa, por exemplo) fica
+  registrada na trilha e sai da fila até ser corrigida — **sem** impedir que as
+  outras subam. O aviso no perfil diz qual é, e o botão *Diagnosticar
+  sincronização* mostra as últimas recusas, quantas tarefas esperam para subir e
+  há quantos minutos foi a última leitura.
 
 No painel de Projetos e Tarefas há três abas:
 
