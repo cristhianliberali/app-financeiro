@@ -16,6 +16,7 @@ export const STATUS_PLANO = [
   "trial",
   "cortesia",
   "atrasado",
+  "pausado",
   "cancelado",
   "reembolsado",
   "chargeback",
@@ -31,14 +32,27 @@ export type OrigemPlano = (typeof ORIGEM_PLANO)[number];
 export const STATUS_PADRAO: StatusPlano = "sem_assinatura";
 
 /**
- * Os status que dão acesso.
+ * Os status que dão acesso sem ressalva.
  *
- * `atrasado` fica de fora de propósito: a Cakto ainda vai tentar cobrar de
- * novo, e quem decide por quanto tempo o acesso sobrevive à falha é a janela de
- * tolerância abaixo, não o status. Assim uma retentativa bem-sucedida no dia
- * seguinte não deixa rastro nenhum para o assinante.
+ * `atrasado` não está aqui, mas também não bloqueia na hora: ele tem uma janela
+ * própria, logo abaixo. Os demais encerram o acesso imediatamente.
  */
 const STATUS_LIBERADOS: readonly StatusPlano[] = ["ativo", "trial", "cortesia"];
+
+/**
+ * Janela de carência da inadimplência, em dias.
+ *
+ * Uma renovação recusada não é o fim da assinatura: a Cakto tenta de novo. Os
+ * webhooks reais trazem a política dela no próprio corpo — `max_retries: 3` com
+ * `retry_interval: 1` —, ou seja, três tentativas em três dias. Cortar o acesso
+ * no instante da primeira recusa tiraria o app de quem vai pagar no dia
+ * seguinte, e ainda geraria o suporte que essa retentativa existe para evitar.
+ *
+ * A janela conta a partir de quando a recusa chegou (`atualizadoEm`), não do
+ * fim do período pago: `next_payment_date` nos eventos de recusa aponta a
+ * próxima *tentativa*, e não uma data até a qual a pessoa pagou.
+ */
+const DIAS_CARENCIA_PADRAO = 3;
 
 export function isStatusPlano(value: unknown): value is StatusPlano {
   return typeof value === "string" && (STATUS_PLANO as readonly string[]).includes(value);
@@ -52,10 +66,13 @@ export type EstadoPlano = {
   status: StatusPlano;
   /** Fim do acesso já pago. Nulo = sem prazo (cortesia vitalícia, por exemplo). */
   expiraEm?: Date | string | null;
+  /** Quando o status atual foi gravado. Base da carência de `atrasado`. */
+  atualizadoEm?: Date | string | null;
   codigoOferta?: string | null;
 };
 
-export type MotivoBloqueio = "sem_assinatura" | "vencido" | "inadimplente" | "encerrado";
+export type MotivoBloqueio =
+  "sem_assinatura" | "vencido" | "inadimplente" | "pausado" | "encerrado";
 
 export type AvaliacaoPlano = {
   liberado: boolean;
@@ -73,26 +90,52 @@ function paraData(value: Date | string | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+export type OpcoesAvaliacao = {
+  agora?: Date;
+  /** Folga depois de `expiraEm`, para a demora do webhook de renovação. */
+  toleranciaDias?: number;
+  /** Janela de carência de `atrasado`, contada a partir de `atualizadoEm`. */
+  diasCarencia?: number;
+};
+
 /**
  * Avalia o acesso de uma pessoa.
  *
- * `toleranciaDias` é a folga depois de `expiraEm` — cobre o intervalo entre a
- * data de renovação e a chegada do webhook de renovação, que não é instantâneo.
- * Sem essa folga, todo assinante em dia perderia o app por algumas horas em
- * cada ciclo de cobrança.
+ * Dois relógios diferentes, por dois motivos diferentes:
+ *
+ *   - `toleranciaDias` é a folga depois de `expiraEm`. Cobre o intervalo entre
+ *     a renovação acontecer na Cakto e o webhook dela chegar aqui. Sem essa
+ *     folga, todo assinante em dia perderia o app por algumas horas a cada
+ *     ciclo de cobrança;
+ *   - `diasCarencia` é a folga depois de uma recusa de pagamento. Cobre as
+ *     retentativas da Cakto, que são três, uma por dia.
+ *
+ * A ordem importa: um status encerrado (cancelado, reembolsado, chargeback,
+ * pausado) bloqueia na hora, independentemente de qualquer data. Prazo só
+ * encurta acesso — nunca ressuscita uma assinatura que acabou.
  */
-export function avaliarPlano(
-  plano: EstadoPlano,
-  opcoes: { agora?: Date; toleranciaDias?: number } = {},
-): AvaliacaoPlano {
+export function avaliarPlano(plano: EstadoPlano, opcoes: OpcoesAvaliacao = {}): AvaliacaoPlano {
   const agora = opcoes.agora ?? new Date();
   const tolerancia = Math.max(0, opcoes.toleranciaDias ?? 0);
+  const carencia = Math.max(0, opcoes.diasCarencia ?? DIAS_CARENCIA_PADRAO);
   const status = normalizarStatus(plano.status);
   const expiraEm = paraData(plano.expiraEm);
 
   const diasRestantes = expiraEm
     ? Math.ceil((expiraEm.getTime() - agora.getTime()) / DIA_MS)
     : null;
+
+  // Inadimplência tem regra própria: vale enquanto a Cakto ainda tenta cobrar.
+  if (status === "atrasado") {
+    const desde = paraData(plano.atualizadoEm);
+    const dentroDaCarencia = !!desde && desde.getTime() + carencia * DIA_MS > agora.getTime();
+    return {
+      liberado: dentroDaCarencia,
+      status,
+      motivo: dentroDaCarencia ? null : "inadimplente",
+      diasRestantes,
+    };
+  }
 
   if (!STATUS_LIBERADOS.includes(status)) {
     return { liberado: false, status, motivo: motivoDoStatus(status), diasRestantes };
@@ -108,14 +151,12 @@ export function avaliarPlano(
 function motivoDoStatus(status: StatusPlano): MotivoBloqueio {
   if (status === "sem_assinatura") return "sem_assinatura";
   if (status === "atrasado") return "inadimplente";
+  if (status === "pausado") return "pausado";
   return "encerrado";
 }
 
 /** Atalho para quando só interessa o sim ou não. */
-export function planoLiberado(
-  plano: EstadoPlano,
-  opcoes: { agora?: Date; toleranciaDias?: number } = {},
-): boolean {
+export function planoLiberado(plano: EstadoPlano, opcoes: OpcoesAvaliacao = {}): boolean {
   return avaliarPlano(plano, opcoes).liberado;
 }
 
@@ -124,6 +165,7 @@ export const ROTULO_STATUS: Record<StatusPlano, string> = {
   trial: "Em teste",
   cortesia: "Cortesia",
   atrasado: "Pagamento atrasado",
+  pausado: "Pausada",
   cancelado: "Cancelado",
   reembolsado: "Reembolsado",
   chargeback: "Chargeback",
@@ -145,7 +187,10 @@ export const MENSAGEM_BLOQUEIO: Record<MotivoBloqueio, string> = {
   sem_assinatura: "Escolha um plano para começar a usar o app.",
   vencido: "Sua assinatura chegou ao fim do período pago. Renove para voltar a usar o app.",
   inadimplente:
-    "O último pagamento não foi aprovado. Atualize a forma de pagamento para recuperar o acesso — " +
+    "O último pagamento não foi aprovado e as novas tentativas também falharam. Atualize a forma " +
+    "de pagamento para recuperar o acesso — seus dados continuam aqui, intactos.",
+  pausado:
+    "Sua assinatura está pausada. Retome-a para voltar a usar o app — " +
     "seus dados continuam aqui, intactos.",
   encerrado:
     "Sua assinatura foi encerrada. Assine novamente para voltar a usar o app — " +

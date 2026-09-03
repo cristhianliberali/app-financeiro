@@ -114,8 +114,20 @@ Duas consequências disso, que também não se negociam:
   `sem_assinatura`, que não libera. Nem liberar nem bloquear por adivinhação.
 
 `contrato.ts` é tolerante de propósito (procura cada campo numa lista de
-caminhos plausíveis) porque documentação de gateway envelhece. A tolerância para
-na conferência do segredo e na decisão de acesso — ali, adivinhar é o erro.
+caminhos plausíveis) porque documentação de gateway envelhece — e aqui não foi
+hipótese: os payloads reais mandam `data` como **lista**, onde a documentação
+descreve um objeto. As fixtures em `test/fixtures/cakto/` são capturas de
+verdade e existem para travar isso.
+
+Delas sai a regra assimétrica que **não se inverte**: só o nome do evento libera
+acesso; o campo `status` do corpo só pode restringir. No `chargeback` real,
+`data[0].status` vale `"paid"` e `subscription.status` vale `"active"` — confiar
+neles daria acesso a quem acabou de contestar a cobrança. E no `purchase_approved`
+real, `subscription.status` vale `"inactive"` numa compra aprovada. Os dois
+campos descrevem o pedido, não a assinatura.
+
+A tolerância para na conferência do segredo e na decisão de acesso — ali,
+adivinhar é o erro.
 
 Esconder botão na tela não é trava: server function é endpoint HTTP. Toda função
 que lê ou escreve dado financeiro ou de tarefa passa por `requirePlano`; ficam

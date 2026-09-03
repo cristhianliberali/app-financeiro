@@ -620,6 +620,18 @@ export function getPlanoToleranciaDias(): number {
 }
 
 /**
+ * Carência da inadimplência, em dias.
+ *
+ * Uma renovação recusada não encerra a assinatura: a Cakto tenta de novo. Os
+ * webhooks reais trazem a política dela no corpo — `max_retries: 3` com
+ * `retry_interval: 1` —, então o padrão aqui é justamente essa janela. Cortar o
+ * acesso na primeira recusa tiraria o app de quem vai pagar no dia seguinte.
+ */
+export function getPlanoDiasCarencia(): number {
+  return readInt("CAKTO_DIAS_CARENCIA", 3);
+}
+
+/**
  * Quem foi convidado para a conta de um assinante entra junto.
  *
  * O plano é por pessoa, mas o dado é da conta: bloquear o cônjuge convidado

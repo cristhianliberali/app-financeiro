@@ -13,6 +13,7 @@ import { avaliarPlano, type AvaliacaoPlano, type OrigemPlano, type StatusPlano }
 
 import { query, queryOne } from "./client.server";
 import {
+  getPlanoDiasCarencia,
   getPlanoToleranciaDias,
   isAcessoHerdadoPorConvite,
   isPlanoObrigatorio,
@@ -84,8 +85,14 @@ export async function lerAcesso(userId: string): Promise<Acesso> {
   }
 
   const avaliacao = avaliarPlano(
-    { status: row.status_plano, expiraEm: row.plano_expira_em, codigoOferta: row.codigo_oferta },
-    { toleranciaDias: getPlanoToleranciaDias() },
+    {
+      status: row.status_plano,
+      expiraEm: row.plano_expira_em,
+      // Base da carência de `atrasado`: quando a recusa chegou.
+      atualizadoEm: row.plano_atualizado_em,
+      codigoOferta: row.codigo_oferta,
+    },
+    { toleranciaDias: getPlanoToleranciaDias(), diasCarencia: getPlanoDiasCarencia() },
   );
 
   const base = {
@@ -117,8 +124,12 @@ export async function lerAcesso(userId: string): Promise<Acesso> {
  *
  * A avaliação do dono é refeita em SQL em vez de reusar `avaliarPlano` porque
  * são N donos possíveis: trazer todos para o Node só para descartá-los seria
- * uma consulta por membro. Os status liberados e a tolerância são os mesmos —
- * o teste em test/plano.test.ts trava os dois lados no mesmo vocabulário.
+ * uma consulta por membro.
+ *
+ * A regra aqui é de propósito mais estrita que a de `avaliarPlano`: herda-se de
+ * quem está sólido (`ativo`, `trial`, `cortesia`), nunca de quem está só dentro
+ * de uma janela de carência. Esticar a carência de um titular inadimplente para
+ * a família inteira multiplicaria por N o acesso que ninguém pagou.
  */
 async function herdaDeAlgumaConta(userId: string): Promise<boolean> {
   const row = await queryOne<{ existe: boolean }>(

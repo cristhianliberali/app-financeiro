@@ -42,7 +42,8 @@ Disso saem três consequências que valem mais do que qualquer detalhe de campo:
 | `ativo` | sim | compra aprovada, assinatura criada ou renovada |
 | `trial` | sim | período de teste da oferta |
 | `cortesia` | sim | liberado na mão por um super admin |
-| `atrasado` | não | pagamento recusado (a Cakto ainda vai tentar de novo) |
+| `atrasado` | **por 3 dias** | renovação recusada — a Cakto ainda tenta de novo |
+| `pausado` | não | assinatura pausada (`subscription_paused`) |
 | `cancelado` | não | assinatura encerrada |
 | `reembolsado` | não | compra devolvida |
 | `chargeback` | não | contestada no cartão |
@@ -51,6 +52,14 @@ Disso saem três consequências que valem mais do que qualquer detalhe de campo:
 Além do status, `plano_expira_em` encurta o acesso: passado o prazo (mais
 `CAKTO_TOLERANCIA_DIAS`), bloqueia mesmo com status liberado. O contrário não
 vale — data futura não ressuscita um `cancelado`.
+
+`atrasado` tem regra própria, e é a única exceção ao "status ruim bloqueia na
+hora". Os webhooks reais trazem a política de cobrança da Cakto no próprio
+corpo — `max_retries: 3` com `retry_interval: 1` —, então uma recusa dá início a
+três tentativas em três dias. O acesso sobrevive a essa janela
+(`CAKTO_DIAS_CARENCIA`), contada a partir de quando a recusa chegou. Cortar na
+primeira falha tiraria o app de quem paga no dia seguinte, e geraria justamente
+o suporte que a retentativa existe para evitar.
 
 Quem decide é sempre `avaliarPlano()` em `src/lib/plano.ts`, nunca uma
 comparação de string espalhada pelas telas.
@@ -89,10 +98,12 @@ server function correspondente — a tela esconde, ela não protege.
    e tabelas). Confira com `bun run db:check`.
 
 2. **Configure o segredo.** No painel da Cakto, crie um webhook apontando para
-   `https://SEU-DOMINIO/api/cakto/webhook` e marque os eventos de compra
-   aprovada, compra recusada, reembolso, chargeback, assinatura criada,
-   renovada e cancelada. Copie o segredo para `CAKTO_WEBHOOK_SECRET` no serviço
-   e reinicie o container.
+   `https://SEU-DOMINIO/api/cakto/webhook` e marque todos os eventos. Os oito
+   já observados nesta conta são `purchase_approved`, `subscription_created`,
+   `subscription_renewal_refused`, `subscription_paused`,
+   `subscription_resumed`, `subscription_canceled`, `refund` e `chargeback`.
+   Copie o segredo para `CAKTO_WEBHOOK_SECRET` no serviço e reinicie o
+   container.
 
 3. **Defina o primeiro super admin.** Ponha seu e-mail em `SUPER_ADMIN_EMAILS`
    e abra `/admin`. A conta é marcada no banco no primeiro acesso; dali em
@@ -163,20 +174,74 @@ Quase todo "assinei e não liberou" cai em um destes:
    na tela, acrescente o nome em `EVENTO_PARA_STATUS` (`contrato.ts`) e clique
    em *Reprocessar*.
 
+## O corpo real do webhook
+
+Vale registrar, porque a documentação e a realidade divergem em pontos que
+custam caro. As fixtures em `test/fixtures/cakto/` são capturas de verdade
+desta conta, com a estrutura preservada e só os dados pessoais trocados.
+
+```jsonc
+{
+  "secret": "…",                    // o segredo do painel, no corpo
+  "event": "purchase_approved",
+  "data": [                          // ← LISTA, não objeto
+    {
+      "id": "…uuid…",                // id do pedido: chave de idempotência
+      "refId": "4HSuUHa",
+      "status": "paid",              // ⚠ status do PEDIDO, não da assinatura
+      "customer": { "id": 8239121, "email": "…", "name": "…" },
+      "offer": { "id": "3359jgv", "name": "Teste", "price": 5 },
+      "product": { "type": "subscription", … },
+      "parent_order": "4HSuUHa",     // texto (refId), não objeto
+      "subscription": {
+        "id": "…uuid…",
+        "status": "inactive",        // ⚠ também não é confiável
+        "offer": "3359jgv",          // o código da oferta, em texto
+        "next_payment_date": "2026-10-03T…",
+        "max_retries": 3,
+        "retry_interval": 1,
+        "canceledAt": null
+      }
+    }
+  ]
+}
+```
+
+Três coisas que só apareceram com os payloads reais:
+
+**1. `data` é uma lista.** A documentação descreve um objeto. Ler só o objeto
+fazia todo campo sair nulo, todo webhook virar "sem conta correspondente" e
+nenhuma compra liberar acesso. `corpoDoPedido()` em `contrato.ts` aceita as três
+formas (lista, objeto e campos na raiz).
+
+**2. Os campos `status` mentem — nos dois sentidos.** Em `chargeback`,
+`subscription_paused` e `subscription_renewal_refused`, `data[0].status` vale
+`"paid"` e `subscription.status` vale `"active"`: eles descrevem o pedido que um
+dia foi pago, não o estado atual. Em `purchase_approved`, ao contrário,
+`subscription.status` vale `"inactive"` numa compra aprovada.
+
+Por isso a regra é assimétrica de propósito: **só o nome do evento libera
+acesso**. O `status` cru entra apenas como rede de segurança para eventos
+desconhecidos, e só quando fala de algo inequivocamente ruim (`refunded`,
+`chargeback`, `canceled`, `paused`). Errar restringindo custa um ticket de
+suporte; errar liberando custa o produto.
+
+**3. A Cakto retenta pagamentos recusados.** `max_retries: 3`,
+`retry_interval: 1` — daí a carência de `atrasado`.
+
 ## Sobre a tolerância a variações de formato
 
 `contrato.ts` procura cada dado numa lista de caminhos plausíveis
 (`customer.email`, `customer_email`, `customerEmail`, …) em vez de exigir um
-formato exato. Isso é deliberado: documentação de gateway envelhece, e um campo
-que vira camelCase entre versões não pode virar assinante bloqueado.
+formato exato. O caso de `data` acima é exatamente o motivo: o formato que chega
+não é necessariamente o formato documentado, e descobrir isso em produção não
+pode custar as compras que chegarem nesse meio-tempo.
 
 A tolerância para no que importa: **a conferência do segredo e a decisão de
 acesso não adivinham nada**. Segredo é comparado em tempo constante contra o
 valor configurado, e status desconhecido cai em `sem_assinatura`, que não
 libera.
 
-Os dois mapas (`EVENTO_PARA_STATUS` e `STATUS_CAKTO_PARA_STATUS`) foram escritos
-a partir dos sete eventos documentados pela Cakto e das grafias que o mesmo
-evento costuma assumir. Se a sua conta mandar um nome que não está lá, a tela de
-eventos mostra exatamente o que veio, e acrescentar uma linha ao mapa resolve —
+Se a sua conta mandar um evento que não está no mapa, a tela de eventos mostra
+exatamente o que veio, e acrescentar uma linha em `EVENTO_PARA_STATUS` resolve —
 que é o motivo de o corpo cru ser guardado.

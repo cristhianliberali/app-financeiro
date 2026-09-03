@@ -775,7 +775,9 @@ CREATE TABLE IF NOT EXISTS merchant_labels (
 --   ativo          assinatura paga e em dia
 --   trial          período de teste concedido pela oferta
 --   cortesia       liberado manualmente por um super admin, sem cobrança
---   atrasado       pagamento recusado; a Cakto ainda vai tentar de novo
+--   atrasado       pagamento recusado; a Cakto ainda vai tentar de novo (três
+--                  vezes, uma por dia — o acesso sobrevive a essa janela)
+--   pausado        assinatura pausada (evento `subscription_paused`)
 --   cancelado      assinatura encerrada
 --   reembolsado    compra devolvida
 --   chargeback     contestada no cartão
@@ -803,27 +805,22 @@ ALTER TABLE app_users ADD COLUMN IF NOT EXISTS cakto_customer_id text;
 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS cakto_subscription_id text;
 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_super_admin boolean NOT NULL DEFAULT false;
 
-DO $plano$
-BEGIN
-  ALTER TABLE app_users ADD CONSTRAINT app_users_status_plano_check CHECK (
-    status_plano IN (
-      'ativo','trial','cortesia','atrasado','cancelado','reembolsado','chargeback','sem_assinatura'
-    )
-  );
-EXCEPTION WHEN duplicate_object THEN
-  NULL;
-END;
-$plano$;
+-- DROP antes do ADD, e não um bloco que engole "constraint já existe": o
+-- vocabulário cresce (`pausado` entrou depois que os webhooks reais mostraram
+-- o evento `subscription_paused`), e engolir o erro deixaria o banco preso na
+-- lista antiga, recusando um status que o código já sabe gravar.
+ALTER TABLE app_users DROP CONSTRAINT IF EXISTS app_users_status_plano_check;
+ALTER TABLE app_users ADD CONSTRAINT app_users_status_plano_check CHECK (
+  status_plano IN (
+    'ativo','trial','cortesia','atrasado','pausado','cancelado','reembolsado',
+    'chargeback','sem_assinatura'
+  )
+);
 
-DO $origem$
-BEGIN
-  ALTER TABLE app_users ADD CONSTRAINT app_users_plano_origem_check CHECK (
-    plano_origem IS NULL OR plano_origem IN ('cakto','admin','cadastro')
-  );
-EXCEPTION WHEN duplicate_object THEN
-  NULL;
-END;
-$origem$;
+ALTER TABLE app_users DROP CONSTRAINT IF EXISTS app_users_plano_origem_check;
+ALTER TABLE app_users ADD CONSTRAINT app_users_plano_origem_check CHECK (
+  plano_origem IS NULL OR plano_origem IN ('cakto','admin','cadastro')
+);
 
 CREATE INDEX IF NOT EXISTS app_users_status_plano_idx ON app_users(status_plano);
 CREATE INDEX IF NOT EXISTS app_users_cakto_subscription_idx ON app_users(cakto_subscription_id)

@@ -34,6 +34,7 @@ const TOM_STATUS: Record<StatusPlano, string> = {
   trial: "border-info/30 bg-info-soft text-info-soft-foreground",
   cortesia: "border-primary/30 bg-primary-soft text-primary-soft-foreground",
   atrasado: "border-warning/35 bg-warning-soft text-warning-soft-foreground",
+  pausado: "border-warning/35 bg-warning-soft text-warning-soft-foreground",
   cancelado: "border-border bg-muted text-muted-foreground",
   reembolsado: "border-border bg-muted text-muted-foreground",
   chargeback: "border-destructive/30 bg-destructive/10 text-destructive",

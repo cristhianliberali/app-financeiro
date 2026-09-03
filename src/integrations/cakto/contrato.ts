@@ -52,71 +52,71 @@ export type EventoCakto = {
  * olhar — nunca chutado.
  */
 const EVENTO_PARA_STATUS: Record<string, StatusPlano> = {
-  // Compra aprovada / assinatura ativa
+  // Confirmados em payloads reais desta conta:
   purchase_approved: "ativo",
-  purchase_approved_recurring: "ativo",
-  compra_aprovada: "ativo",
   subscription_created: "ativo",
+  subscription_resumed: "ativo",
+  subscription_canceled: "cancelado",
+  subscription_paused: "pausado",
+  subscription_renewal_refused: "atrasado",
+  refund: "reembolsado",
+  chargeback: "chargeback",
+
+  // Documentados mas ainda não vistos aqui, e variações de grafia do mesmo
+  // evento. Não custam nada e evitam que uma renomeação do lado da Cakto vire
+  // assinante bloqueado.
   subscription_renewed: "ativo",
   subscription_renewal: "ativo",
   subscription_reactivated: "ativo",
+  purchase_approved_recurring: "ativo",
+  compra_aprovada: "ativo",
   assinatura_criada: "ativo",
   assinatura_renovada: "ativo",
-
-  // Período de teste
   subscription_trial: "trial",
   trial_started: "trial",
-
-  // Pagamento que não entrou
   purchase_refused: "atrasado",
   purchase_declined: "atrasado",
   compra_recusada: "atrasado",
   payment_failed: "atrasado",
   subscription_payment_failed: "atrasado",
   subscription_late: "atrasado",
-
-  // Fim da relação
-  subscription_canceled: "cancelado",
   subscription_cancelled: "cancelado",
   subscription_expired: "cancelado",
   assinatura_cancelada: "cancelado",
-  refund: "reembolsado",
   refunded: "reembolsado",
   purchase_refunded: "reembolsado",
   reembolso: "reembolsado",
-  chargeback: "chargeback",
   purchase_chargeback: "chargeback",
 };
 
 /**
- * Rede de segurança: o campo `status` do próprio pedido.
+ * Rede de segurança para evento desconhecido — e só para **restringir**.
  *
- * Vale quando o nome do evento é desconhecido — um evento novo que a Cakto
- * passe a mandar tende a trazer um `status` que já conhecemos, e é melhor
- * acertar por aí do que ignorar a mudança e deixar alguém pagando sem acesso.
+ * A tentação seria ler o campo `status` do pedido e confiar nele. Os payloads
+ * reais mostram por que isso seria um furo grave: no `chargeback` e no
+ * `subscription_renewal_refused` desta conta, `data[0].status` vale `"paid"` e
+ * `subscription.status` vale `"active"` — os dois descrevem o *pedido que um
+ * dia foi pago*, não o estado atual da assinatura. Um mapa permissivo daria
+ * acesso a quem acabou de dar chargeback.
+ *
+ * (No sentido contrário o campo é igualmente traiçoeiro: no `purchase_approved`
+ * real, `subscription.status` vale `"inactive"` numa compra aprovada.)
+ *
+ * Então a regra é assimétrica, de propósito: **o nome do evento é a única coisa
+ * que libera acesso**. O status cru só serve para tirá-lo, quando fala de algo
+ * inequivocamente ruim. Errar restringindo custa um ticket de suporte; errar
+ * liberando custa o produto.
  */
-const STATUS_CAKTO_PARA_STATUS: Record<string, StatusPlano> = {
-  paid: "ativo",
-  approved: "ativo",
-  active: "ativo",
-  aprovado: "ativo",
-  pago: "ativo",
-  trialing: "trial",
-  trial: "trial",
-  refused: "atrasado",
-  declined: "atrasado",
-  failed: "atrasado",
-  overdue: "atrasado",
-  late: "atrasado",
-  recusado: "atrasado",
-  waiting_payment: "atrasado",
-  canceled: "cancelado",
-  cancelled: "cancelado",
-  expired: "cancelado",
-  cancelado: "cancelado",
+const STATUS_CAKTO_RESTRITIVO: Record<string, StatusPlano> = {
   refunded: "reembolsado",
   reembolsado: "reembolsado",
   chargeback: "chargeback",
+  canceled: "cancelado",
+  cancelled: "cancelado",
+  cancelado: "cancelado",
+  expired: "cancelado",
+  paused: "pausado",
+  pausada: "pausado",
 };
 
 /** Eventos que reconhecemos e que, de propósito, não mexem no acesso. */
@@ -182,6 +182,30 @@ function data(raiz: unknown, ...caminhos: string[]): Date | null {
 }
 
 /**
+ * Acha o objeto do pedido dentro do corpo.
+ *
+ * Na Cakto real, `data` é uma **lista** — sempre com um item, mas lista:
+ *
+ *     { "secret": "…", "event": "purchase_approved", "data": [ { … } ] }
+ *
+ * A documentação descreve `data` como objeto, e ler só o objeto foi o bug que
+ * os payloads reais revelaram: todo campo saía nulo, todo webhook virava
+ * "sem conta correspondente" e nenhuma compra liberava acesso. As três formas
+ * são aceitas agora — lista, objeto e campos na raiz —, porque qual delas chega
+ * é justamente o tipo de detalhe que muda sem aviso.
+ *
+ * Só o primeiro item da lista é lido. Nenhum payload observado traz mais de um,
+ * e um segundo pedido no mesmo evento seria uma mudança de contrato grande o
+ * bastante para merecer uma decisão explícita, não um laço improvisado aqui.
+ */
+function corpoDoPedido(corpo: unknown): unknown {
+  const data = noCaminho(corpo, "data");
+  if (Array.isArray(data)) return isObjeto(data[0]) ? data[0] : corpo;
+  if (isObjeto(data)) return data;
+  return corpo;
+}
+
+/**
  * Traduz o corpo do webhook.
  *
  * Devolve `null` só quando não há nem nome de evento — aí não há o que
@@ -194,9 +218,7 @@ export function interpretarWebhook(corpo: unknown): EventoCakto | null {
   );
   if (!evento) return null;
 
-  // O corpo documentado embrulha tudo em `data`; alguns gateways mandam os
-  // campos na raiz. Procurar nos dois cobre as duas formas sem ramificação.
-  const dados = isObjeto(noCaminho(corpo, "data")) ? noCaminho(corpo, "data") : corpo;
+  const dados = corpoDoPedido(corpo);
 
   const statusCakto = texto(dados, "status", "subscription.status", "order.status");
   const status = resolverStatus(evento, statusCakto);
@@ -212,6 +234,7 @@ export function interpretarWebhook(corpo: unknown): EventoCakto | null {
         "customerEmail",
         "cliente.email",
         "buyer.email",
+        "subscription.customer.email",
         "email",
       ),
     ),
@@ -225,6 +248,8 @@ export function interpretarWebhook(corpo: unknown): EventoCakto | null {
       "oferta.id",
       "subscription.offer.id",
       "subscription.offer_id",
+      // Nos payloads reais `subscription.offer` é o próprio código, em texto.
+      "subscription.offer",
     ),
     nomeOferta: texto(dados, "offer.name", "offer_name", "oferta.nome", "product.name"),
     assinaturaId: texto(
@@ -233,10 +258,6 @@ export function interpretarWebhook(corpo: unknown): EventoCakto | null {
       "subscription_id",
       "subscriptionId",
       "assinatura.id",
-      // Numa assinatura sem objeto próprio, o pedido-pai é o fio que liga as
-      // renovações à compra original.
-      "parent_order.id",
-      "parentOrder.id",
     ),
     clienteId: texto(dados, "customer.id", "customer_id", "customerId", "cliente.id"),
     status,
@@ -263,8 +284,9 @@ function resolverStatus(evento: string, statusCakto: string | null): StatusPlano
   if (porEvento) return porEvento;
   if (EVENTOS_SEM_EFEITO.has(evento)) return null;
 
-  const chave = normalizarNomeEvento(statusCakto);
-  return STATUS_CAKTO_PARA_STATUS[chave] ?? null;
+  // Evento desconhecido: só o que restringe passa. Ver o comentário de
+  // STATUS_CAKTO_RESTRITIVO — o `status` do pedido não prova acesso.
+  return STATUS_CAKTO_RESTRITIVO[normalizarNomeEvento(statusCakto)] ?? null;
 }
 
 function normalizarEmail(valor: string | null): string | null {
