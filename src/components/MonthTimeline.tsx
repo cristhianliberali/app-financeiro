@@ -12,7 +12,7 @@ import {
 import { badgeVariants } from "@/components/ui/badge";
 import { useAppState } from "@/lib/app-state";
 import { useRecurring, useTransactions } from "@/lib/data";
-import { MONTH_METRICS, monthTimeline, type MonthMetric, type MonthPoint } from "@/lib/analytics";
+import { MONTH_METRICS, monthTimeline, type MonthMetric } from "@/lib/analytics";
 import {
   brl,
   monthChipLabel,
@@ -117,13 +117,19 @@ function trendOf(value: number, previous: number, metric: MonthMetric) {
  * quando se quer percorrer o ano inteiro. Um arrasto não vira clique: o cartão
  * onde o botão foi solto só troca o período se o ponteiro não tiver andado.
  */
-export function MonthTimeline({
-  metric,
-  onMetricChange,
-}: {
-  metric: MonthMetric;
-  onMetricChange: (metric: MonthMetric) => void;
-}) {
+/**
+ * A faixa mostra sempre o saldo previsto.
+ *
+ * Havia seis abas para trocar a métrica — despesas, receitas, fixas de cada
+ * lado. Na prática só a primeira era usada: as outras cinco repetem, num
+ * formato pior, o que os cartões logo abaixo já dizem do mês em foco, e cada
+ * uma delas exigia ler o rótulo para saber o que os números na tela
+ * significavam. Com uma métrica só, a faixa responde sempre à mesma pergunta —
+ * "como está cada mês?" — e não precisa se explicar.
+ */
+const METRIC: MonthMetric = "balance";
+
+export function MonthTimeline() {
   const { profileId, from, to, dateBasis, setRange } = useAppState();
   const strip = useRef<HTMLDivElement>(null);
 
@@ -164,8 +170,8 @@ export function MonthTimeline({
   const { data: rules = [] } = useRecurring(profileId);
 
   const points = useMemo(
-    () => monthTimeline(months, txs, rules, dateBasis, metric),
-    [months, txs, rules, dateBasis, metric],
+    () => monthTimeline(months, txs, rules, dateBasis, METRIC),
+    [months, txs, rules, dateBasis],
   );
 
   /** O mês em foco é o do período atual — desde que o período seja mensal. */
@@ -286,15 +292,7 @@ export function MonthTimeline({
     drag.current.active = false;
   }
 
-  const active = MONTH_METRICS.find((m) => m.value === metric) ?? MONTH_METRICS[0]!;
-  const both = metric === "income_expense";
-
-  /** A cor do número em destaque segue o que a métrica mede. */
-  function figureTone(point: MonthPoint) {
-    if (metric === "expense" || metric === "fixed_expense") return "text-negative";
-    if (metric === "income" || metric === "fixed_income") return "text-positive";
-    return point.value < 0 ? "text-negative" : "text-positive";
-  }
+  const active = MONTH_METRICS.find((m) => m.value === METRIC) ?? MONTH_METRICS[0]!;
 
   return (
     <div className="panel p-4">
@@ -324,22 +322,6 @@ export function MonthTimeline({
         </div>
       </div>
 
-      <div className="mb-1 flex flex-wrap gap-0.5 rounded-xl border border-border bg-secondary p-1">
-        {MONTH_METRICS.map((option) => (
-          <button
-            key={option.value}
-            onClick={() => onMetricChange(option.value)}
-            aria-pressed={option.value === metric}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-              option.value === metric
-                ? "bg-card text-foreground shadow-xs ring-1 ring-border"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
       <p className="mb-2 px-1 text-xs text-muted-foreground">
         {active.label} de cada mês, no perfil e nos filtros atuais.
       </p>
@@ -359,7 +341,7 @@ export function MonthTimeline({
           const state: MonthState =
             point.key < thisMonth ? "closed" : point.key === thisMonth ? "current" : "forecast";
           const badge = MONTH_STATE[state];
-          const trend = trendOf(point.value, previous.value, metric);
+          const trend = trendOf(point.value, previous.value, METRIC);
           const flow = point.income + point.expense;
 
           return (
@@ -406,28 +388,19 @@ export function MonthTimeline({
                 </span>
               </span>
 
-              {both ? (
-                <span className="flex flex-col gap-0.5">
-                  <span className="font-mono text-base font-bold text-positive">
-                    {brl(point.income)}
-                  </span>
-                  <span className="font-mono text-base font-bold text-negative">
-                    {brl(point.expense)}
-                  </span>
+              <span className="flex flex-col gap-1.5">
+                <span
+                  className={`font-mono text-xl font-bold tracking-tight ${
+                    point.value < 0 ? "text-negative" : "text-positive"
+                  }`}
+                >
+                  {brl(point.value)}
                 </span>
-              ) : (
-                <span className="flex flex-col gap-1.5">
-                  <span
-                    className={`font-mono text-xl font-bold tracking-tight ${figureTone(point)}`}
-                  >
-                    {brl(point.value)}
-                  </span>
-                  <span className="flex items-center justify-between gap-2 font-mono text-[11px] font-semibold">
-                    <span className="text-positive">+{brl(point.income)}</span>
-                    <span className="text-negative">-{brl(point.expense)}</span>
-                  </span>
+                <span className="flex items-center justify-between gap-2 font-mono text-[11px] font-semibold">
+                  <span className="text-positive">+{brl(point.income)}</span>
+                  <span className="text-negative">-{brl(point.expense)}</span>
                 </span>
-              )}
+              </span>
 
               {/* A barra é a proporção entre o que entrou e o que saiu no mês:
                   dois números viram uma imagem que se lê sem contar zeros. */}

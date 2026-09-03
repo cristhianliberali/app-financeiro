@@ -39,7 +39,6 @@ import {
   categoryBudgets,
   monthlySeries,
   settlement,
-  type MonthMetric,
 } from "@/lib/analytics";
 import { MonthTimeline } from "@/components/MonthTimeline";
 import { brl, brlCompact, formatDateBR, monthLabel } from "@/lib/format";
@@ -163,7 +162,6 @@ function Dashboard() {
   const { profileId, from, to, dateBasis } = useAppState();
   const [dialog, setDialog] = useState<null | "income" | "expense">(null);
   const [recurringOpen, setRecurringOpen] = useState(false);
-  const [metric, setMetric] = useState<MonthMetric>("balance");
 
   const { data: txs = [] } = useTransactions({ profileId, from, to, basis: dateBasis });
   const { data: yearTxs = [] } = useTransactions({
@@ -216,7 +214,7 @@ function Dashboard() {
     >
       <h1 className="sr-only">Dashboard financeiro</h1>
 
-      <MonthTimeline metric={metric} onMetricChange={setMetric} />
+      <MonthTimeline />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <SettlementCard
