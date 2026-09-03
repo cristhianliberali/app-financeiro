@@ -264,7 +264,7 @@ export function TasksShell({
         })}
       </nav>
 
-      <div className="flex-1 overflow-y-auto px-2 py-3">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3">
         {collapsed ? (
           <div className="space-y-1">
             {activeSpaces.map((space) => (
@@ -539,7 +539,17 @@ export function TasksShell({
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto">
+        {/*
+          `overflow-x-hidden` não é decoração: sem ele, este contêiner rola
+          para o lado também. O CSS diz que, quando um eixo deixa de ser
+          `visible`, o outro vira `auto` junto — então "rola para baixo" virou
+          "rola para todo lado", e como o Kanban lá dentro tem a própria
+          rolagem horizontal, dava para arrastar as duas. No celular o quadro
+          inteiro deslizava, levando junto a busca e as abas, que deviam ficar
+          paradas. Quem precisa de largura extra aqui dentro traz o próprio
+          scroller.
+        */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {/*
             Ritmo mais apertado que o do Finanças: as telas daqui terminam num
             Kanban ou num calendário que ocupam o resto da janela, e cada folga

@@ -167,7 +167,19 @@ function BoardPage() {
           </p>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {/*
+          Sem `shrink-0`: era ele o começo do estrago. Ele mandava este grupo
+          nunca encolher, e no celular a busca mais os três filtros mais as
+          abas dão 847px numa tela de 390 — 473px vazando para fora. O
+          contêiner da casca então rolava para o lado junto com o Kanban, que
+          já tem a própria rolagem, e o quadro inteiro deslizava levando a
+          busca e as abas consigo.
+
+          Deixando encolher (`min-w-0`), o `flex-wrap` faz o que sempre soube
+          fazer: os filtros descem de linha e cabem. A largura extra fica só
+          com o Kanban, que é quem tem scroller para ela.
+        */}
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           {view !== "list" && (
             <TaskFilterBar
               value={filters}
