@@ -169,6 +169,75 @@ export function isAiConfigured(): boolean {
 }
 
 /**
+ * Configuração do chat de IA (`/transacoes`, `/` — o botão "Assistente").
+ *
+ * É separada da importação de propósito. São dois trabalhos diferentes: a
+ * importação lê um documento inteiro e paga por isso; o chat interpreta uma
+ * frase curta e precisa responder na hora. Separar deixa cada um no provedor e
+ * no modelo que lhe serve — hoje o chat usa a Groq, que tem cota gratuita e é
+ * rápida o bastante para uma conversa.
+ *
+ * A API da Groq fala o mesmo dialeto da OpenAI (`/chat/completions`), então
+ * `GROQ_BASE_URL` também serve para apontar o chat a qualquer outro serviço
+ * compatível sem tocar em código.
+ */
+export type ChatSettings = {
+  provider: "groq";
+  model: string;
+  apiKey: string;
+  baseUrl: string;
+  /** Quantas mensagens anteriores acompanham a pergunta atual. */
+  historyLimit: number;
+  /** Teto de tokens da resposta. O contrato é curto; isto é só uma trava. */
+  maxTokens: number;
+};
+
+const CHAT_PROVIDERS = ["groq"] as const;
+
+/** Modelo gratuito da Groq que dá conta do contrato; trocável por MODELO_IA_CHAT. */
+const DEFAULT_CHAT_MODEL = "llama-3.3-70b-versatile";
+const DEFAULT_GROQ_BASE_URL = "https://api.groq.com/openai/v1";
+
+export function getChatSettings(): ChatSettings {
+  const provider = (readEnv("PROVEDOR_IA_CHAT") ?? "groq").toLowerCase();
+  if (!(CHAT_PROVIDERS as readonly string[]).includes(provider)) {
+    throw new Error(
+      `PROVEDOR_IA_CHAT "${provider}" não é suportado. ` +
+        `Provedores disponíveis: ${CHAT_PROVIDERS.join(", ")}.`,
+    );
+  }
+
+  const apiKey = readEnv("GROQ_API_KEY");
+  if (!apiKey) {
+    throw new Error(
+      "Chat de IA não configurado. Defina GROQ_API_KEY no serviço — veja .env.example. " +
+        "A chave é criada em console.groq.com/keys e tem cota gratuita.",
+    );
+  }
+
+  const baseUrl = (readEnv("GROQ_BASE_URL") ?? DEFAULT_GROQ_BASE_URL).replace(/\/+$/, "");
+
+  return {
+    provider: provider as "groq",
+    model: readEnv("MODELO_IA_CHAT") ?? DEFAULT_CHAT_MODEL,
+    apiKey,
+    baseUrl,
+    historyLimit: readInt("CHAT_IA_HISTORICO", 6),
+    maxTokens: readInt("CHAT_IA_MAX_TOKENS", 800),
+  };
+}
+
+/** A tela usa isto para esconder o chat quando não há chave configurada. */
+export function isChatConfigured(): boolean {
+  try {
+    getChatSettings();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Logs das requisições de IA.
  *
  * Ficam ligados por padrão: sem eles não há como conferir o que foi enviado ao

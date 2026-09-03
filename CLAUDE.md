@@ -49,3 +49,27 @@ caminho principal, reabra a decisão: aí a conta muda.
 é a importação em produção hoje, em que o modelo **transcreve** os lançamentos e
 o servidor confere depois. O pipeline novo convive com ele em
 `src/integrations/ai/pipeline/` e não altera nenhum desses arquivos.
+
+## Chat de IA (assistente do Finanças)
+
+Vive em `src/integrations/ai/chat/` + `src/lib/chat-contract.ts`, e é
+independente dos dois pipelines de importação acima.
+
+Regra arquitetural inviolável, irmã da do pipeline de extração: **o LLM devolve
+intenção, nunca resultado**. Ele diz "consultar gastos de Alimentação no mês
+passado"; o número vem de um `SUM` no Postgres, a data vem de
+`resolvePeriodo`/`resolveData`, a frase vem de `resumoConsulta`, e a categoria
+vem de `casarCategoria` contra as categorias reais do perfil.
+
+A IA não escreve no banco. Não existe caminho da resposta do modelo até um
+`INSERT`: um registro vira rascunho, a tela mostra para revisão, e o botão
+Confirmar chama o mesmo `upsertRows` do formulário manual.
+
+Se uma decisão de design fizer o chat responder um número que o modelo escreveu,
+ou gravar algo sem passar pela confirmação, essa decisão está errada.
+
+A única transcrição aceita é o valor de um lançamento novo — ele nasce no texto
+que a pessoa escreveu, e a mitigação é o cartão de revisão editável.
+
+Ver `docs/chat-ia.md`. Configuração: `GROQ_API_KEY` e `MODELO_IA_CHAT`
+(`.env.example`, seção *Chat com IA*).

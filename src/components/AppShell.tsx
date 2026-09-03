@@ -20,6 +20,7 @@ import { PeriodBar } from "@/components/PeriodBar";
 import { ModuleSwitcher } from "@/components/ModuleSwitcher";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AiChatLauncher } from "@/components/chat/AiChatSheet";
 import { ActiveTimerBar } from "@/components/tasks/ActiveTimerBar";
 import { NotificationBell } from "@/components/tasks/NotificationBell";
 import {
@@ -260,6 +261,13 @@ export function AppShell({
             </DropdownMenu>
           </div>
           <div className="flex items-center gap-2">
+            {/*
+              O assistente fica no cabeçalho, e não numa tela própria: perguntar
+              quanto se gastou em alimentação faz sentido de dentro do painel,
+              da lista de transações ou das metas — sair da tela para perguntar
+              seria perder justamente o contexto da pergunta.
+            */}
+            <AiChatLauncher />
             <ActiveTimerBar />
             {/* Os lembretes de tarefa também alcançam quem está no Finanças. */}
             <NotificationBell />
