@@ -41,6 +41,7 @@ import {
   settlement,
 } from "@/lib/analytics";
 import { MonthTimeline } from "@/components/MonthTimeline";
+import { CategoryPie } from "@/components/CategoryPie";
 import { brl, brlCompact, formatDateBR, monthLabel } from "@/lib/format";
 import { DEFAULT_CATEGORY_ICON, IconBadge } from "@/lib/icons";
 import { StatusPill } from "@/components/ui/status";
@@ -310,7 +311,20 @@ function Dashboard() {
         </Panel>
 
         <Panel title="Teto por categoria" subtitle="Orçamento proporcional aos dias selecionados">
-          <div className="space-y-6">
+          {/*
+            Teto de altura só no desktop.
+            Cada categoria com teto acrescenta uns 88px à lista, e como o cartão
+            vizinho usa `h-full` para acompanhar o mais alto da fileira, uma
+            conta com quinze categorias esticava a fileira inteira: o gráfico de
+            evolução virava uma faixa de dois metros ao lado de uma lista sem
+            fim. Com o teto, a fileira volta a ter tamanho de fileira e a lista
+            rola por dentro.
+
+            No celular não: ali os cartões são um embaixo do outro, nada estica
+            nada, e uma caixa que rola dentro de uma página que rola é o pior
+            gesto que existe num telefone.
+          */}
+          <div className="space-y-6 lg:max-h-[26rem] lg:overflow-y-auto lg:overflow-x-hidden lg:pr-2">
             {budgets.length === 0 && (
               <p className="text-sm text-muted-foreground">
                 Defina tetos em Categorias para acompanhar o orçamento.
@@ -574,39 +588,5 @@ function Dashboard() {
       />
       <RecurringDialog open={recurringOpen} onOpenChange={setRecurringOpen} />
     </AppShell>
-  );
-}
-
-function CategoryPie({
-  data,
-}: {
-  data: Array<{ id: string; name: string; color: string; value: number }>;
-}) {
-  if (data.length === 0) {
-    return <p className="text-sm text-muted-foreground">Sem dados no período.</p>;
-  }
-  return (
-    <div className="h-56">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            dataKey="value"
-            nameKey="name"
-            innerRadius={48}
-            outerRadius={78}
-            paddingAngle={2}
-            stroke="var(--color-card)"
-            strokeWidth={2}
-          >
-            {data.map((d) => (
-              <Cell key={d.id} fill={d.color} />
-            ))}
-          </Pie>
-          <Tooltip formatter={(v: number) => brl(v)} contentStyle={TOOLTIP_STYLE} />
-          <Legend wrapperStyle={{ fontSize: 10 }} />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
   );
 }
