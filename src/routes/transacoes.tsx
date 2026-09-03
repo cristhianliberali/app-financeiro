@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   ArrowDownLeft,
+  ArrowDownRight,
   ArrowUpRight,
   Check,
   CheckCheck,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
+import { CategorySelect } from "@/components/CategorySelect";
 import { DEFAULT_CATEGORY_ICON, IconBadge } from "@/lib/icons";
 import { StatusPill } from "@/components/ui/status";
 import { PaginationBar, usePagination } from "@/components/PaginationBar";
@@ -68,11 +70,18 @@ const SELECT_CLASS =
   "h-11 rounded-xl border border-input bg-card px-3 text-sm font-medium shadow-xs outline-none " +
   "transition-colors hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-ring/25";
 
-/** Os três recortes por natureza do lançamento. */
+/**
+ * Os três recortes por natureza do lançamento.
+ *
+ * Botões lado a lado, e não uma lista suspensa: são três opções fixas, o que
+ * está escolhido fica à vista sem abrir nada, e trocar custa um clique em vez
+ * de dois. O "Só" saiu dos rótulos — ao lado de "Tudo", "Entradas" já quer
+ * dizer só entradas, e a seta diz para que lado o dinheiro anda.
+ */
 const KIND_FILTERS = [
-  { value: "", label: "Entradas e saídas" },
-  { value: "income", label: "Só entradas" },
-  { value: "expense", label: "Só saídas" },
+  { value: "", label: "Tudo", icon: null, tone: "text-foreground" },
+  { value: "income", label: "Entradas", icon: ArrowUpRight, tone: "text-positive" },
+  { value: "expense", label: "Saídas", icon: ArrowDownRight, tone: "text-negative" },
 ] as const;
 
 type KindFilter = (typeof KIND_FILTERS)[number]["value"];
@@ -303,45 +312,47 @@ function TransactionsPage() {
           Entrada ou saída, antes da categoria: é o corte mais grosso e o mais
           usado — "quanto saiu neste mês" não pede categoria nenhuma.
         */}
-        <select
-          value={kindFilter}
-          onChange={(e) => {
-            const next = e.target.value as KindFilter;
-            setKindFilter(next);
-            // Categoria pertence a um tipo só. Manter uma de despesa escolhida
-            // com "só entradas" esvaziaria a lista sem dizer por quê.
-            if (next && categoryFilter && catMap[categoryFilter]?.kind !== next) {
-              setCategoryFilter("");
-            }
-          }}
-          className={`${SELECT_CLASS} md:w-44`}
+        <div
+          role="group"
           aria-label="Filtrar por entrada ou saída"
+          className="flex h-11 shrink-0 items-center gap-0.5 rounded-xl border border-input bg-secondary p-1 shadow-xs"
         >
-          {KIND_FILTERS.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-        <select
+          {KIND_FILTERS.map((f) => {
+            const on = f.value === kindFilter;
+            return (
+              <button
+                key={f.value}
+                type="button"
+                aria-pressed={on}
+                onClick={() => {
+                  setKindFilter(f.value);
+                  // Categoria pertence a um tipo só. Manter uma de despesa
+                  // escolhida com "entradas" esvaziaria a lista sem dizer por quê.
+                  if (f.value && categoryFilter && catMap[categoryFilter]?.kind !== f.value) {
+                    setCategoryFilter("");
+                  }
+                }}
+                className={`flex h-full items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all ${
+                  on
+                    ? `bg-card shadow-xs ring-1 ring-border ${f.tone}`
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f.icon && <f.icon className="size-3.5" />}
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+        <CategorySelect
+          className="md:w-56"
+          categories={categories}
           value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className={`${SELECT_CLASS} md:w-56`}
+          onChange={setCategoryFilter}
+          placeholder="Todas as categorias"
+          allowEmpty
           aria-label="Filtrar por categoria"
-        >
-          <option value="">Todas as categorias</option>
-          {/* Arquivadas continuam aqui: elas ainda têm lançamentos para filtrar.
-              Com um tipo escolhido, só as daquele tipo — as outras não teriam o
-              que filtrar. */}
-          {categories
-            .filter((c) => !kindFilter || c.kind === kindFilter)
-            .map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {c.archived_at ? " (arquivada)" : ""}
-              </option>
-            ))}
-        </select>
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

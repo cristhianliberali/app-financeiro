@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { AppShell } from "@/components/AppShell";
+import { CategorySelect } from "@/components/CategorySelect";
 import { TransactionDialog } from "@/components/TransactionDialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -418,19 +419,15 @@ function PendingPage() {
             className="pl-9"
           />
         </div>
-        <select
+        <CategorySelect
+          className="md:w-56"
+          categories={categories}
           value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          className={`${SELECT_CLASS} md:w-56`}
+          onChange={setCategoryId}
+          placeholder="Todas as categorias"
+          allowEmpty
           aria-label="Filtrar por categoria"
-        >
-          <option value="">Todas as categorias</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+        />
         <select
           value={due}
           onChange={(e) => setDue(e.target.value as DueFilter)}
