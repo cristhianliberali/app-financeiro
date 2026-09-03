@@ -184,6 +184,17 @@ export type EventPage = {
   events: CalendarEvent[];
   /** Marcador para a próxima sincronização trazer só o que mudou. */
   nextSyncToken: string | undefined;
+  /** Páginas pedidas ao Google nesta leitura. */
+  pages: number;
+  /**
+   * A leitura parou no teto de segurança antes da última página.
+   *
+   * Quem chamou precisa saber: o Google só manda `nextSyncToken` na última
+   * página, então uma leitura truncada volta sem marcador — e sem marcador a
+   * rodada seguinte relê a janela inteira e nunca alcança o que ficou além do
+   * teto. Era assim que uma agenda cheia parava de sincronizar em silêncio.
+   */
+  truncated: boolean;
 };
 
 /**
@@ -200,6 +211,20 @@ export async function listEvents(
   const events: CalendarEvent[] = [];
   let pageToken: string | undefined;
   let nextSyncToken: string | undefined;
+  let pages = 0;
+
+  /*
+   * O teto é de segurança, não de rotina — e é bem mais alto que
+   * `GOOGLE_MAX_EVENTOS_SYNC`.
+   *
+   * Parar a paginação no meio custa o `nextSyncToken`, e esse é o pior negócio
+   * possível: sem marcador, toda rodada seguinte relê a janela inteira, gasta
+   * mais cota do que o teto economizou e ainda deixa de fora justamente os
+   * eventos que passaram do teto. A leitura completa acontece uma vez (primeira
+   * conexão, ou marcador vencido); pagá-la inteira uma vez é o que torna todas
+   * as outras baratas.
+   */
+  const teto = Math.max(settings.maxEventsPerSync, 5_000);
 
   do {
     const page = (await call(accessToken, `/calendars/${encodeURIComponent(calendarId)}/events`, {
@@ -214,10 +239,11 @@ export async function listEvents(
       },
     })) as { items?: CalendarEvent[]; nextPageToken?: string; nextSyncToken?: string } | null;
 
+    pages += 1;
     events.push(...(page?.items ?? []));
     pageToken = page?.nextPageToken;
     nextSyncToken = page?.nextSyncToken ?? nextSyncToken;
-  } while (pageToken && events.length < settings.maxEventsPerSync);
+  } while (pageToken && events.length < teto);
 
-  return { events, nextSyncToken };
+  return { events, nextSyncToken, pages, truncated: !!pageToken };
 }

@@ -17,7 +17,7 @@
  * onde se descobre depois por que uma data sumiu.
  */
 import { query, queryOne } from "./client.server";
-import { getGoogleSettings } from "./config.server";
+import { getCalendarLogSettings, getGoogleSettings } from "./config.server";
 import { decryptToken, encryptToken } from "../google/crypto.server";
 import { refreshAccessToken, type GoogleTokens } from "../google/oauth.server";
 import {
@@ -305,6 +305,14 @@ export async function syncTaskToCalendar(taskId: string): Promise<TaskSyncResult
       [taskId, owner, created.id, connection.calendar_id],
     );
     await logCalendar(taskId, owner, "calendar_event_created", { event_id: created.id });
+    // A outra ponta do rastro da leitura: é este par que a volta procura, tanto
+    // pelo id do evento quanto pela marca `auraTaskId` gravada dentro dele.
+    if (getCalendarLogSettings().enabled) {
+      console.info(
+        `[agenda] usuário ${owner}: compromisso ${created.id} criado para a tarefa ${taskId} ` +
+          `("${task.title}") em ${input.start} → ${input.end}`,
+      );
+    }
     return { ok: true };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
@@ -480,6 +488,29 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
   /** Tarefas que já têm um compromisso vivo — trava contra adotar uma cópia. */
   const tarefasComVinculo = new Set([...linkByEvent.values()].map((link) => link.taskId));
 
+  /*
+   * O rastro de cada evento, e não só o total da rodada.
+   *
+   * "A agenda não volta para a tarefa" tem meia dúzia de causas que, de fora,
+   * são idênticas — o evento não veio na leitura, veio sem a marca, veio com a
+   * marca mas sem vínculo, veio vinculado mas idêntico à tarefa. Sem registrar
+   * a decisão evento a evento, distinguir uma da outra é palpite.
+   */
+  const log = getCalendarLogSettings();
+  const registrar = (event: CalendarEvent, decisao: string) => {
+    const marca = taskIdOf(event);
+    const link = linkByEvent.get(event.id);
+    if (!log.enabled) return;
+    if (!marca && !link && !log.todosOsEventos) return;
+    console.info(
+      `[agenda] usuário ${userId} evento ${event.id} "${event.summary ?? "(sem título)"}" — ` +
+        `marca=${marca ?? "nenhuma"} vínculo=${link?.taskId ?? "nenhum"} ` +
+        `google=${event.start?.dateTime ?? event.start?.date ?? "—"}→` +
+        `${event.end?.dateTime ?? event.end?.date ?? "—"} ` +
+        `alterado=${event.updated ?? "—"} status=${event.status ?? "—"} :: ${decisao}`,
+    );
+  };
+
   let cleared = 0;
   let updated = 0;
   let adotados = 0;
@@ -490,9 +521,13 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
       // Apagado: vale também o evento que carrega a marca da tarefa sem vínculo
       // no banco — é como uma exclusão feita antes de o vínculo existir chega.
       const taskId = link?.taskId ?? taskIdOf(event);
-      if (!taskId) continue;
+      if (!taskId) {
+        registrar(event, "apagado, mas não é espelho de tarefa nenhuma — ignorado");
+        continue;
+      }
       await clearTaskDates(taskId, userId, event.id);
       cleared += 1;
+      registrar(event, `apagado na agenda — limpou as datas da tarefa ${taskId}`);
       continue;
     }
 
@@ -512,7 +547,14 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
      */
     if (!link) {
       const marcada = taskIdOf(event);
-      if (!marcada || tarefasComVinculo.has(marcada)) continue;
+      if (!marcada) {
+        registrar(event, "sem a marca auraTaskId — não nasceu de uma tarefa, ignorado");
+        continue;
+      }
+      if (tarefasComVinculo.has(marcada)) {
+        registrar(event, `a tarefa ${marcada} já tem outro compromisso vivo — cópia ignorada`);
+        continue;
+      }
 
       await query(
         `INSERT INTO task_calendar_events (task_id, user_id, event_id, calendar_id)
@@ -523,7 +565,13 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
       );
       tarefasComVinculo.add(marcada);
       adotados += 1;
-      if (await applyEventDates(marcada, userId, event)) updated += 1;
+      const gravou = await applyEventDates(marcada, userId, event);
+      if (gravou) updated += 1;
+      registrar(
+        event,
+        `compromisso nosso sem vínculo — readotado para a tarefa ${marcada}` +
+          (gravou ? ", e as datas dela foram atualizadas" : "; as datas já estavam iguais"),
+      );
       continue;
     }
 
@@ -542,10 +590,24 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
      */
     if (!incremental) {
       const modificadoNoGoogle = event.updated ? new Date(event.updated) : null;
-      if (modificadoNoGoogle && modificadoNoGoogle <= link.syncedAt) continue;
+      if (modificadoNoGoogle && modificadoNoGoogle <= link.syncedAt) {
+        registrar(
+          event,
+          `leitura completa e o evento é anterior à nossa última escrita ` +
+            `(${link.syncedAt.toISOString()}) — descartado`,
+        );
+        continue;
+      }
     }
 
-    if (await applyEventDates(link.taskId, userId, event)) updated += 1;
+    const gravou = await applyEventDates(link.taskId, userId, event);
+    if (gravou) updated += 1;
+    registrar(
+      event,
+      gravou
+        ? `datas da tarefa ${link.taskId} atualizadas a partir do compromisso`
+        : `nada a gravar: o compromisso já bate com a tarefa ${link.taskId}`,
+    );
   }
 
   /*
@@ -555,10 +617,29 @@ export async function pullCalendarChanges(userId: string): Promise<SyncResult> {
    * conferiu e quantos deles o app reconhece como espelho de uma tarefa.
    */
   console.info(
-    `[agenda] usuário ${userId}: leitura ${incremental ? "incremental" : "completa"} — ` +
-      `${page.events.length} evento(s) lido(s), ${linkByEvent.size} vinculado(s) a tarefas, ` +
-      `${adotados} readotado(s), ${updated} data(s) atualizada(s), ${cleared} limpa(s)`,
+    `[agenda] usuário ${userId}: leitura ${incremental ? "incremental" : "completa"} em ` +
+      `${page.pages} página(s) — ${page.events.length} evento(s) lido(s), ` +
+      `${linkByEvent.size} vinculado(s) a tarefas, ${adotados} readotado(s), ` +
+      `${updated} data(s) atualizada(s), ${cleared} limpa(s), ` +
+      `marcador ${page.nextSyncToken ? "renovado" : "não veio"}`,
   );
+
+  /*
+   * Leitura truncada é falha, e precisa gritar.
+   *
+   * O `nextSyncToken` só vem na última página. Parar antes dela deixa a conta
+   * sem marcador, e sem marcador a rodada seguinte relê a janela inteira e
+   * volta a parar no mesmo ponto — os eventos além do teto nunca são lidos, e
+   * a agenda simplesmente não volta para as tarefas, sem nenhum erro no
+   * caminho. É o tipo de defeito que só aparece em agenda cheia.
+   */
+  if (page.truncated) {
+    const aviso =
+      `leitura truncada no teto de segurança depois de ${page.events.length} evento(s): ` +
+      `a conta ficou sem marcador incremental e a próxima rodada vai reler tudo de novo`;
+    console.error(`[agenda] usuário ${userId}: ${aviso}`);
+    await markError(userId, aviso);
+  }
 
   // O erro registrado pela escrita não é apagado aqui: ler a agenda com
   // sucesso não desfaz um evento que o Google recusou a criar. Quem limpa é a
@@ -751,6 +832,12 @@ export type CalendarDiagnostic = {
   /** As últimas tarefas que o Google recusou, com o motivo. */
   recusadas: Array<{ titulo: string; quando: string; motivo: string }>;
   eventosLidos: number;
+  /**
+   * A leitura parou no teto sem chegar à última página. Quando isto é verdade,
+   * a conta não consegue guardar o marcador incremental e a sincronização
+   * nunca alcança os eventos que ficaram além do teto.
+   */
+  leituraTruncada: boolean;
   /** Dos lidos, quantos carregam a marca que só o app escreve. */
   comMarcaDeTarefa: number;
   /** Dos com marca, quantos o banco reconhece pelo id do evento. */
@@ -780,6 +867,7 @@ export async function diagnoseCalendar(userId: string): Promise<CalendarDiagnost
     pendentesDeEnvio: 0,
     recusadas: [],
     eventosLidos: 0,
+    leituraTruncada: false,
     comMarcaDeTarefa: 0,
     comVinculo: 0,
     amostra: [],
@@ -844,6 +932,7 @@ export async function diagnoseCalendar(userId: string): Promise<CalendarDiagnost
   }
 
   base.eventosLidos = page.events.length;
+  base.leituraTruncada = page.truncated;
 
   for (const event of page.events) {
     if (event.status === "cancelled") continue;

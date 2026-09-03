@@ -27,6 +27,15 @@ let lastListQuery: URLSearchParams | undefined;
 let criarEvento: (corpo: { summary?: string }) => Response = (corpo) =>
   Response.json({ id: `evento-${corpo.summary}` });
 
+/**
+ * Páginas extras que a listagem devolve antes da última.
+ *
+ * O Google só manda `nextSyncToken` na última página — é isto que permite
+ * provar que uma agenda paginada não perde o marcador pelo caminho.
+ */
+let paginasExtras = 0;
+let paginasPedidas = 0;
+
 const google = Bun.serve({
   port: 0,
   async fetch(request) {
@@ -36,6 +45,11 @@ const google = Bun.serve({
         return criarEvento((await request.json()) as { summary?: string });
       }
       lastListQuery = url.searchParams;
+      paginasPedidas += 1;
+      if (paginasPedidas <= paginasExtras) {
+        // Página intermediária: tem continuação e não tem marcador.
+        return Response.json({ items: googleEvents, nextPageToken: `pagina-${paginasPedidas}` });
+      }
       return Response.json({ items: googleEvents, nextSyncToken });
     }
     return new Response("not found", { status: 404 });
@@ -151,8 +165,14 @@ function cenario({ comToken }: { comToken: boolean }) {
   googleEvents = [];
   fila = [];
   lastListQuery = undefined;
+  paginasExtras = 0;
+  paginasPedidas = 0;
   criarEvento = (corpo) => Response.json({ id: `evento-${corpo.summary}` });
 }
+
+/** O que foi gravado em `google_accounts.sync_token` na última rodada. */
+const marcadorGravado = () =>
+  written.find((w) => w.sql.includes("SET sync_token"))?.params[1] ?? null;
 
 const datasGravadas = () => written.find((w) => w.sql.includes("UPDATE tasks SET start_date"));
 
@@ -236,6 +256,28 @@ describe("pullCalendarChanges", () => {
     const update = datasGravadas();
     expect(update).toBeDefined();
     expect(update!.params[2]).toEqual(new Date("2026-09-11T16:00:00"));
+  });
+
+  test("agenda paginada não perde o marcador incremental", async () => {
+    cenario({ comToken: false });
+    // Primeira leitura de uma agenda cheia: três páginas até a última, que é a
+    // única que traz `nextSyncToken`. O teto de eventos por rodada é atingido
+    // logo na primeira — e era aí que a leitura parava, deixando a conta sem
+    // marcador. Sem marcador, toda rodada relia tudo de novo e nunca alcançava
+    // os eventos além do teto: a agenda simplesmente não voltava para as
+    // tarefas, sem um único erro no caminho.
+    process.env["GOOGLE_MAX_EVENTOS_SYNC"] = "1";
+    paginasExtras = 2;
+    googleEvents = [evento("2026-09-11T16:00:00", "2026-09-11T17:00:00", "2026-09-10T09:00:00")];
+
+    try {
+      await googleServer.pullCalendarChanges(USER);
+    } finally {
+      delete process.env["GOOGLE_MAX_EVENTOS_SYNC"];
+    }
+
+    expect(paginasPedidas).toBe(3);
+    expect(marcadorGravado()).toBe("token-novo");
   });
 
   test("a leitura incremental não manda janela de datas junto do marcador", async () => {
