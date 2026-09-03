@@ -11,9 +11,9 @@ import type { AccountUser } from "@/lib/tasks";
  *
  * Abrir o formulário inteiro para escrever "Ligar para o cliente" é caro: são
  * sete campos, um diálogo que cobre o quadro e a perda do lugar onde se estava.
- * Quem está organizando a semana quer despejar cinco tarefas numa coluna e
- * seguir. Aqui só existem os três campos que uma tarefa recém-nascida costuma
- * ter: o que é, de quem é e para quando é.
+ * Quem está organizando a semana quer despejar tarefas numa coluna e seguir.
+ * Aqui só existem os três campos que uma tarefa recém-nascida costuma ter: o
+ * que é, de quem é e para quando é.
  *
  * O resto continua onde estava — o `+` do cabeçalho da coluna abre o formulário
  * completo, e clicar no cartão depois abre tudo. Isto é atalho, não substituto.
@@ -62,15 +62,12 @@ export function QuickTaskForm({
         due_date: dueFromDay(day),
       });
     } catch {
-      // Quem chama já avisou na tela. Aqui o que importa é não limpar o nome:
-      // a pessoa acabou de digitar e a linha não entrou.
+      // Quem chama já avisou na tela. O formulário fica de pé com o que foi
+      // digitado: a linha não entrou, e perder o texto agora seria o segundo
+      // prejuízo.
       return;
     }
-    // Só o nome volta a zero. Quem cadastra três tarefas seguidas quase sempre
-    // as cadastra para a mesma pessoa e o mesmo prazo; refazer essa escolha a
-    // cada linha é o que torna o atalho inútil.
-    setTitle("");
-    inputRef.current?.focus();
+    // Deu certo: quem fecha é quem chamou, e o formulário sai da coluna.
   }
 
   return (

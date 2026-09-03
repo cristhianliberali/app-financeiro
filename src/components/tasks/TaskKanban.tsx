@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Plus } from "lucide-react";
 import { QuickTaskForm, type QuickTaskDraft } from "./QuickTaskForm";
 import { useTone } from "@/hooks/use-tone";
@@ -12,51 +12,6 @@ export type KanbanColumn = {
   /** Explicação da coluna, no title do cabeçalho. */
   hint?: string;
 };
-
-/** Folga entre o fim do quadro e a borda de baixo da janela. */
-const BOTTOM_GAP = 12;
-/** Altura mínima, para o quadro não sumir numa janela baixa. */
-const MIN_HEIGHT = 320;
-
-/**
- * Estica o quadro até o rodapé da janela.
- *
- * Um Kanban que termina onde termina a última tarefa deixa um vazio embaixo e
- * encolhe a área onde se solta o cartão. Medindo onde ele começa dá para dizer
- * exatamente quanto falta até o fim da tela — e a coluna vazia continua sendo
- * uma coluna inteira, não uma tarja.
- */
-function useFillHeight() {
-  // Ref de callback, e não `useRef`: enquanto os status não chegam o quadro
-  // renderiza o aviso de "sem status" e o elemento medido nem existe. Guardar
-  // o nó em estado é o que faz a medição acontecer quando ele enfim monta.
-  const [element, setElement] = useState<HTMLDivElement | null>(null);
-  const [height, setHeight] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!element) return;
-
-    const measure = () => {
-      const top = element.getBoundingClientRect().top;
-      const next = Math.max(MIN_HEIGHT, Math.round(window.innerHeight - top - BOTTOM_GAP));
-      // Só reage a mudança de verdade: sem isso, a própria altura que
-      // acabamos de aplicar realimentaria o observador.
-      setHeight((current) => (current !== null && Math.abs(current - next) < 2 ? current : next));
-    };
-
-    measure();
-    window.addEventListener("resize", measure);
-    // O cabeçalho da tela cresce quando os filtros quebram em duas linhas.
-    const observer = new ResizeObserver(measure);
-    if (element.parentElement) observer.observe(element.parentElement);
-    return () => {
-      window.removeEventListener("resize", measure);
-      observer.disconnect();
-    };
-  }, [element]);
-
-  return { ref: setElement, height };
-}
 
 /**
  * Kanban com movimentação por arraste. Ao soltar o cartão em outra coluna o
@@ -108,22 +63,32 @@ export function TaskKanban({
   const [quick, setQuick] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const tone = useTone();
-  const { ref, height } = useFillHeight();
 
   if (columns.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center text-sm text-muted-foreground">
+      <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center text-sm text-muted-foreground">
         Este quadro ainda não possui status configurados.
       </div>
     );
   }
 
   return (
-    <div
-      ref={ref}
-      className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1"
-      style={height ? { height } : { minHeight: "70vh" }}
-    >
+    /*
+      Altura pelo CSS, e não medida por JS.
+      A versão anterior lia `getBoundingClientRect().top` e calculava o que
+      sobrava até o fim da janela. Funcionava até a barra de filtros quebrar
+      numa linha a mais — o que no celular é a regra, não a exceção: o valor
+      medido virava passado, e a coluna encolhia ou estourava a tela. Como
+      `flex-1` dentro da coluna de altura cheia da casca, o navegador refaz a
+      conta sozinho a cada mudança de layout, e a coluna vazia continua sendo
+      uma coluna inteira em vez de uma tarja.
+
+      `min-h-72` é piso, não alvo: num telefone estreito a barra de filtros pode
+      ocupar três linhas, e sem piso o quadro seria espremido a nada. Nesse caso
+      ele mantém as 18rem e a casca rola — o único momento em que rolar a página
+      é o comportamento certo.
+    */
+    <div className="-mx-1 flex min-h-72 flex-1 gap-3 overflow-x-auto px-1 pb-1">
       {columns.map((col) => {
         const items = tasks.filter((t) => columnOf(t) === col.id);
         const color = tone(col.color);
@@ -136,7 +101,15 @@ export function TaskKanban({
         return (
           <section
             key={col.id}
-            className={`flex h-full w-[19.5rem] shrink-0 flex-col overflow-hidden rounded-2xl border transition-colors ${
+            /*
+              Sem `h-full`: era ele que impedia a coluna de encher.
+              Numa fila cuja altura vem do próprio flex, `height: 100%` não tem
+              contra o que resolver e o navegador devolve a altura do conteúdo —
+              a coluna parava no último cartão, com meia tela vazia embaixo. O
+              `align-items: stretch`, que já é o padrão da fila, estica sozinho,
+              e só funciona porque nenhuma altura explícita o atropela.
+            */
+            className={`flex min-h-0 w-[19.5rem] shrink-0 flex-col overflow-hidden rounded-2xl border transition-colors ${
               active
                 ? "border-primary bg-primary-soft ring-2 ring-ring/25"
                 : "border-border bg-surface"
@@ -214,11 +187,33 @@ export function TaskKanban({
                     setSaving(true);
                     try {
                       await onQuickAdd(col.id, draft);
+                      // Fecha ao gravar. Manter aberto para a próxima parecia
+                      // economia, mas deixa um formulário em branco plantado no
+                      // meio da coluna, que se confunde com um cartão. Quem vai
+                      // criar outra clica de novo — é um clique, e a coluna
+                      // volta a mostrar só tarefas.
+                      setQuick(null);
                     } finally {
                       setSaving(false);
                     }
                   }}
                 />
+              )}
+
+              {/*
+                Logo abaixo do último cartão, e não preso no pé da coluna.
+                Preso lá embaixo, numa coluna com duas tarefas, ele flutuava
+                sozinho a meia tela de distância delas, e a relação entre "esta
+                lista" e "acrescentar a ela" se perdia. Aqui ele acompanha a
+                lista e some quando o formulário toma o lugar.
+              */}
+              {(onQuickAdd || onAdd) && !quickOpen && items.length > 0 && (
+                <button
+                  onClick={() => (onQuickAdd ? setQuick(col.id) : onAdd?.(col.id))}
+                  className="flex w-full items-center gap-1.5 rounded-xl px-2.5 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <Plus className="size-3.5" /> Adicionar tarefa
+                </button>
               )}
 
               {items.length === 0 && !quickOpen && (
@@ -239,17 +234,6 @@ export function TaskKanban({
                 </div>
               )}
             </div>
-
-            {(onQuickAdd || onAdd) && !quickOpen && (
-              <div className="p-2 pt-0">
-                <button
-                  onClick={() => (onQuickAdd ? setQuick(col.id) : onAdd?.(col.id))}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border px-2.5 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-border-strong hover:bg-accent hover:text-foreground"
-                >
-                  <Plus className="size-3.5" /> Adicionar tarefa
-                </button>
-              </div>
-            )}
           </section>
         );
       })}

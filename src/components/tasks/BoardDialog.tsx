@@ -233,7 +233,10 @@ export function BoardDialog({
               {!form.space_id && <option value="">Selecione um espaço</option>}
               {spaces.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.icon} {s.name}
+                  {/* Só o nome: `<option>` não aceita componente, e um espaço
+                      antigo ainda guarda um emoji na coluna do ícone — era ele que
+                      vazava aqui, cru, no meio de uma lista sem ícone nenhum. */}
+                  {s.name}
                 </option>
               ))}
             </select>
