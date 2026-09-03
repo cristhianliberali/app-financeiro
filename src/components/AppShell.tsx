@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { PlanoGate } from "@/components/PlanoGate";
 
 /**
  * Casca do módulo Finanças. O módulo Projetos e Tarefas tem a sua própria
@@ -46,7 +47,7 @@ const nav = [
   // vive no menu do perfil, junto das outras preferências da pessoa.
 ] as const;
 
-export function AppShell({
+function AppShellInterno({
   children,
   actions,
   /**
@@ -286,5 +287,42 @@ export function AppShell({
       */}
       <AiChatLauncher />
     </div>
+  );
+}
+
+/**
+ * A casca do Finanças, atrás da trava de assinatura.
+ *
+ * O conteúdo real fica em `AppShellInterno` para que ele só monte depois de o
+ * acesso estar confirmado: as consultas de conta, subconta e lançamentos são
+ * todas barradas no servidor quando o plano não libera, e montá-las só para
+ * vê-las falharem encheria a tela de erro em vez da explicação do bloqueio.
+ */
+export function AppShell({
+  ignorarPlano = false,
+  ...props
+}: {
+  children: ReactNode;
+  actions?: ReactNode;
+  showPeriodBar?: boolean;
+  /**
+   * Deixa a tela passar mesmo com a assinatura inativa.
+   *
+   * Existe para "Conta & equipe", e por um motivo concreto: quando a compra foi
+   * feita com um e-mail diferente do cadastro, trocar o e-mail do cadastro é
+   * justamente o que resolve o bloqueio. Trancar essa tela transformaria um
+   * problema com saída em um problema sem saída.
+   *
+   * Não é um furo na trava: as server functions de lançamento, tarefa e
+   * importação continuam barradas no servidor, aqui como em qualquer lugar.
+   */
+  ignorarPlano?: boolean;
+}) {
+  if (ignorarPlano) return <AppShellInterno {...props} />;
+
+  return (
+    <PlanoGate>
+      <AppShellInterno {...props} />
+    </PlanoGate>
   );
 }

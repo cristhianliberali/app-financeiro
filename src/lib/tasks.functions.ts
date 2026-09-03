@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireAuth } from "@/integrations/postgres/auth-middleware";
+import { requirePlano } from "@/integrations/postgres/auth-middleware";
 
 // `pg` só existe no Node e este arquivo vai para o bundle do navegador, então
 // o módulo do servidor entra por `await import()` dentro de cada handler.
@@ -59,7 +59,7 @@ function idList(value: unknown): string[] {
 // ──────────────────────── usuários / espaços ────────────────────────────
 
 export const fetchAccountUsers = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { accountId: string }) => ({ accountId: requireId(input?.accountId) }))
   .handler(async ({ data, context }) =>
     (await import("@/integrations/postgres/tasks.server")).listAccountUsers(
@@ -69,7 +69,7 @@ export const fetchAccountUsers = createServerFn({ method: "GET" })
   );
 
 export const fetchSpaces = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { accountId: string }) => ({ accountId: requireId(input?.accountId) }))
   .handler(async ({ data, context }) =>
     (await import("@/integrations/postgres/tasks.server")).listSpaces(
@@ -79,7 +79,7 @@ export const fetchSpaces = createServerFn({ method: "GET" })
   );
 
 export const fetchSpaceMembers = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { spaceId: string }) => ({ spaceId: requireId(input?.spaceId) }))
   .handler(async ({ data, context }) =>
     (await import("@/integrations/postgres/tasks.server")).listSpaceMembers(
@@ -89,7 +89,7 @@ export const fetchSpaceMembers = createServerFn({ method: "GET" })
   );
 
 export const saveSpace = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: {
       id?: string;
@@ -116,7 +116,7 @@ export const saveSpace = createServerFn({ method: "POST" })
   );
 
 export const deleteSpace = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { id: string }) => ({ id: requireId(input?.id) }))
   .handler(async ({ data, context }): Promise<null> => {
     await (
@@ -128,7 +128,7 @@ export const deleteSpace = createServerFn({ method: "POST" })
 // ──────────────────────────────── quadros ───────────────────────────────
 
 export const fetchBoards = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { accountId: string; spaceId?: string | null }) => ({
     accountId: requireId(input?.accountId, "accountId"),
     ...(optionalId(input?.spaceId) ? { spaceId: input!.spaceId as string } : {}),
@@ -142,14 +142,14 @@ export const fetchBoards = createServerFn({ method: "GET" })
   );
 
 export const fetchBoard = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { boardId: string }) => ({ boardId: requireId(input?.boardId) }))
   .handler(async ({ data, context }) =>
     (await import("@/integrations/postgres/tasks.server")).getBoard(context.user.id, data.boardId),
   );
 
 export const fetchBoardMembers = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { boardId: string }) => ({ boardId: requireId(input?.boardId) }))
   .handler(async ({ data, context }) =>
     (await import("@/integrations/postgres/tasks.server")).listBoardMembers(
@@ -159,7 +159,7 @@ export const fetchBoardMembers = createServerFn({ method: "GET" })
   );
 
 export const createBoard = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: {
       spaceId: string;
@@ -201,7 +201,7 @@ export const createBoard = createServerFn({ method: "POST" })
   );
 
 export const updateBoard = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: { id: string; patch?: Record<string, unknown>; memberIds?: string[] | null }) => {
       const source = input?.patch ?? {};
@@ -242,7 +242,7 @@ export const updateBoard = createServerFn({ method: "POST" })
   });
 
 export const deleteBoard = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { id: string }) => ({ id: requireId(input?.id) }))
   .handler(async ({ data, context }): Promise<null> => {
     await (
@@ -254,7 +254,7 @@ export const deleteBoard = createServerFn({ method: "POST" })
 // ───────────────────────── status do quadro ─────────────────────────────
 
 export const fetchBoardStatuses = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { boardId: string }) => ({ boardId: requireId(input?.boardId) }))
   .handler(async ({ data, context }) =>
     (await import("@/integrations/postgres/tasks.server")).listBoardStatuses(
@@ -264,7 +264,7 @@ export const fetchBoardStatuses = createServerFn({ method: "GET" })
   );
 
 export const fetchSpaceStatuses = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { spaceId: string }) => ({ spaceId: requireId(input?.spaceId) }))
   .handler(async ({ data, context }) =>
     (await import("@/integrations/postgres/tasks.server")).listSpaceStatuses(
@@ -274,7 +274,7 @@ export const fetchSpaceStatuses = createServerFn({ method: "GET" })
   );
 
 export const fetchAccountStatuses = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { accountId: string }) => ({ accountId: requireId(input?.accountId) }))
   .handler(async ({ data, context }) =>
     (await import("@/integrations/postgres/tasks.server")).listAccountStatuses(
@@ -284,7 +284,7 @@ export const fetchAccountStatuses = createServerFn({ method: "GET" })
   );
 
 export const saveStatus = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: {
       id?: string;
@@ -307,7 +307,7 @@ export const saveStatus = createServerFn({ method: "POST" })
   );
 
 export const reorderStatuses = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { items: Array<{ id: string; sortOrder: number }> }) => ({
     items: (Array.isArray(input?.items) ? input.items : []).map((item, index) => ({
       id: requireId(item?.id),
@@ -322,7 +322,7 @@ export const reorderStatuses = createServerFn({ method: "POST" })
   });
 
 export const deleteStatus = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { id: string }) => ({ id: requireId(input?.id) }))
   .handler(async ({ data, context }): Promise<null> => {
     await (
@@ -334,7 +334,7 @@ export const deleteStatus = createServerFn({ method: "POST" })
 // ──────────────────────────────── tarefas ───────────────────────────────
 
 export const fetchTasks = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { accountId: string; boardId?: string | null }) => ({
     accountId: requireId(input?.accountId, "accountId"),
     ...(optionalId(input?.boardId) ? { boardId: input!.boardId as string } : {}),
@@ -344,7 +344,7 @@ export const fetchTasks = createServerFn({ method: "GET" })
   );
 
 export const fetchTaskActivity = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { taskId: string }) => ({ taskId: requireId(input?.taskId) }))
   .handler(async ({ data, context }) =>
     (await import("@/integrations/postgres/tasks.server")).listTaskActivity(
@@ -354,7 +354,7 @@ export const fetchTaskActivity = createServerFn({ method: "GET" })
   );
 
 export const saveTask = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: {
       id?: string;
@@ -401,7 +401,7 @@ export const saveTask = createServerFn({ method: "POST" })
   );
 
 export const moveTask = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { id: string; statusId: string; sortOrder?: number }) => ({
     id: requireId(input?.id),
     statusId: requireId(input?.statusId, "statusId"),
@@ -413,7 +413,7 @@ export const moveTask = createServerFn({ method: "POST" })
   });
 
 export const moveTaskByPolarity = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { id: string; polarity: string }) => ({
     id: requireId(input?.id),
     polarity: oneOf(input?.polarity, POLARITIES, "IN_PROGRESS"),
@@ -426,7 +426,7 @@ export const moveTaskByPolarity = createServerFn({ method: "POST" })
   );
 
 export const deleteTask = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { id: string }) => ({ id: requireId(input?.id) }))
   .handler(async ({ data, context }): Promise<null> => {
     await (
@@ -438,7 +438,7 @@ export const deleteTask = createServerFn({ method: "POST" })
 // ─────────────────────────────── etiquetas ──────────────────────────────
 
 export const fetchLabels = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { accountId: string }) => ({ accountId: requireId(input?.accountId) }))
   .handler(async ({ data, context }) =>
     (await import("@/integrations/postgres/tasks.server")).listLabels(
@@ -448,7 +448,7 @@ export const fetchLabels = createServerFn({ method: "GET" })
   );
 
 export const saveLabel = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { id?: string; accountId: string; name: string; color?: string }) => ({
     ...(input?.id ? { id: input.id } : {}),
     accountId: requireId(input?.accountId, "accountId"),
@@ -460,7 +460,7 @@ export const saveLabel = createServerFn({ method: "POST" })
   );
 
 export const deleteLabel = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { id: string }) => ({ id: requireId(input?.id) }))
   .handler(async ({ data, context }): Promise<null> => {
     await (
@@ -472,7 +472,7 @@ export const deleteLabel = createServerFn({ method: "POST" })
 // ─────────────────────────────── lembretes ──────────────────────────────
 
 export const saveReminder = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: {
       id?: string;
@@ -497,7 +497,7 @@ export const saveReminder = createServerFn({ method: "POST" })
   );
 
 export const deleteReminder = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { id: string }) => ({ id: requireId(input?.id) }))
   .handler(async ({ data, context }): Promise<null> => {
     await (
@@ -507,19 +507,19 @@ export const deleteReminder = createServerFn({ method: "POST" })
   });
 
 export const fetchDueReminders = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .handler(async ({ context }) =>
     (await import("@/integrations/postgres/tasks.server")).listDueReminders(context.user.id),
   );
 
 export const fetchUpcomingReminders = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .handler(async ({ context }) =>
     (await import("@/integrations/postgres/tasks.server")).listUpcomingReminders(context.user.id),
   );
 
 export const ackReminders = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { ids: string[] }) => ({ ids: idList(input?.ids) }))
   .handler(async ({ data, context }): Promise<null> => {
     await (
@@ -531,7 +531,7 @@ export const ackReminders = createServerFn({ method: "POST" })
 // ─────────────────────────────── subtarefas ─────────────────────────────
 
 export const saveSubtask = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: {
       id?: string;
@@ -562,7 +562,7 @@ export const saveSubtask = createServerFn({ method: "POST" })
   );
 
 export const deleteSubtask = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { id: string }) => ({ id: requireId(input?.id) }))
   .handler(async ({ data, context }): Promise<null> => {
     await (
@@ -574,20 +574,20 @@ export const deleteSubtask = createServerFn({ method: "POST" })
 // ──────────────────────── rastreamento de tempo ─────────────────────────
 
 export const fetchActiveTimer = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .handler(async ({ context }) =>
     (await import("@/integrations/postgres/tasks.server")).getActiveTimer(context.user.id),
   );
 
 export const startTimer = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { taskId: string }) => ({ taskId: requireId(input?.taskId, "taskId") }))
   .handler(async ({ data, context }) =>
     (await import("@/integrations/postgres/tasks.server")).startTimer(context.user.id, data.taskId),
   );
 
 export const stopTimer = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { entryId?: string | null }) => ({
     entryId: optionalId(input?.entryId),
   }))
@@ -599,7 +599,7 @@ export const stopTimer = createServerFn({ method: "POST" })
   });
 
 export const deleteTimeEntry = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { id: string }) => ({ id: requireId(input?.id) }))
   .handler(async ({ data, context }): Promise<null> => {
     await (
@@ -609,7 +609,7 @@ export const deleteTimeEntry = createServerFn({ method: "POST" })
   });
 
 export const fetchAccountTimeEntries = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { accountId: string; from?: string; to?: string }) => ({
     accountId: requireId(input?.accountId, "accountId"),
     ...(optionalDate(input?.from) ? { from: input!.from as string } : {}),
@@ -625,7 +625,7 @@ export const fetchAccountTimeEntries = createServerFn({ method: "GET" })
 // ─────────────────────── modelos de etapas (por conta) ───────────────────────
 
 export const fetchStatusTemplates = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { accountId: string }) => ({
     accountId: requireId(input?.accountId, "accountId"),
   }))
@@ -642,7 +642,7 @@ export const fetchStatusTemplates = createServerFn({ method: "GET" })
  * resto do app não sabe classificar.
  */
 export const saveStatusTemplate = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: { id?: string; accountId: string; name: string; statuses: unknown[] }) => ({
       ...(input?.id ? { id: requireId(input.id) } : {}),
@@ -659,7 +659,7 @@ export const saveStatusTemplate = createServerFn({ method: "POST" })
   );
 
 export const deleteStatusTemplate = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { id: string }) => ({ id: requireId(input?.id) }))
   .handler(async ({ data, context }): Promise<null> => {
     await (

@@ -82,6 +82,21 @@ export const signUp = createServerFn({ method: "POST" })
     }
 
     const user = await createUser({ email: data.email, password: data.password, name: data.name });
+
+    // Comprar antes de criar a conta é o caminho normal de quem chega pelo
+    // checkout da Cakto: o webhook da compra chegou quando ainda não havia a
+    // quem aplicá-lo e ficou guardado. Aplicá-lo agora evita que a pessoa
+    // esbarre num bloqueio que o próprio pagamento dela já resolveu. Falhar
+    // aqui não pode derrubar o cadastro — no pior caso ela entra bloqueada e o
+    // super admin reprocessa o evento pelo painel.
+    try {
+      const { aplicarEventosPendentesDoEmail } =
+        await import("@/integrations/cakto/webhook.server");
+      await aplicarEventosPendentesDoEmail(user.email);
+    } catch (error) {
+      console.error("[cakto] não foi possível aplicar eventos pendentes do cadastro:", error);
+    }
+
     await startSession(user.id);
     return {
       id: user.id,

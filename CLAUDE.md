@@ -86,3 +86,41 @@ de interpretação errada do pedido.
 
 Ver `docs/chat-ia.md`. Configuração: `GROQ_API_KEY` e `MODELO_IA_CHAT`
 (`.env.example`, seção *Chat com IA*).
+
+## Assinaturas (Cakto) e acesso ao app
+
+Vive em `src/integrations/cakto/` + `src/lib/plano.ts`, com a trava em
+`requirePlano` (`src/integrations/postgres/auth-middleware.ts`).
+
+Regra arquitetural inviolável, irmã das duas acima: **a Cakto decide o estado da
+assinatura; o app decide o que esse estado libera** — e essa decisão nunca é uma
+chamada de rede. O status chega por webhook, é normalizado e gravado em
+`app_users.status_plano`; o acesso é uma leitura de coluna, no login e em cada
+requisição de dado.
+
+Se o acesso passar a depender de perguntar à Cakto na hora, uma instabilidade
+dela vira um app fora do ar, com todo mundo trancado para fora dos próprios
+dados. É por isso que a API pública (`api.server.ts`) só serve para o teste de
+conexão do painel, e nada no caminho do login a atravessa.
+
+Duas consequências disso, que também não se negociam:
+
+- **o corpo cru de todo webhook é gravado em `cakto_webhook_events` antes de ser
+  interpretado.** Essa tabela não é log, é a fonte da verdade sobre o que a
+  Cakto mandou: mapeamento errado se corrige e reprocessa (`aplicarEvento`), sem
+  depender de reenvio;
+- **na dúvida não se chuta.** Evento desconhecido cuja intenção não dá para
+  deduzir fica `ignorado` e aparece no painel; status desconhecido vira
+  `sem_assinatura`, que não libera. Nem liberar nem bloquear por adivinhação.
+
+`contrato.ts` é tolerante de propósito (procura cada campo numa lista de
+caminhos plausíveis) porque documentação de gateway envelhece. A tolerância para
+na conferência do segredo e na decisão de acesso — ali, adivinhar é o erro.
+
+Esconder botão na tela não é trava: server function é endpoint HTTP. Toda função
+que lê ou escreve dado financeiro ou de tarefa passa por `requirePlano`; ficam
+fora, de propósito, entrar, sair, o próprio cadastro e a tela de assinatura.
+
+Ver `docs/cakto-assinaturas.md`. Configuração: `CAKTO_WEBHOOK_SECRET`,
+`CAKTO_EXIGIR_ASSINATURA` e `SUPER_ADMIN_EMAILS` (`.env.example`, seções
+*Assinaturas (Cakto)* e *Super admin*).

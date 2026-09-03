@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AssinaturaRouteImport } from './routes/assinatura'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CategoriasRouteImport } from './routes/categorias'
 import { Route as ContaRouteImport } from './routes/conta'
@@ -20,6 +21,8 @@ import { Route as MetasRouteImport } from './routes/metas'
 import { Route as PendentesRouteImport } from './routes/pendentes'
 import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
 import { Route as TransacoesRouteImport } from './routes/transacoes'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminEventosRouteImport } from './routes/admin/eventos'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as TarefasIndexRouteImport } from './routes/tarefas/index'
 import { Route as TarefasAgendaRouteImport } from './routes/tarefas/agenda'
@@ -27,6 +30,7 @@ import { Route as TarefasCalendarioRouteImport } from './routes/tarefas/calendar
 import { Route as TarefasMeuDiaRouteImport } from './routes/tarefas/meu-dia'
 import { Route as TarefasMinhasRouteImport } from './routes/tarefas/minhas'
 import { Route as TarefasTodasRouteImport } from './routes/tarefas/todas'
+import { Route as ApiCaktoWebhookRouteImport } from './routes/api/cakto/webhook'
 import { Route as ApiGoogleCallbackRouteImport } from './routes/api/google/callback'
 import { Route as ApiGoogleSyncRouteImport } from './routes/api/google/sync'
 import { Route as TarefasEspacosIndexRouteImport } from './routes/tarefas/espacos/index'
@@ -36,6 +40,11 @@ import { Route as TarefasQuadrosBoardIdRouteImport } from './routes/tarefas/quad
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssinaturaRoute = AssinaturaRouteImport.update({
+  id: '/assinatura',
+  path: '/assinatura',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -88,6 +97,16 @@ const TransacoesRoute = TransacoesRouteImport.update({
   path: '/transacoes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminEventosRoute = AdminEventosRouteImport.update({
+  id: '/admin/eventos',
+  path: '/admin/eventos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
@@ -123,6 +142,11 @@ const TarefasTodasRoute = TarefasTodasRouteImport.update({
   path: '/tarefas/todas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCaktoWebhookRoute = ApiCaktoWebhookRouteImport.update({
+  id: '/api/cakto/webhook',
+  path: '/api/cakto/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGoogleCallbackRoute = ApiGoogleCallbackRouteImport.update({
   id: '/api/google/callback',
   path: '/api/google/callback',
@@ -151,6 +175,7 @@ const TarefasQuadrosBoardIdRoute = TarefasQuadrosBoardIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/assinatura': typeof AssinaturaRoute
   '/auth': typeof AuthRoute
   '/categorias': typeof CategoriasRoute
   '/conta': typeof ContaRoute
@@ -161,13 +186,16 @@ export interface FileRoutesByFullPath {
   '/pendentes': typeof PendentesRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/transacoes': typeof TransacoesRoute
+  '/admin/eventos': typeof AdminEventosRoute
   '/api/health': typeof ApiHealthRoute
   '/tarefas/agenda': typeof TarefasAgendaRoute
   '/tarefas/calendario': typeof TarefasCalendarioRoute
   '/tarefas/meu-dia': typeof TarefasMeuDiaRoute
   '/tarefas/minhas': typeof TarefasMinhasRoute
   '/tarefas/todas': typeof TarefasTodasRoute
+  '/admin/': typeof AdminIndexRoute
   '/tarefas/': typeof TarefasIndexRoute
+  '/api/cakto/webhook': typeof ApiCaktoWebhookRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
   '/api/google/sync': typeof ApiGoogleSyncRoute
   '/tarefas/espacos/$spaceId': typeof TarefasEspacosSpaceIdRoute
@@ -176,6 +204,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/assinatura': typeof AssinaturaRoute
   '/auth': typeof AuthRoute
   '/categorias': typeof CategoriasRoute
   '/conta': typeof ContaRoute
@@ -186,13 +215,16 @@ export interface FileRoutesByTo {
   '/pendentes': typeof PendentesRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/transacoes': typeof TransacoesRoute
+  '/admin/eventos': typeof AdminEventosRoute
   '/api/health': typeof ApiHealthRoute
   '/tarefas/agenda': typeof TarefasAgendaRoute
   '/tarefas/calendario': typeof TarefasCalendarioRoute
   '/tarefas/meu-dia': typeof TarefasMeuDiaRoute
   '/tarefas/minhas': typeof TarefasMinhasRoute
   '/tarefas/todas': typeof TarefasTodasRoute
+  '/admin': typeof AdminIndexRoute
   '/tarefas': typeof TarefasIndexRoute
+  '/api/cakto/webhook': typeof ApiCaktoWebhookRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
   '/api/google/sync': typeof ApiGoogleSyncRoute
   '/tarefas/espacos/$spaceId': typeof TarefasEspacosSpaceIdRoute
@@ -202,6 +234,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/assinatura': typeof AssinaturaRoute
   '/auth': typeof AuthRoute
   '/categorias': typeof CategoriasRoute
   '/conta': typeof ContaRoute
@@ -212,13 +245,16 @@ export interface FileRoutesById {
   '/pendentes': typeof PendentesRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/transacoes': typeof TransacoesRoute
+  '/admin/eventos': typeof AdminEventosRoute
   '/api/health': typeof ApiHealthRoute
   '/tarefas/agenda': typeof TarefasAgendaRoute
   '/tarefas/calendario': typeof TarefasCalendarioRoute
   '/tarefas/meu-dia': typeof TarefasMeuDiaRoute
   '/tarefas/minhas': typeof TarefasMinhasRoute
   '/tarefas/todas': typeof TarefasTodasRoute
+  '/admin/': typeof AdminIndexRoute
   '/tarefas/': typeof TarefasIndexRoute
+  '/api/cakto/webhook': typeof ApiCaktoWebhookRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
   '/api/google/sync': typeof ApiGoogleSyncRoute
   '/tarefas/espacos/$spaceId': typeof TarefasEspacosSpaceIdRoute
@@ -229,6 +265,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/assinatura'
     | '/auth'
     | '/categorias'
     | '/conta'
@@ -239,13 +276,16 @@ export interface FileRouteTypes {
     | '/pendentes'
     | '/redefinir-senha'
     | '/transacoes'
+    | '/admin/eventos'
     | '/api/health'
     | '/tarefas/agenda'
     | '/tarefas/calendario'
     | '/tarefas/meu-dia'
     | '/tarefas/minhas'
     | '/tarefas/todas'
+    | '/admin/'
     | '/tarefas/'
+    | '/api/cakto/webhook'
     | '/api/google/callback'
     | '/api/google/sync'
     | '/tarefas/espacos/$spaceId'
@@ -254,6 +294,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/assinatura'
     | '/auth'
     | '/categorias'
     | '/conta'
@@ -264,13 +305,16 @@ export interface FileRouteTypes {
     | '/pendentes'
     | '/redefinir-senha'
     | '/transacoes'
+    | '/admin/eventos'
     | '/api/health'
     | '/tarefas/agenda'
     | '/tarefas/calendario'
     | '/tarefas/meu-dia'
     | '/tarefas/minhas'
     | '/tarefas/todas'
+    | '/admin'
     | '/tarefas'
+    | '/api/cakto/webhook'
     | '/api/google/callback'
     | '/api/google/sync'
     | '/tarefas/espacos/$spaceId'
@@ -279,6 +323,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/assinatura'
     | '/auth'
     | '/categorias'
     | '/conta'
@@ -289,13 +334,16 @@ export interface FileRouteTypes {
     | '/pendentes'
     | '/redefinir-senha'
     | '/transacoes'
+    | '/admin/eventos'
     | '/api/health'
     | '/tarefas/agenda'
     | '/tarefas/calendario'
     | '/tarefas/meu-dia'
     | '/tarefas/minhas'
     | '/tarefas/todas'
+    | '/admin/'
     | '/tarefas/'
+    | '/api/cakto/webhook'
     | '/api/google/callback'
     | '/api/google/sync'
     | '/tarefas/espacos/$spaceId'
@@ -305,6 +353,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AssinaturaRoute: typeof AssinaturaRoute
   AuthRoute: typeof AuthRoute
   CategoriasRoute: typeof CategoriasRoute
   ContaRoute: typeof ContaRoute
@@ -315,13 +364,16 @@ export interface RootRouteChildren {
   PendentesRoute: typeof PendentesRoute
   RedefinirSenhaRoute: typeof RedefinirSenhaRoute
   TransacoesRoute: typeof TransacoesRoute
+  AdminEventosRoute: typeof AdminEventosRoute
   ApiHealthRoute: typeof ApiHealthRoute
   TarefasAgendaRoute: typeof TarefasAgendaRoute
   TarefasCalendarioRoute: typeof TarefasCalendarioRoute
   TarefasMeuDiaRoute: typeof TarefasMeuDiaRoute
   TarefasMinhasRoute: typeof TarefasMinhasRoute
   TarefasTodasRoute: typeof TarefasTodasRoute
+  AdminIndexRoute: typeof AdminIndexRoute
   TarefasIndexRoute: typeof TarefasIndexRoute
+  ApiCaktoWebhookRoute: typeof ApiCaktoWebhookRoute
   ApiGoogleCallbackRoute: typeof ApiGoogleCallbackRoute
   ApiGoogleSyncRoute: typeof ApiGoogleSyncRoute
   TarefasEspacosSpaceIdRoute: typeof TarefasEspacosSpaceIdRoute
@@ -336,6 +388,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assinatura': {
+      id: '/assinatura'
+      path: '/assinatura'
+      fullPath: '/assinatura'
+      preLoaderRoute: typeof AssinaturaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -408,6 +467,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TransacoesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/eventos': {
+      id: '/admin/eventos'
+      path: '/admin/eventos'
+      fullPath: '/admin/eventos'
+      preLoaderRoute: typeof AdminEventosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/health': {
       id: '/api/health'
       path: '/api/health'
@@ -457,6 +530,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TarefasTodasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cakto/webhook': {
+      id: '/api/cakto/webhook'
+      path: '/api/cakto/webhook'
+      fullPath: '/api/cakto/webhook'
+      preLoaderRoute: typeof ApiCaktoWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/google/callback': {
       id: '/api/google/callback'
       path: '/api/google/callback'
@@ -497,6 +577,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AssinaturaRoute: AssinaturaRoute,
   AuthRoute: AuthRoute,
   CategoriasRoute: CategoriasRoute,
   ContaRoute: ContaRoute,
@@ -507,13 +588,16 @@ const rootRouteChildren: RootRouteChildren = {
   PendentesRoute: PendentesRoute,
   RedefinirSenhaRoute: RedefinirSenhaRoute,
   TransacoesRoute: TransacoesRoute,
+  AdminEventosRoute: AdminEventosRoute,
   ApiHealthRoute: ApiHealthRoute,
   TarefasAgendaRoute: TarefasAgendaRoute,
   TarefasCalendarioRoute: TarefasCalendarioRoute,
   TarefasMeuDiaRoute: TarefasMeuDiaRoute,
   TarefasMinhasRoute: TarefasMinhasRoute,
   TarefasTodasRoute: TarefasTodasRoute,
+  AdminIndexRoute: AdminIndexRoute,
   TarefasIndexRoute: TarefasIndexRoute,
+  ApiCaktoWebhookRoute: ApiCaktoWebhookRoute,
   ApiGoogleCallbackRoute: ApiGoogleCallbackRoute,
   ApiGoogleSyncRoute: ApiGoogleSyncRoute,
   TarefasEspacosSpaceIdRoute: TarefasEspacosSpaceIdRoute,

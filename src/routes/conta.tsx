@@ -97,7 +97,7 @@ function AccountPage() {
   const inviteLink = (token: string) => siteUrl(`/convite?token=${token}`);
 
   return (
-    <AppShell>
+    <AppShell ignorarPlano>
       <header>
         <h1 className="title-xl">Conta e equipe</h1>
         <p className="text-sm text-muted-foreground">

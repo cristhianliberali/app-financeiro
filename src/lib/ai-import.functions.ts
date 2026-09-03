@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireAuth } from "@/integrations/postgres/auth-middleware";
+import { requirePlano } from "@/integrations/postgres/auth-middleware";
 
 export type ParsedRow = {
   description: string;
@@ -58,7 +58,7 @@ function requireId(value: unknown, field = "id"): string {
 
 /** Diz à tela se a importação por IA está configurada neste ambiente. */
 export const getImportConfig = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .handler(async (): Promise<{ enabled: boolean; provider: string; model: string | null }> => {
     const { getAiSettings } = await import("@/integrations/postgres/config.server");
     try {
@@ -74,7 +74,7 @@ export const getImportConfig = createServerFn({ method: "GET" })
  * usuário dispara cada lote em seguida.
  */
 export const prepareImport = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: { profileId: string; text?: string; file?: { name: string; base64: string } }) => {
       const profileId = requireId(input?.profileId, "profileId");
@@ -96,7 +96,7 @@ export const prepareImport = createServerFn({ method: "POST" })
 
 /** Processa o próximo lote pendente — uma requisição de IA por chamada. */
 export const processNextBatch = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { importId: string; profileId: string }) => ({
     importId: requireId(input?.importId, "importId"),
     profileId: requireId(input?.profileId, "profileId"),

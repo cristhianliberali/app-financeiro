@@ -8,7 +8,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireAuth } from "@/integrations/postgres/auth-middleware";
+import { requirePlano } from "@/integrations/postgres/auth-middleware";
 import type { ExtracaoParaTela } from "@/integrations/ai/pipeline/extracao.server";
 
 export type {
@@ -31,7 +31,7 @@ function requireId(value: unknown, field = "id"): string {
  * o mesmo arquivo devolve exatamente o mesmo resultado, e não gasta IA.
  */
 export const extractDocument = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: { profileId: string; text?: string; file?: { name: string; base64: string } }) => {
       const profileId = requireId(input?.profileId, "profileId");
@@ -112,7 +112,7 @@ function validarItens(brutos: unknown): ItemBruto[] {
  * decisão nova alimenta o cache da próxima importação.
  */
 export const categorizeDocument = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { profileId: string; itens: ItemBruto[] }) => ({
     profileId: requireId(input?.profileId, "profileId"),
     itens: validarItens(input?.itens),
@@ -197,7 +197,7 @@ export const categorizeDocument = createServerFn({ method: "POST" })
  * sobrescreve. É o que faz a próxima fatura chegar já categorizada.
  */
 export const learnMerchantLabels = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: { profileId: string; rotulos: Array<{ descricao: string; categoria: string }> }) => ({
       profileId: requireId(input?.profileId, "profileId"),

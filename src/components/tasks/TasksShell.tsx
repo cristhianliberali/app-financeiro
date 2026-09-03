@@ -18,6 +18,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { PlanoGate } from "@/components/PlanoGate";
 import { useTone } from "@/hooks/use-tone";
 import { useAppState } from "@/lib/app-state";
 import { useAccounts } from "@/lib/accounts";
@@ -80,7 +81,7 @@ const NAV = [
  * hierárquico e os controles do módulo. A troca entre os dois módulos acontece
  * pelo `ModuleSwitcher`, no topo da lateral.
  */
-export function TasksShell({
+function TasksShellInterno({
   children,
   /** Botões da tela atual, no canto direito do cabeçalho. */
   actions,
@@ -685,5 +686,27 @@ function ItemMenu({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/**
+ * A casca do módulo Projetos e Tarefas, atrás da trava de assinatura.
+ *
+ * Mesmo arranjo do Finanças: o conteúdo real só monta depois de o acesso estar
+ * confirmado, porque espaços, quadros e tarefas são todos barrados no servidor
+ * quando o plano não libera.
+ */
+export function TasksShell(props: {
+  children: ReactNode;
+  actions?: ReactNode;
+  spaceId?: string | null;
+  boardId?: string | null;
+  breadcrumbCurrent?: string;
+  wide?: boolean;
+}) {
+  return (
+    <PlanoGate>
+      <TasksShellInterno {...props} />
+    </PlanoGate>
   );
 }

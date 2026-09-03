@@ -222,6 +222,32 @@ No painel de Projetos e Tarefas há três abas:
   (escolhendo espaço e quadro, com a etapa padrão do quadro);
 - **Calendário** — semana (padrão) ou mês, com tarefas e compromissos juntos.
 
+#Assinaturas e acesso
+O app é pago, e o meio de pagamento é a **Cakto**. O estado da assinatura de
+cada pessoa chega por webhook e fica em `app_users.status_plano`; o acesso é
+decidido lendo essa coluna, nunca perguntando à Cakto na hora — um gateway fora
+do ar não pode virar um app fora do ar.
+
+- `status_plano`: `ativo`, `trial`, `cortesia`, `atrasado`, `cancelado`,
+  `reembolsado`, `chargeback` ou `sem_assinatura`. Os três primeiros liberam;
+- `codigo_oferta`: qual oferta a pessoa comprou. É por ele que se liberam
+  funcionalidades por plano — o status diz *se* entra, a oferta diz *no quê*;
+- quem foi convidado para a conta de um assinante entra junto
+  (`CAKTO_ACESSO_HERDADO`), para não cobrar duas assinaturas pelo mesmo
+  orçamento da família;
+- a trava nasce **desligada** (`CAKTO_EXIGIR_ASSINATURA`): aplique o schema,
+  aponte o webhook, confira no painel que os status estão chegando, e só então
+  ligue. Ligar antes trancaria os usuários existentes para fora dos dados deles.
+
+Em **/admin** há uma área de super admin, com entrada própria: usuários ativos,
+busca e filtro por status, cortesia em um clique (1 mês, 3 meses, 1 ano ou sem
+prazo), histórico de toda mudança com autor e motivo, e a lista crua dos eventos
+recebidos da Cakto com um botão de reprocessar. O primeiro administrador sai de
+`SUPER_ADMIN_EMAILS`.
+
+Passo a passo, diagnóstico e o desenho por trás disso em
+[`docs/cakto-assinaturas.md`](docs/cakto-assinaturas.md).
+
 #Tema
 Preto e branco, claro e escuro, no sistema inteiro. A escolha fica no rodapé do
 menu lateral (claro / escuro / seguir o sistema) e é lembrada no navegador.

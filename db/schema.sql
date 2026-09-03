@@ -761,3 +761,124 @@ CREATE TABLE IF NOT EXISTS merchant_labels (
   origem     text NOT NULL DEFAULT 'ia' CHECK (origem IN ('ia','usuario')),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+
+-- ──────────────────── assinaturas (Cakto) e super admin ─────────────────────
+--
+-- O acesso ao app é condicionado ao estado do plano da pessoa. Quem decide esse
+-- estado é a Cakto, por webhook; o que fica no banco é o resultado já
+-- normalizado, para que a checagem de acesso seja uma leitura de coluna e não
+-- uma chamada de rede no caminho do login.
+--
+-- Vocabulário de `status_plano` (o mesmo de src/lib/plano.ts):
+--
+--   ativo          assinatura paga e em dia
+--   trial          período de teste concedido pela oferta
+--   cortesia       liberado manualmente por um super admin, sem cobrança
+--   atrasado       pagamento recusado; a Cakto ainda vai tentar de novo
+--   cancelado      assinatura encerrada
+--   reembolsado    compra devolvida
+--   chargeback     contestada no cartão
+--   sem_assinatura nunca comprou (estado de quem acabou de se cadastrar)
+--
+-- Quem libera o app é `planoLiberado()` em src/lib/plano.ts — nunca uma
+-- comparação de string espalhada pelas telas.
+
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS status_plano text NOT NULL DEFAULT 'sem_assinatura';
+-- Identificador da oferta comprada na Cakto. É ele que diz *qual* plano a
+-- pessoa tem, e não o status: dois assinantes ativos podem estar em ofertas
+-- diferentes, com funcionalidades diferentes.
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS codigo_oferta text;
+
+-- Restante do estado da assinatura. Fica em `app_users` de propósito: é uma
+-- linha por pessoa, lida em toda requisição autenticada, e uma junção a mais no
+-- caminho do login não pagaria por si.
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS plano_expira_em timestamptz;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS plano_origem text;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS plano_atualizado_em timestamptz;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS plano_observacao text;
+-- Identificadores do lado da Cakto, usados para reconciliar e para achar a
+-- pessoa quando o e-mail da compra não é o mesmo do cadastro.
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS cakto_customer_id text;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS cakto_subscription_id text;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_super_admin boolean NOT NULL DEFAULT false;
+
+DO $plano$
+BEGIN
+  ALTER TABLE app_users ADD CONSTRAINT app_users_status_plano_check CHECK (
+    status_plano IN (
+      'ativo','trial','cortesia','atrasado','cancelado','reembolsado','chargeback','sem_assinatura'
+    )
+  );
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END;
+$plano$;
+
+DO $origem$
+BEGIN
+  ALTER TABLE app_users ADD CONSTRAINT app_users_plano_origem_check CHECK (
+    plano_origem IS NULL OR plano_origem IN ('cakto','admin','cadastro')
+  );
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END;
+$origem$;
+
+CREATE INDEX IF NOT EXISTS app_users_status_plano_idx ON app_users(status_plano);
+CREATE INDEX IF NOT EXISTS app_users_cakto_subscription_idx ON app_users(cakto_subscription_id)
+  WHERE cakto_subscription_id IS NOT NULL;
+
+-- Toda mudança de plano vira uma linha aqui — a do webhook e a da mão do
+-- super admin. É o que responde "por que esta pessoa está liberada?" seis meses
+-- depois, quando ninguém lembra da cortesia que alguém concedeu numa quinta.
+CREATE TABLE IF NOT EXISTS plano_historico (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       uuid NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  de_status     text,
+  para_status   text NOT NULL,
+  codigo_oferta text,
+  expira_em     timestamptz,
+  origem        text NOT NULL CHECK (origem IN ('cakto','admin','cadastro')),
+  -- Preenchido só quando a mudança foi manual: quem mexeu.
+  ator_id       uuid REFERENCES app_users(id) ON DELETE SET NULL,
+  motivo        text,
+  evento_id     uuid,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS plano_historico_user_idx ON plano_historico(user_id, created_at DESC);
+
+-- Todo webhook recebido, cru, antes de qualquer interpretação.
+--
+-- Esta tabela não é log: é a fonte da verdade sobre o que a Cakto realmente
+-- mandou. O mapeamento de evento -> status vive em código e pode estar errado
+-- (um nome de campo diferente do documentado, um evento novo); guardando o
+-- corpo original, corrigir o mapa e reprocessar é possível sem pedir à Cakto
+-- que reenvie nada.
+CREATE TABLE IF NOT EXISTS cakto_webhook_events (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- Identificador do evento no lado da Cakto (`data.id`), quando vem. É a
+  -- chave de idempotência: reentrega do mesmo evento não reaplica nada.
+  evento_externo  text,
+  evento          text NOT NULL,
+  payload         jsonb NOT NULL,
+  -- pendente -> aplicado | ignorado | erro | sem_usuario
+  situacao        text NOT NULL DEFAULT 'pendente'
+                  CHECK (situacao IN ('pendente','aplicado','ignorado','erro','sem_usuario')),
+  detalhe         text,
+  email           text,
+  codigo_oferta   text,
+  status_aplicado text,
+  user_id         uuid REFERENCES app_users(id) ON DELETE SET NULL,
+  recebido_em     timestamptz NOT NULL DEFAULT now(),
+  processado_em   timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS cakto_webhook_events_recebido_idx
+  ON cakto_webhook_events(recebido_em DESC);
+CREATE INDEX IF NOT EXISTS cakto_webhook_events_user_idx ON cakto_webhook_events(user_id);
+-- Idempotência: o par (evento, id externo) só entra uma vez. Eventos sem id
+-- externo ficam de fora do índice e são sempre gravados.
+CREATE UNIQUE INDEX IF NOT EXISTS cakto_webhook_events_externo_key
+  ON cakto_webhook_events(evento, evento_externo) WHERE evento_externo IS NOT NULL;

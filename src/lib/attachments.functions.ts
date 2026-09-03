@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireAuth } from "@/integrations/postgres/auth-middleware";
+import { requirePlano } from "@/integrations/postgres/auth-middleware";
 
 export type Attachment = {
   id: string;
@@ -21,7 +21,7 @@ function requireId(value: unknown, field: string): string {
 
 /** A tela usa isto para explicar por que os anexos estão indisponíveis. */
 export const getStorageConfig = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .handler(async (): Promise<{ enabled: boolean; maxUploadMb: number }> => {
     const { getS3Settings, isS3Configured } = await import("@/integrations/postgres/config.server");
     if (!isS3Configured()) return { enabled: false, maxUploadMb: 0 };
@@ -32,7 +32,7 @@ export const getStorageConfig = createServerFn({ method: "GET" })
   });
 
 export const fetchAttachments = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { taskId: string }) => ({ taskId: requireId(input?.taskId, "taskId") }))
   .handler(async ({ data, context }): Promise<Attachment[]> => {
     const { listAttachments } = await import("@/integrations/postgres/attachments.server");
@@ -41,7 +41,7 @@ export const fetchAttachments = createServerFn({ method: "GET" })
 
 /** Etapa 1 do envio: devolve a URL assinada para o navegador mandar o arquivo. */
 export const startUpload = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: { taskId: string; fileName: string; contentType: string; size: number }) => ({
       taskId: requireId(input?.taskId, "taskId"),
@@ -59,7 +59,7 @@ export const startUpload = createServerFn({ method: "POST" })
 
 /** Etapa 2: o arquivo já está no bucket; vira anexo da tarefa. */
 export const confirmUpload = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: { taskId: string; key: string; fileName: string; contentType: string }) => ({
       taskId: requireId(input?.taskId, "taskId"),
@@ -74,7 +74,7 @@ export const confirmUpload = createServerFn({ method: "POST" })
   });
 
 export const removeAttachment = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { id: string }) => ({ id: requireId(input?.id, "id") }))
   .handler(async ({ data, context }): Promise<null> => {
     const { deleteAttachment } = await import("@/integrations/postgres/attachments.server");
