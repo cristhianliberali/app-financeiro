@@ -512,7 +512,13 @@ export function AiChatSheet({
 }
 
 /**
- * Botão que abre o assistente, com a gaveta junto.
+ * O widget flutuante do assistente.
+ *
+ * Fica ancorado no canto inferior direito, sobre o conteúdo, em vez de morar
+ * num botão do cabeçalho. É o gesto que as pessoas já conhecem de qualquer
+ * chat de site: a bolha está sempre no mesmo lugar, não disputa espaço com os
+ * seletores de conta e período, e no celular cai bem debaixo do polegar — onde
+ * o cabeçalho, encostado no topo da tela, é o ponto mais difícil de alcançar.
  *
  * Some por completo quando o servidor não tem chave de IA configurada: um botão
  * que só sabe dizer "não configurado" é pior do que botão nenhum.
@@ -525,16 +531,25 @@ export function AiChatLauncher() {
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
+      <button
+        type="button"
         onClick={() => setOpen(true)}
-        className="gap-1.5"
         aria-label="Abrir o assistente de IA"
+        title="Assistente"
+        /*
+         * z-30 é o andar entre o conteúdo e o cabeçalho fixo (z-20) de um lado
+         * e a gaveta (z-50) do outro: a bolha passa por cima da página, some
+         * atrás do véu quando o chat abre, e nunca cobre um diálogo.
+         */
+        className="brand-gradient fixed bottom-5 right-4 z-30 flex size-14 items-center justify-center rounded-full shadow-glow outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-95 motion-reduce:transition-none motion-reduce:hover:scale-100 lg:bottom-6 lg:right-6"
+        /*
+         * Levanta a bolha acima da barra de gestos do iPhone. Onde a variável
+         * não existe ela vale zero, e a margem simplesmente não faz nada.
+         */
+        style={{ marginBottom: "env(safe-area-inset-bottom)" }}
       >
-        <Sparkles className="size-4" />
-        <span className="hidden sm:inline">Assistente</span>
-      </Button>
+        <Sparkles className="size-6" strokeWidth={2.2} />
+      </button>
       <AiChatSheet open={open} onOpenChange={setOpen} />
     </>
   );

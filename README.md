@@ -62,8 +62,9 @@ vez de lançar tudo de novo.
 
 #Assistente de IA (chat)
 
-Um botão "Assistente" no cabeçalho abre um chat onde dá para escrever em
-português. Ele faz duas coisas:
+Uma bolha flutuante no canto inferior direito, presente em todas as telas do
+módulo Finanças (no computador e no celular), abre um chat onde dá para escrever
+em português. Ele faz duas coisas:
 
 - **Consultar**: "quanto gastei este mês em alimentação?" responde
   "Você gastou R$ 100,00 do seu teto de R$ 350,00". Vale para gastos, entradas e

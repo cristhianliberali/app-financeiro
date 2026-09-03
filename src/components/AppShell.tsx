@@ -261,13 +261,6 @@ export function AppShell({
             </DropdownMenu>
           </div>
           <div className="flex items-center gap-2">
-            {/*
-              O assistente fica no cabeçalho, e não numa tela própria: perguntar
-              quanto se gastou em alimentação faz sentido de dentro do painel,
-              da lista de transações ou das metas — sair da tela para perguntar
-              seria perder justamente o contexto da pergunta.
-            */}
-            <AiChatLauncher />
             <ActiveTimerBar />
             {/* Os lembretes de tarefa também alcançam quem está no Finanças. */}
             <NotificationBell />
@@ -284,6 +277,14 @@ export function AppShell({
           {children}
         </div>
       </main>
+
+      {/*
+        O assistente acompanha todas as telas do módulo, e não uma tela própria:
+        perguntar quanto se gastou em alimentação faz sentido de dentro do
+        painel, da lista de transações ou das metas — sair da tela para
+        perguntar seria perder justamente o contexto da pergunta.
+      */}
+      <AiChatLauncher />
     </div>
   );
 }
