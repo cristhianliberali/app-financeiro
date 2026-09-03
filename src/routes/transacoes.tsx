@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { CategorySelect } from "@/components/CategorySelect";
+import { RecurringTag } from "@/components/RecurringTag";
 import { SettleDialog } from "@/components/SettleDialog";
 import { DEFAULT_CATEGORY_ICON, IconBadge } from "@/lib/icons";
 import { StatusPill } from "@/components/ui/status";
@@ -522,6 +523,7 @@ function TransactionsPage() {
                         {t.installment_no}/{t.installment_total}
                       </span>
                     ) : null}
+                    <RecurringTag transaction={t} />
                   </p>
                   <p className="text-[11px] text-muted-foreground">
                     {cat?.name ?? "Sem categoria"} · transação {formatDateBR(t.transaction_date)} ·

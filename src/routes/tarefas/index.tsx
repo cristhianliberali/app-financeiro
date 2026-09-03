@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { AlarmClock, CalendarCheck, CheckCircle2, Clock, Loader, Plus, Timer } from "lucide-react";
 import { TasksShell } from "@/components/tasks/TasksShell";
+import { BAR_TOOLTIP, PIE_TOOLTIP } from "@/lib/chart-theme";
 import { Button } from "@/components/ui/button";
 import { useTasksModule } from "@/components/tasks/useTasksModule";
 import { useNow } from "@/hooks/use-now";
@@ -543,7 +544,7 @@ function TasksDashboard() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} />
                   <YAxis tickLine={false} axisLine={false} fontSize={11} />
-                  <Tooltip formatter={(v: number) => `${v} h`} />
+                  <Tooltip {...BAR_TOOLTIP} formatter={(v: number) => `${v} h`} />
                   <Bar dataKey="horas" fill="var(--primary)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -562,7 +563,7 @@ function TasksDashboard() {
                     axisLine={false}
                     fontSize={11}
                   />
-                  <Tooltip formatter={(v: number) => `${v} h`} />
+                  <Tooltip {...BAR_TOOLTIP} formatter={(v: number) => `${v} h`} />
                   <Bar dataKey="horas" fill="var(--chart-2)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -581,7 +582,7 @@ function TasksDashboard() {
                     axisLine={false}
                     fontSize={11}
                   />
-                  <Tooltip formatter={(v: number) => `${v} h`} />
+                  <Tooltip {...BAR_TOOLTIP} formatter={(v: number) => `${v} h`} />
                   <Bar dataKey="horas" fill="var(--chart-4)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -600,7 +601,7 @@ function TasksDashboard() {
                     axisLine={false}
                     fontSize={11}
                   />
-                  <Tooltip formatter={(v: number) => `${v} h`} />
+                  <Tooltip {...BAR_TOOLTIP} formatter={(v: number) => `${v} h`} />
                   <Bar dataKey="horas" fill="var(--chart-5)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -621,7 +622,10 @@ function TasksDashboard() {
                       <Cell key={s.name} fill={s.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number, n: string) => [`${v} tarefas`, n]} />
+                  <Tooltip
+                    {...PIE_TOOLTIP}
+                    formatter={(v: number, n: string) => [`${v} tarefas`, n]}
+                  />
                 </PieChart>
               </ResponsiveContainer>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
@@ -654,7 +658,7 @@ function TasksDashboard() {
                         axisLine={false}
                         fontSize={11}
                       />
-                      <Tooltip formatter={(v: number) => `${v} h`} />
+                      <Tooltip {...BAR_TOOLTIP} formatter={(v: number) => `${v} h`} />
                       <Bar dataKey="estimado" fill="var(--chart-4)" radius={[0, 4, 4, 0]} />
                       <Bar dataKey="realizado" fill="var(--chart-1)" radius={[0, 4, 4, 0]} />
                     </BarChart>
@@ -686,7 +690,10 @@ function TasksDashboard() {
                       <Cell key={row.name} fill={row.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number, n: string) => [`${v} tarefas`, n]} />
+                  <Tooltip
+                    {...PIE_TOOLTIP}
+                    formatter={(v: number, n: string) => [`${v} tarefas`, n]}
+                  />
                 </PieChart>
               </ResponsiveContainer>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
@@ -712,7 +719,7 @@ function TasksDashboard() {
                     axisLine={false}
                     fontSize={11}
                   />
-                  <Tooltip formatter={(v: number) => `${v} tarefas`} />
+                  <Tooltip {...BAR_TOOLTIP} formatter={(v: number) => `${v} tarefas`} />
                   <Bar dataKey="tarefas" radius={[0, 4, 4, 0]}>
                     {byResponsible.map((_, i) => (
                       <Cell

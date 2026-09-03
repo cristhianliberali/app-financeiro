@@ -28,6 +28,7 @@ import {
 import { useAppState } from "@/lib/app-state";
 import { useGoals, useInvestments, useRemove, useUpsert, type Investment } from "@/lib/data";
 import { brl, brlCompact, toISODate } from "@/lib/format";
+import { BAR_TOOLTIP } from "@/lib/chart-theme";
 
 export const Route = createFileRoute("/investimentos")({
   head: () => ({
@@ -133,16 +134,7 @@ function InvestmentsPage() {
                 <CartesianGrid vertical={false} stroke="var(--color-border)" />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={10} />
                 <YAxis tickFormatter={brlCompact} tickLine={false} axisLine={false} fontSize={10} />
-                <Tooltip
-                  formatter={(v: number) => brl(v)}
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: "1px solid var(--color-border)",
-                    background: "var(--color-popover)",
-                    boxShadow: "var(--elevation-lg)",
-                    fontSize: 12,
-                  }}
-                />
+                <Tooltip {...BAR_TOOLTIP} formatter={(v: number) => brl(v)} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="estimado" fill="var(--color-chart-1)" radius={[6, 6, 0, 0]} />
                 <Bar dataKey="real" fill="var(--color-chart-3)" radius={[6, 6, 0, 0]} />

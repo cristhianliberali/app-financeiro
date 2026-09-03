@@ -42,6 +42,8 @@ import {
 } from "@/lib/analytics";
 import { MonthTimeline } from "@/components/MonthTimeline";
 import { CategoryPie } from "@/components/CategoryPie";
+import { RecurringTag } from "@/components/RecurringTag";
+import { BAR_TOOLTIP, LINE_TOOLTIP } from "@/lib/chart-theme";
 import { brl, brlCompact, formatDateBR, monthLabel } from "@/lib/format";
 import { DEFAULT_CATEGORY_ICON, IconBadge } from "@/lib/icons";
 import { StatusPill } from "@/components/ui/status";
@@ -66,14 +68,6 @@ export const Route = createFileRoute("/")({
 });
 
 /** Estilo compartilhado dos balões dos gráficos. */
-const TOOLTIP_STYLE = {
-  borderRadius: 12,
-  border: "1px solid var(--color-border)",
-  background: "var(--color-popover)",
-  boxShadow: "var(--elevation-lg)",
-  fontSize: 12,
-} as const;
-
 /**
  * Cartão de um lado do caixa, com a quebra por situação.
  *
@@ -298,9 +292,9 @@ function Dashboard() {
                 />
                 <YAxis tickFormatter={brlCompact} tickLine={false} axisLine={false} fontSize={10} />
                 <Tooltip
+                  {...BAR_TOOLTIP}
                   formatter={(v: number) => brl(v)}
                   labelFormatter={monthLabel}
-                  contentStyle={TOOLTIP_STYLE}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="receitas" fill="var(--color-positive)" radius={[6, 6, 0, 0]} />
@@ -398,9 +392,9 @@ function Dashboard() {
                 />
                 <YAxis tickFormatter={brlCompact} tickLine={false} axisLine={false} fontSize={10} />
                 <Tooltip
+                  {...LINE_TOOLTIP}
                   formatter={(v: number) => brl(v)}
                   labelFormatter={monthLabel}
-                  contentStyle={TOOLTIP_STYLE}
                 />
                 <Line
                   type="monotone"
@@ -452,7 +446,10 @@ function Dashboard() {
                     </td>
                     <td className="px-6 py-3.5">
                       <div className="flex flex-col">
-                        <span className="font-semibold">{tx.description}</span>
+                        <span className="font-semibold">
+                          {tx.description}
+                          <RecurringTag transaction={tx} />
+                        </span>
                         {tx.installment_total && (
                           <span className="text-[10px] text-muted-foreground">
                             Parcela {tx.installment_no}/{tx.installment_total}
