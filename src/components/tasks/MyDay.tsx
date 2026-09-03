@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   AlarmClock,
@@ -15,6 +15,16 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { DateField } from "@/components/ui/date-field";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAgendaEvents, useGoogleStatus } from "@/lib/google";
 import {
   useBoardStatuses,
@@ -481,10 +491,22 @@ function TaskRow({
 }
 
 /**
- * Atalho para criar tarefa sem sair do painel. Toda tarefa precisa de espaço,
- * quadro e etapa — os dois primeiros são escolhidos aqui, e a etapa é a padrão
- * do quadro. A data já nasce hoje, que é o sentido do painel.
+ * Atalho para criar tarefa sem sair do painel.
+ *
+ * Era um bloco que se abria dentro da página, empurrando o resto para baixo, e
+ * os quatro campos brigavam numa grade de quatro colunas que no celular virava
+ * uma escada. Virou diálogo: a tarefa nova é uma tarefa de cada vez, e o painel
+ * atrás dela fica quieto.
+ *
+ * O dia é hoje — é o que o painel significa —, então nunca se pede a data. Do
+ * horário para baixo tudo é opcional: sem hora, o prazo é o fim do dia.
+ *
+ * Espaço e quadro não são enfeite: uma tarefa não existe fora de um quadro, e a
+ * etapa é a padrão dele. Para isso não custar uma escolha por tarefa, o último
+ * quadro usado volta preenchido.
  */
+const ULTIMO_QUADRO = "aura.meu-dia.ultimoQuadro";
+
 function NewTaskShortcut({ accountId }: { accountId: string | null }) {
   const { data: spaces = [] } = useSpaces(accountId);
   const { data: boards = [] } = useBoards({ accountId });
@@ -492,111 +514,174 @@ function NewTaskShortcut({ accountId }: { accountId: string | null }) {
 
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
-  const [spaceId, setSpaceId] = useState("");
+  const [time, setTime] = useState("");
+  const [description, setDescription] = useState("");
   const [boardId, setBoardId] = useState("");
 
-  const activeSpaces = spaces.filter((space) => !space.archived_at);
-  const spaceBoards = boards.filter(
-    (board) => !board.archived_at && (!spaceId || board.space_id === spaceId),
-  );
+  const activeBoards = boards.filter((board) => !board.archived_at);
   const { data: statuses = [] } = useBoardStatuses(boardId || null);
+  const spaceName = (id: string) => spaces.find((s) => s.id === id)?.name ?? "";
+
+  // Ao abrir, recupera o último quadro usado; se não houver, o primeiro serve.
+  useEffect(() => {
+    if (!open || boardId) return;
+    let lembrado = "";
+    try {
+      lembrado = localStorage.getItem(ULTIMO_QUADRO) ?? "";
+    } catch {
+      // Navegador sem armazenamento (aba anônima): segue com o primeiro quadro.
+    }
+    // `boards` na dependência, e não a lista já filtrada: esta se refaz a cada
+    // render e o efeito rodaria sem parar.
+    const abertos = boards.filter((b) => !b.archived_at);
+    const valido = abertos.some((b) => b.id === lembrado);
+    setBoardId(valido ? lembrado : (abertos[0]?.id ?? ""));
+  }, [open, boardId, boards]);
+
+  function close() {
+    setOpen(false);
+    setTitle("");
+    setTime("");
+    setDescription("");
+  }
 
   async function create() {
     const status = statuses.find((s) => s.is_default) ?? statuses[0];
     if (!boardId || !status) {
-      toast.error("Escolha o espaço e o quadro onde a tarefa entra");
+      toast.error("Escolha o quadro onde a tarefa entra");
       return;
     }
-    // Prazo hoje, ao fim do dia: é o que faz a tarefa aparecer no painel.
+    // Hoje, na hora escolhida — ou no fim do dia, que é o que faz a tarefa
+    // aparecer neste painel sem fingir um horário que ninguém marcou.
     const end = new Date();
-    end.setHours(23, 59, 0, 0);
+    const [hora, minuto] = time.split(":").map(Number);
+    if (time && Number.isFinite(hora) && Number.isFinite(minuto)) {
+      end.setHours(hora!, minuto!, 0, 0);
+    } else {
+      end.setHours(23, 59, 0, 0);
+    }
 
-    await saveTask.mutateAsync({
-      board_id: boardId,
-      status_id: status.id,
-      title: title.trim(),
-      due_date: end.toISOString(),
-    });
+    try {
+      await saveTask.mutateAsync({
+        board_id: boardId,
+        status_id: status.id,
+        title: title.trim(),
+        description: description.trim() || null,
+        due_date: end.toISOString(),
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível criar a tarefa");
+      return;
+    }
+    try {
+      localStorage.setItem(ULTIMO_QUADRO, boardId);
+    } catch {
+      // Sem armazenamento o atalho segue funcionando, só sem memória.
+    }
     toast.success("Tarefa criada para hoje");
-    setTitle("");
-    setOpen(false);
+    close();
   }
 
-  if (!open) {
-    return (
+  const semEtapa = Boolean(boardId) && statuses.length === 0;
+  const pronto = title.trim().length > 0 && !saveTask.isPending && !semEtapa;
+
+  return (
+    <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
         <Plus className="mr-1 size-3.5" /> Nova tarefa para hoje
       </Button>
-    );
-  }
 
-  return (
-    <div className="panel w-full p-3">
-      <div className="grid gap-2 sm:grid-cols-4">
-        <div className="space-y-1 sm:col-span-4">
-          <Label htmlFor="meu-dia-titulo">Tarefa</Label>
-          <Input
-            id="meu-dia-titulo"
-            autoFocus
-            value={title}
-            placeholder="O que precisa ser feito hoje?"
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && title.trim() && void create()}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="meu-dia-espaco">Espaço</Label>
-          <select
-            id="meu-dia-espaco"
-            value={spaceId}
-            onChange={(e) => {
-              setSpaceId(e.target.value);
-              setBoardId("");
+      <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : close())}>
+        <DialogContent className="max-h-[88vh] max-w-md overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Nova tarefa para hoje</DialogTitle>
+            <DialogDescription>
+              {new Date().toLocaleDateString("pt-BR", {
+                weekday: "long",
+                day: "2-digit",
+                month: "long",
+              })}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (pronto) void create();
             }}
-            className="h-9 w-full rounded-md border border-input bg-card px-2 text-sm"
           >
-            <option value="">Escolha…</option>
-            {activeSpaces.map((space) => (
-              <option key={space.id} value={space.id}>
-                {space.icon} {space.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="meu-dia-quadro">Quadro</Label>
-          <select
-            id="meu-dia-quadro"
-            value={boardId}
-            onChange={(e) => setBoardId(e.target.value)}
-            className="h-9 w-full rounded-md border border-input bg-card px-2 text-sm"
-          >
-            <option value="">Escolha…</option>
-            {spaceBoards.map((board) => (
-              <option key={board.id} value={board.id}>
-                {board.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-end gap-2 sm:col-span-2">
-          <Button
-            size="sm"
-            onClick={() => void create()}
-            disabled={!title.trim() || saveTask.isPending}
-          >
-            Criar para hoje
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setOpen(false)}>
-            Cancelar
-          </Button>
-        </div>
-      </div>
-      {boardId && statuses.length === 0 && (
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          Este quadro ainda não tem etapas. Crie uma etapa no quadro antes.
-        </p>
-      )}
-    </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="meu-dia-titulo">Tarefa</Label>
+              <Input
+                id="meu-dia-titulo"
+                autoFocus
+                value={title}
+                placeholder="O que precisa ser feito hoje?"
+                maxLength={200}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="meu-dia-hora">Horário</Label>
+              <DateField
+                id="meu-dia-hora"
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Em branco, vale para o fim do dia.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="meu-dia-descricao">Descrição</Label>
+              <Textarea
+                id="meu-dia-descricao"
+                rows={3}
+                value={description}
+                placeholder="Detalhes, links, contexto… (opcional)"
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="meu-dia-quadro">Quadro</Label>
+              <select
+                id="meu-dia-quadro"
+                value={boardId}
+                onChange={(e) => setBoardId(e.target.value)}
+                className="h-11 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-primary"
+              >
+                <option value="">Escolha…</option>
+                {activeBoards.map((board) => (
+                  <option key={board.id} value={board.id}>
+                    {spaceName(board.space_id)
+                      ? `${spaceName(board.space_id)} · ${board.name}`
+                      : board.name}
+                  </option>
+                ))}
+              </select>
+              {semEtapa && (
+                <p className="text-[11px] text-negative-soft-foreground">
+                  Este quadro ainda não tem etapas. Crie uma etapa nele antes.
+                </p>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button type="button" size="sm" variant="outline" onClick={close}>
+                Cancelar
+              </Button>
+              <Button type="submit" size="sm" disabled={!pronto}>
+                Criar para hoje
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

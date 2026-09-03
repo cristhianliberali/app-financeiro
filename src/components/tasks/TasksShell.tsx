@@ -555,7 +555,19 @@ export function TasksShell({
             Kanban ou num calendário que ocupam o resto da janela, e cada folga
             a mais aqui em cima é altura que sai deles.
           */}
-          <div className={`space-y-4 p-4 lg:px-6 lg:py-5 ${wide ? "" : "mx-auto max-w-[1600px]"}`}>
+          {/*
+            Nas telas de grade o conteúdo é uma coluna de altura cheia: é o que
+            permite ao Kanban pedir `flex-1` e ocupar o que sobra da janela,
+            sem ninguém medir nada. `h-full` e não `min-h-full`: com o mínimo, a
+            coluna cheia esticava até o último cartão e quem rolava era a página
+            inteira — o cabeçalho subia e o quadro deixava de ser um quadro. Com
+            a altura exata, quem rola é a pilha de cartões dentro da coluna.
+          */}
+          <div
+            className={`space-y-4 p-4 lg:px-6 lg:py-5 ${
+              wide ? "flex h-full flex-col" : "mx-auto max-w-[1600px]"
+            }`}
+          >
             {children}
           </div>
         </div>
