@@ -20,6 +20,7 @@ import {
   priorityOf,
 } from "@/lib/tasks-analytics";
 import { DEFAULT_SPACE_ICON, IconBadge } from "@/lib/icons";
+import { resumirTitulo, tituloPorExtenso } from "@/lib/task-title";
 import { LabelChip, LabelFilter } from "./LabelPicker";
 import { PriorityBadge } from "./PriorityPicker";
 import { UserAvatar, UserStack } from "./UserPicker";
@@ -295,8 +296,11 @@ export function TaskListView({
                                     : "border-l-info"
                           }`}
                         >
-                          <p className={`font-semibold ${state === "done" ? "done-text" : ""}`}>
-                            {task.title}
+                          <p
+                            className={`font-semibold ${state === "done" ? "done-text" : ""}`}
+                            title={tituloPorExtenso(task.title)}
+                          >
+                            {resumirTitulo(task.title)}
                           </p>
                           {showBoard && (
                             <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">

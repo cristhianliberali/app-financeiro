@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useNow } from "@/hooks/use-now";
 import { useActiveTimer, useStopTimer } from "@/lib/tasks";
 import { formatClock } from "@/lib/tasks-analytics";
+import { resumirTitulo } from "@/lib/task-title";
 
 /**
  * Cronômetro ativo do usuário, exibido no cabeçalho de todo o aplicativo.
@@ -33,7 +34,7 @@ export function ActiveTimerBar() {
           })
         }
       >
-        {timer.task.title}
+        {resumirTitulo(timer.task.title)}
       </button>
       <span className="font-mono text-xs font-bold tabular-nums text-primary">
         {formatClock(elapsed)}

@@ -3,6 +3,7 @@ import { CalendarClock, ExternalLink, GripHorizontal } from "lucide-react";
 
 import { useNow } from "@/hooks/use-now";
 import { cn } from "@/lib/utils";
+import { resumirTitulo } from "@/lib/task-title";
 
 /**
  * Grade de horários — a visão de semana e de dia dos calendários.
@@ -472,7 +473,9 @@ function Chip({ entry, onOpen }: { entry: GridEntry; onOpen: (entry: GridEntry) 
       ) : (
         <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />
       )}
-      <span className={cn("truncate", entry.done && "done-text")}>{entry.title}</span>
+      <span className={cn("truncate", entry.done && "done-text")}>
+        {resumirTitulo(entry.title)}
+      </span>
     </button>
   );
 }
@@ -572,7 +575,7 @@ function EventBlock({
         )}
       >
         {agenda && <CalendarClock className="mr-1 inline size-2.5 -translate-y-px" />}
-        {entry.title}
+        {resumirTitulo(entry.title)}
         {agenda && entry.link && (
           <ExternalLink className="ml-1 inline size-2.5 -translate-y-px opacity-0 transition-opacity group-hover:opacity-70" />
         )}

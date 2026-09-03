@@ -9,6 +9,7 @@ import { TaskListView } from "@/components/tasks/TaskListView";
 import { useTasksModule } from "@/components/tasks/useTasksModule";
 import { useBoardStatuses, useMoveTaskByPolarity, useTasks, type Task } from "@/lib/tasks";
 import { BOARD_VIEWS, POLARITIES, type BoardView, type Polarity } from "@/lib/tasks-analytics";
+import { resumirTitulo } from "@/lib/task-title";
 
 export const Route = createFileRoute("/tarefas/minhas")({
   head: () => ({
@@ -56,7 +57,7 @@ function MyTasksPage() {
         toast.error(`O quadro “${task.board.name}” não possui status com essa polaridade.`);
         return;
       }
-      toast.success(`“${task.title}” movida para ${result.statusName}`);
+      toast.success(`“${resumirTitulo(task.title)}” movida para ${result.statusName}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível mover a tarefa");
     }

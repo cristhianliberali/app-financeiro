@@ -7,6 +7,7 @@ import { useAgendaEvents, useGoogleStatus, useSyncGoogleNow } from "@/lib/google
 import { useSaveTask, type Task } from "@/lib/tasks";
 import { formatDateBR, toISODate } from "@/lib/format";
 import { WEEKDAY_LABELS, monthMatrix, todayKey, weekDays } from "@/lib/tasks-analytics";
+import { resumirTitulo, tituloPorExtenso } from "@/lib/task-title";
 import { buildCalendarEntries, type EntryMeta } from "./calendar-entries";
 import { TimeGrid, type GridEntry } from "./TimeGrid";
 
@@ -324,8 +325,9 @@ export function AgendaCalendar({
                         />
                         <span
                           className={`min-w-0 flex-1 truncate ${entry.done ? "done-text" : ""}`}
+                          title={tituloPorExtenso(entry.title)}
                         >
-                          {entry.title}
+                          {resumirTitulo(entry.title)}
                         </span>
                         <span className="font-mono text-[10px] text-muted-foreground">
                           {hourLabel(entry.allDay ? null : entry.start.toISOString())}
@@ -341,7 +343,12 @@ export function AgendaCalendar({
                         title="Compromisso da agenda"
                       >
                         <CalendarClock className="size-2.5 shrink-0" />
-                        <span className="min-w-0 flex-1 truncate">{entry.title}</span>
+                        <span
+                          className="min-w-0 flex-1 truncate"
+                          title={tituloPorExtenso(entry.title)}
+                        >
+                          {resumirTitulo(entry.title)}
+                        </span>
                         {entry.link && <ExternalLink className="size-2.5 shrink-0 opacity-60" />}
                       </a>
                     ),

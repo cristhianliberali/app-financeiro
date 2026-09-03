@@ -35,6 +35,7 @@ import {
   hoursOf,
   type BoardView,
 } from "@/lib/tasks-analytics";
+import { resumirTitulo } from "@/lib/task-title";
 
 export const Route = createFileRoute("/tarefas/quadros/$boardId")({
   validateSearch: (search: Record<string, unknown>): { task?: string } =>
@@ -140,7 +141,7 @@ function BoardPage() {
         responsible_user_id: draft.responsible_user_id,
         due_date: draft.due_date,
       });
-      toast.success(`“${draft.title}” criada`);
+      toast.success(`“${resumirTitulo(draft.title)}” criada`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível criar a tarefa");
       throw error;
@@ -243,7 +244,7 @@ function BoardPage() {
           onMove={async (task, columnId) => {
             await move.mutateAsync({ id: task.id, status_id: columnId });
             const name = statuses.find((s) => s.id === columnId)?.name ?? "";
-            toast.success(`“${task.title}” movida para ${name}`);
+            toast.success(`“${resumirTitulo(task.title)}” movida para ${name}`);
           }}
           onOpen={(task) => setTaskDialog({ open: true, task })}
           onToggleTimer={toggleTimer}
