@@ -181,7 +181,9 @@ function SpacePage() {
         </div>
 
         {boards.length > 0 && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+          // Sem `shrink-0` pelo mesmo motivo do quadro: ele vazava a barra para
+          // fora da tela no celular. Ver o comentário em `quadros/$boardId.tsx`.
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             {view !== "list" && (
               <TaskFilterBar
                 value={filters}

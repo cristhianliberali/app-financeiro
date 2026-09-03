@@ -323,6 +323,22 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+
+    /*
+     * Mata o zoom por toque duplo, e só ele.
+     *
+     * É o zoom que ninguém pede: dois toques rápidos em lugares diferentes —
+     * marcar duas tarefas, apertar dois dias do calendário — e a página salta
+     * de escala do nada. `manipulation` desliga esse gesto e mantém os que
+     * fazem falta: rolar, arrastar e a pinça.
+     *
+     * O zoom por pinça fica de propósito. Dá para bloqueá-lo no `viewport`
+     * (`user-scalable=no`), mas o Safari do iPhone ignora isso desde o iOS 10 —
+     * justamente para não deixar um site tirar de quem enxerga mal a única
+     * forma de ler. Ou seja: no aparelho do problema não funcionaria, e onde
+     * funciona é dano puro.
+     */
+    touch-action: manipulation;
   }
 
   /*

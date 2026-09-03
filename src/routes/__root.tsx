@@ -80,7 +80,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      /*
+       * Zoom travado no celular, a pedido.
+       *
+       * `user-scalable=no` é ignorado pelo Safari do iPhone desde o iOS 10 —
+       * ali a pinça continua funcionando, faça o que fizer. Vale no Chrome do
+       * Android e nas webviews. `maximum-scale=1` acompanha porque sozinho o
+       * `user-scalable` não segura alguns navegadores.
+       *
+       * O zoom que quebrava a tela (o automático, ao focar um campo) não
+       * depende disto: sai pelo mínimo de 16px em `styles.css`, que funciona
+       * inclusive no iPhone.
+       */
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
+      },
       { title: "Lovable App" },
       { name: "description", content: "Lovable Generated Project" },
       { name: "author", content: "Lovable" },
