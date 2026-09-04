@@ -129,6 +129,18 @@ campos descrevem o pedido, não a assinatura.
 A tolerância para na conferência do segredo e na decisão de acesso — ali,
 adivinhar é o erro.
 
+**A entrega do acesso roda em `subscription_created`, e em nenhum outro evento.**
+Uma compra dispara também `purchase_approved` com o mesmo `data[0].id`;
+provisionar nos dois mandaria duas senhas diferentes para a mesma pessoa. A
+renovação não provisiona pelo motivo inverso — quem renova já escolheu a própria
+senha. Quem muda isso precisa responder antes: qual das senhas a pessoa usa?
+
+Duas travas em volta disso, ambas com motivo concreto:
+`acesso_provisionado_em` impede que *Reprocessar* vire uma enxurrada de senhas
+(a saída para o e-mail que não saiu é *Reenviar acesso*, no painel), e super
+admin nunca tem a senha trocada por webhook — testar a própria compra não pode
+custar o painel.
+
 Esconder botão na tela não é trava: server function é endpoint HTTP. Toda função
 que lê ou escreve dado financeiro ou de tarefa passa por `requirePlano`; ficam
 fora, de propósito, entrar, sair, o próprio cadastro e a tela de assinatura.

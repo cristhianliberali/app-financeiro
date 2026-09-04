@@ -239,6 +239,13 @@ do ar não pode virar um app fora do ar.
   aponte o webhook, confira no painel que os status estão chegando, e só então
   ligue. Ligar antes trancaria os usuários existentes para fora dos dados deles.
 
+Quando uma assinatura nasce (`subscription_created`), o app **cria a conta de
+quem comprou e manda a senha por e-mail** — pagar já é entrar, sem cadastro. Só
+esse evento provisiona: a mesma compra dispara `purchase_approved` também, e
+fazer nos dois mandaria duas senhas diferentes para a mesma pessoa. Quem já
+tinha conta recebe uma senha provisória nova; super admin nunca tem a senha
+trocada. Precisa de SMTP configurado.
+
 Em **/admin** há uma área de super admin, com entrada própria: usuários ativos,
 busca e filtro por status, cortesia em um clique (1 mês, 3 meses, 1 ano ou sem
 prazo), histórico de toda mudança com autor e motivo, e a lista crua dos eventos

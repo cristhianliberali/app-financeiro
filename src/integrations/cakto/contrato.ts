@@ -119,6 +119,31 @@ const STATUS_CAKTO_RESTRITIVO: Record<string, StatusPlano> = {
   pausada: "pausado",
 };
 
+/**
+ * Os eventos que criam a conta e mandam a senha por e-mail.
+ *
+ * **Só `subscription_created`**, e a restrição é o ponto. Uma compra dispara
+ * `purchase_approved` *e* `subscription_created` com o mesmo `data[0].id` — dá
+ * para ver isso nas fixtures reais, onde os dois trazem o pedido
+ * `d4cf37de-…`. Provisionar nos dois criaria a conta uma vez e mandaria dois
+ * e-mails com senhas diferentes, e a pessoa ficaria sem saber qual das duas
+ * vale.
+ *
+ * `subscription_created` é o evento certo porque é o que marca o começo da
+ * relação, e não o pagamento avulso: ele traz `subscription.id` e a data da
+ * próxima cobrança, que é o que a assinatura tem de específico.
+ *
+ * Renovação não entra aqui, e nem poderia: quem renova já tem conta há um mês,
+ * e receber uma senha nova a cada ciclo seria perder a senha que a pessoa
+ * escolheu.
+ */
+const EVENTOS_DE_PROVISIONAMENTO = new Set(["subscription_created", "assinatura_criada"]);
+
+/** A compra deste evento deve criar conta e mandar acesso por e-mail? */
+export function ehEventoDeProvisionamento(evento: string): boolean {
+  return EVENTOS_DE_PROVISIONAMENTO.has(normalizarNomeEvento(evento));
+}
+
 /** Eventos que reconhecemos e que, de propósito, não mexem no acesso. */
 const EVENTOS_SEM_EFEITO = new Set([
   "pix_generated",

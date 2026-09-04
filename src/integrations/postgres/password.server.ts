@@ -6,7 +6,7 @@
  * — para que os parâmetros possam mudar no futuro sem invalidar as senhas já
  * cadastradas.
  */
-import { randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomInt, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 
 const scrypt = promisify(scryptCb) as (
@@ -65,4 +65,35 @@ export async function verifyPassword(password: string, stored: string): Promise<
     maxmem: maxmem(N, r),
   });
   return derived.length === expected.length && timingSafeEqual(derived, expected);
+}
+
+/**
+ * Alfabeto da senha provisória, sem os caracteres que se confundem lidos de um
+ * e-mail: `0`/`O`, `1`/`l`/`I`, `5`/`S`, `2`/`Z`. Quem recebe vai digitar isto à
+ * mão, e uma senha ambígua vira um "não consigo entrar" que ninguém consegue
+ * diagnosticar pelo suporte.
+ */
+const ALFABETO_LEGIVEL = "ABCDEFGHJKLMNPQRTUVWXYabcdefghijkmnopqrstuvwxyz346789";
+
+/**
+ * Senha provisória aleatória, em grupos separados por hífen (`Kf7x-Pq2m-Tb9w`).
+ *
+ * São 12 caracteres de um alfabeto de 52 — cerca de 68 bits de entropia, muito
+ * acima do que uma senha digitada por pessoa costuma ter. Os grupos existem só
+ * para a leitura: dividir em três blocos de quatro é o que torna possível
+ * copiar do e-mail sem errar.
+ *
+ * `randomInt` do node:crypto é usado em vez de `Math.random` porque isto é
+ * credencial: um gerador previsível aqui valeria por uma senha adivinhável.
+ */
+export function gerarSenhaProvisoria(): string {
+  const grupos: string[] = [];
+  for (let g = 0; g < 3; g += 1) {
+    let bloco = "";
+    for (let i = 0; i < 4; i += 1) {
+      bloco += ALFABETO_LEGIVEL[randomInt(ALFABETO_LEGIVEL.length)];
+    }
+    grupos.push(bloco);
+  }
+  return grupos.join("-");
 }

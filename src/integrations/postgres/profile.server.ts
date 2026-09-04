@@ -293,10 +293,10 @@ export async function resetPassword(token: string, newPassword: string): Promise
   const passwordHash = await hashPassword(newPassword);
 
   await withTransaction(async (client) => {
-    await client.query(`UPDATE app_users SET password_hash = $2 WHERE id = $1`, [
-      row.user_id,
-      passwordHash,
-    ]);
+    await client.query(
+      `UPDATE app_users SET password_hash = $2, senha_provisoria = false WHERE id = $1`,
+      [row.user_id, passwordHash],
+    );
     await client.query(`UPDATE password_resets SET consumed_at = now() WHERE id = $1`, [row.id]);
   });
 

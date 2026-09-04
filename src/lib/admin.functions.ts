@@ -284,3 +284,20 @@ export const testarConexaoCakto = createServerFn({ method: "POST" })
       }
     },
   );
+
+/**
+ * Gera uma senha provisória nova e reenvia o e-mail de acesso.
+ *
+ * A saída para quando o e-mail automático da compra não chegou — o webhook já
+ * marcou o acesso como entregue, então reprocessar o evento não reenviaria nada.
+ */
+export const reenviarAcessoAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSuperAdmin])
+  .inputValidator((input: { userId: string }) => {
+    if (!input?.userId) throw new Error("Informe o usuário");
+    return { userId: input.userId };
+  })
+  .handler(async ({ data, context }): Promise<{ ok: boolean; detalhe: string }> => {
+    const { reenviarAcesso } = await import("@/integrations/cakto/provisionamento.server");
+    return reenviarAcesso({ userId: data.userId, atorId: context.admin.id });
+  });

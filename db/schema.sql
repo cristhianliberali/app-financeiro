@@ -805,6 +805,18 @@ ALTER TABLE app_users ADD COLUMN IF NOT EXISTS cakto_customer_id text;
 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS cakto_subscription_id text;
 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_super_admin boolean NOT NULL DEFAULT false;
 
+-- Provisionamento de acesso pela compra (evento `subscription_created`).
+--
+-- `acesso_provisionado_em` é a trava de "uma vez só": marca que a conta já
+-- recebeu o e-mail com a senha de acesso. Sem ela, reprocessar o evento no
+-- painel geraria uma senha nova e um segundo e-mail — e a pessoa ficaria com
+-- duas senhas na caixa de entrada sem saber qual vale.
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS acesso_provisionado_em timestamptz;
+-- Continua `true` até a pessoa trocar a senha que veio por e-mail. Aparece no
+-- painel do super admin: senha provisória parada na caixa de entrada há meses é
+-- exatamente o tipo de coisa que ninguém descobre sem alguém poder olhar.
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS senha_provisoria boolean NOT NULL DEFAULT false;
+
 -- DROP antes do ADD, e não um bloco que engole "constraint já existe": o
 -- vocabulário cresce (`pausado` entrou depois que os webhooks reais mostraram
 -- o evento `subscription_paused`), e engolir o erro deixaria o banco preso na

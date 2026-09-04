@@ -29,6 +29,7 @@ Disso saem três consequências que valem mais do que qualquer detalhe de campo:
 | `src/lib/plano.ts` | Vocabulário de status e a regra que libera. Puro, roda nos dois lados. |
 | `src/integrations/cakto/contrato.ts` | Traduz o corpo do webhook para esse vocabulário. Puro. |
 | `src/integrations/cakto/webhook.server.ts` | Guarda o corpo cru e aplica o efeito. |
+| `src/integrations/cakto/provisionamento.server.ts` | Cria a conta e manda a senha por e-mail. |
 | `src/integrations/cakto/api.server.ts` | Cliente da API pública (opcional; só o teste de conexão). |
 | `src/integrations/postgres/plano.server.ts` | Único lugar que escreve `status_plano`. |
 | `src/routes/api/cakto/webhook.ts` | O endpoint que a Cakto chama. |
@@ -136,9 +137,10 @@ justamente da tela que existe para ela voltar a pagar.
 
 ## O que acontece em cada caso
 
-**Compra antes do cadastro.** O webhook chega sem ninguém a quem aplicá-lo e
-fica `sem_usuario`. Quando a pessoa se cadastra com aquele e-mail, o cadastro
-aplica os eventos pendentes e ela já entra liberada.
+**Compra antes do cadastro.** É o caminho normal de quem chega pelo checkout, e
+está resolvido: `subscription_created` **cria a conta** e manda a senha por
+e-mail (ver a seção seguinte). O `purchase_approved` que chega junto fica
+`sem_usuario` se vier antes — inofensivo, e some ao ser reprocessado.
 
 **E-mail da compra diferente do cadastro.** O evento fica `sem_usuario` e
 aparece no painel. Duas saídas: a pessoa troca o e-mail do cadastro (aí
@@ -158,6 +160,46 @@ o segundo é reconhecido como duplicado e não reaplica nada.
 **Ajuste manual e depois um evento da Cakto.** O evento ganha: o estado gravado
 é sempre o do último a chegar, e o webhook não sabe que alguém mexeu na mão.
 Para cortesia permanente, use uma conta sem assinatura ativa na Cakto.
+
+## Entrega do acesso (conta e senha por e-mail)
+
+Quando uma assinatura nasce, o app cria a conta de quem comprou e manda a senha
+por e-mail. Quem comprou não precisa se cadastrar: paga e recebe o acesso.
+
+**Só o evento `subscription_created` dispara isso**, e a restrição é o ponto do
+desenho. Uma compra manda também `purchase_approved`, com o mesmo `data[0].id` —
+dá para ver nas fixtures reais, onde os dois trazem o pedido `d4cf37de-…`.
+Provisionar nos dois criaria a conta uma vez e mandaria **duas senhas
+diferentes** para a mesma pessoa, que não teria como saber qual vale.
+
+Renovação também não provisiona, pelo mesmo motivo invertido: quem renova já
+tem conta e já escolheu a própria senha.
+
+| Situação | O que acontece |
+| --- | --- |
+| Não existe conta com aquele e-mail | Conta criada, senha provisória por e-mail |
+| Já existe conta | Senha provisória nova por e-mail (a anterior deixa de valer) |
+| A conta é de um super admin | **Nada muda.** Só o plano é aplicado |
+| Acesso já entregue antes | Nada é reenviado |
+| Sem SMTP configurado | Nada é criado; o motivo fica no detalhe do evento |
+
+O caso do super admin não é detalhe: você vai testar comprando com o seu próprio
+e-mail, e ter a senha trocada por baixo te tiraria do painel no meio do teste —
+justamente onde se conserta o que der errado.
+
+A trava de "uma vez só" é `app_users.acesso_provisionado_em`. Sem ela, cada
+clique em *Reprocessar* geraria uma senha nova e a pessoa acumularia senhas na
+caixa de entrada. Por isso, quando o e-mail **não** sai (SMTP fora no momento da
+compra), reprocessar não resolve: a saída é o botão **Reenviar acesso**, no
+diálogo de gerenciar assinatura, que gera outra senha e manda de novo.
+
+`app_users.senha_provisoria` fica `true` até a pessoa escolher a própria senha, e
+aparece como um ícone de chave na lista do painel — senha provisória parada numa
+caixa de entrada há meses é exatamente o que ninguém descobre sem poder olhar.
+
+Desligue tudo com `CAKTO_PROVISIONAR_ACESSO=false`; aí a compra continua
+liberando o plano, mas a conta passa a ser responsabilidade de quem comprou
+(cadastro normal, que aplica os eventos pendentes daquele e-mail).
 
 ## Diagnóstico
 

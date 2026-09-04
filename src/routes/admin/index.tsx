@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { PlugZap, Search, ShieldCheck, SlidersHorizontal } from "lucide-react";
+import { KeyRound, PlugZap, Search, ShieldCheck, SlidersHorizontal } from "lucide-react";
 
 import { AdminShell } from "@/components/admin/AdminShell";
 import { PlanoDialog } from "@/components/admin/PlanoDialog";
@@ -204,6 +204,14 @@ function AdminUsuariosPage() {
                         <ShieldCheck
                           className="size-3.5 shrink-0 text-primary"
                           aria-label="Super admin"
+                        />
+                      )}
+                      {/* Senha provisória parada numa caixa de entrada é a
+                          pendência que ninguém descobre sem alguém poder ver. */}
+                      {u.senha_provisoria && (
+                        <KeyRound
+                          className="size-3.5 shrink-0 text-warning"
+                          aria-label="Ainda usa a senha provisória enviada por e-mail"
                         />
                       )}
                     </span>

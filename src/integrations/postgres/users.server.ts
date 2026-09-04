@@ -71,7 +71,10 @@ export async function authenticate(email: string, password: string): Promise<Use
 }
 
 export async function updatePassword(userId: string, password: string): Promise<void> {
-  await query(`UPDATE app_users SET password_hash = $2 WHERE id = $1`, [
+  // `senha_provisoria = false` no mesmo UPDATE, e não numa chamada separada:
+  // escolher a própria senha é exatamente o que encerra a provisória, e separar
+  // as duas coisas abriria a chance de a marca sobreviver à troca.
+  await query(`UPDATE app_users SET password_hash = $2, senha_provisoria = false WHERE id = $1`, [
     userId,
     await hashPassword(password),
   ]);
@@ -81,4 +84,61 @@ export async function updatePassword(userId: string, password: string): Promise<
 export async function countUsers(): Promise<number> {
   const row = await queryOne<{ total: number }>(`SELECT count(*)::bigint AS total FROM app_users`);
   return row?.total ?? 0;
+}
+
+/**
+ * Cria a conta de quem comprou antes de se cadastrar.
+ *
+ * Diferente de `createUser`, não é um cadastro: ninguém escolheu esta senha, e
+ * é por isso que `senha_provisoria` nasce `true` — o app e o painel precisam
+ * saber que existe uma credencial em trânsito num e-mail.
+ *
+ * Devolve `null` quando a conta já existia. Corrida entre dois webhooks do
+ * mesmo comprador é rara, mas é exatamente o tipo de coisa que só aparece em
+ * produção: o `ON CONFLICT` resolve no banco, e não numa checagem antes do
+ * insert que a outra requisição poderia atravessar.
+ */
+export async function criarUsuarioProvisionado(input: {
+  email: string;
+  senha: string;
+  nome?: string | null;
+}): Promise<UserRow | null> {
+  return queryOne<UserRow>(
+    `INSERT INTO app_users (email, password_hash, full_name, senha_provisoria, acesso_provisionado_em)
+     VALUES ($1, $2, $3, true, now())
+     ON CONFLICT (email) DO NOTHING
+     RETURNING id, email, full_name, start_route`,
+    [normalizeEmail(input.email), await hashPassword(input.senha), input.nome?.trim() || null],
+  );
+}
+
+/**
+ * Troca a senha de uma conta que já existe por uma provisória, e marca o
+ * provisionamento como feito.
+ *
+ * As sessões abertas **não** são derrubadas aqui. Quem chama é o webhook, não a
+ * pessoa: expulsar do app alguém que está no meio de um lançamento porque uma
+ * cobrança foi processada seria o app agindo pelas costas dela. A senha antiga
+ * deixa de valer, o que basta para o e-mail fazer sentido.
+ */
+export async function aplicarSenhaProvisoria(userId: string, senha: string): Promise<void> {
+  await query(
+    `UPDATE app_users
+        SET password_hash = $2, senha_provisoria = true,
+            acesso_provisionado_em = now(), updated_at = now()
+      WHERE id = $1`,
+    [userId, await hashPassword(senha)],
+  );
+}
+
+/**
+ * Some com a marca de senha provisória. Chamado quando a pessoa escolhe a
+ * própria senha — é o que fecha o ciclo aberto pelo e-mail.
+ */
+export async function limparSenhaProvisoria(userId: string): Promise<void> {
+  await query(
+    `UPDATE app_users SET senha_provisoria = false, updated_at = now()
+      WHERE id = $1 AND senha_provisoria = true`,
+    [userId],
+  );
 }

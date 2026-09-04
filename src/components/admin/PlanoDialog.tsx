@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { definirPlanoAdmin, lerHistoricoAdmin, type UsuarioAdmin } from "@/lib/admin.functions";
+import {
+  definirPlanoAdmin,
+  lerHistoricoAdmin,
+  reenviarAcessoAdmin,
+  type UsuarioAdmin,
+} from "@/lib/admin.functions";
 import { ROTULO_ORIGEM, ROTULO_STATUS, STATUS_PLANO, type StatusPlano } from "@/lib/plano";
 
 const SELECT_CLASS =
@@ -59,6 +65,16 @@ export function PlanoDialog({
     queryKey: ["admin", "historico", usuario?.id],
     queryFn: () => lerHistoricoAdmin({ data: { userId: usuario!.id } }),
     enabled: !!usuario,
+  });
+
+  const reenviar = useMutation({
+    mutationFn: () => reenviarAcessoAdmin({ data: { userId: usuario!.id } }),
+    onSuccess: (resultado) => {
+      (resultado.ok ? toast.success : toast.error)(resultado.detalhe, { duration: 10_000 });
+      qc.invalidateQueries({ queryKey: ["admin"] });
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Não foi possível reenviar"),
   });
 
   const salvar = useMutation({
@@ -213,13 +229,27 @@ export function PlanoDialog({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
-            Cancelar
+        <DialogFooter className="sm:justify-between">
+          {/* Fica no rodapé, longe dos campos de plano, porque não é um ajuste
+              de assinatura: é a saída para quando o e-mail da compra não
+              chegou. Sai daqui uma senha nova — a anterior deixa de valer. */}
+          <Button
+            variant="outline"
+            onClick={() => reenviar.mutate()}
+            disabled={reenviar.isPending}
+            title="Gera uma senha provisória nova e manda por e-mail"
+          >
+            <KeyRound className="size-4" />
+            {reenviar.isPending ? "Enviando…" : "Reenviar acesso"}
           </Button>
-          <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
-            {salvar.isPending ? "Salvando…" : "Salvar"}
-          </Button>
+          <span className="flex gap-2">
+            <Button variant="ghost" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
+              {salvar.isPending ? "Salvando…" : "Salvar"}
+            </Button>
+          </span>
         </DialogFooter>
       </DialogContent>
     </Dialog>

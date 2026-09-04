@@ -7,6 +7,10 @@
  *      qualquer interpretação;
  *   2. **aplicar** o que ele significa em `app_users`.
  *
+ * Na assinatura nascendo entra uma terceira etapa, entre as duas: criar a conta
+ * de quem comprou sem ter cadastro e mandar a senha por e-mail
+ * (`provisionamento.server.ts`).
+ *
  * A separação é o que torna a integração recuperável. Se a etapa 2 estiver
  * errada — um campo com outro nome, um evento que a Cakto passou a mandar
  * depois — o corpo original continua no banco e o super admin reprocessa o
@@ -21,7 +25,7 @@
 import { query, queryOne } from "@/integrations/postgres/client.server";
 import { aplicarPlano } from "@/integrations/postgres/plano.server";
 
-import { interpretarWebhook, type EventoCakto } from "./contrato";
+import { ehEventoDeProvisionamento, interpretarWebhook, type EventoCakto } from "./contrato";
 
 export type SituacaoEvento = "pendente" | "aplicado" | "ignorado" | "erro" | "sem_usuario";
 
@@ -156,6 +160,17 @@ export async function aplicarEvento(eventoId: string): Promise<ResultadoWebhook>
     return { eventoId, situacao: "ignorado", detalhe, duplicado: false };
   }
 
+  // A assinatura nascendo é o momento de entregar o acesso: cria a conta de
+  // quem comprou sem ter cadastro e manda a senha por e-mail. Vem antes de
+  // procurar o usuário porque é justamente isto que faz o usuário existir.
+  let provisionamento: string | null = null;
+  if (ehEventoDeProvisionamento(lido.evento)) {
+    const { provisionarAcesso } = await import("./provisionamento.server");
+    const resultado = await provisionarAcesso(lido);
+    provisionamento = resultado.detalhe;
+    console.info(`[cakto] provisionamento: ${resultado.detalhe}`);
+  }
+
   const userId = await acharUsuario(lido);
   if (!userId) {
     // Não é erro, e não é raro: comprar antes de criar a conta é o caminho
@@ -164,7 +179,7 @@ export async function aplicarEvento(eventoId: string): Promise<ResultadoWebhook>
     const detalhe = lido.email
       ? `Nenhuma conta com o e-mail ${lido.email}. O acesso é liberado quando ela for criada.`
       : "Evento sem e-mail de cliente — não dá para saber a quem se refere.";
-    await marcar(eventoId, "sem_usuario", detalhe);
+    await marcar(eventoId, "sem_usuario", juntar(detalhe, provisionamento));
     return { eventoId, situacao: "sem_usuario", detalhe, duplicado: false };
   }
 
@@ -188,9 +203,14 @@ export async function aplicarEvento(eventoId: string): Promise<ResultadoWebhook>
     return { eventoId, situacao: "erro", detalhe, duplicado: false };
   }
 
-  const detalhe = `Plano definido como "${lido.status}"`;
+  const detalhe = juntar(`Plano definido como "${lido.status}"`, provisionamento);
   await marcar(eventoId, "aplicado", detalhe, { userId, statusAplicado: lido.status });
   return { eventoId, situacao: "aplicado", detalhe, duplicado: false };
+}
+
+/** Duas frases num detalhe só, quando a segunda existe. */
+function juntar(principal: string, extra: string | null): string {
+  return extra ? `${principal}. ${extra}` : principal;
 }
 
 /** Caminho completo do endpoint: guardar e aplicar. */

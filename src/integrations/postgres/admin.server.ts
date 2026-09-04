@@ -22,6 +22,9 @@ export type UsuarioAdmin = {
   plano_observacao: string | null;
   cakto_subscription_id: string | null;
   is_super_admin: boolean;
+  /** Ainda usando a senha que veio por e-mail — nunca escolheu a própria. */
+  senha_provisoria: boolean;
+  acesso_provisionado_em: Date | null;
   created_at: Date;
   /** Última vez que uma sessão desta pessoa foi vista. Nulo = nunca entrou. */
   ultimo_acesso: Date | null;
@@ -51,7 +54,7 @@ export async function listarUsuarios(
   const itens = await query<UsuarioAdmin>(
     `SELECT u.id, u.email, u.full_name, u.status_plano, u.codigo_oferta, u.plano_expira_em,
             u.plano_origem, u.plano_atualizado_em, u.plano_observacao, u.cakto_subscription_id,
-            u.is_super_admin, u.created_at,
+            u.is_super_admin, u.senha_provisoria, u.acesso_provisionado_em, u.created_at,
             (SELECT max(s.last_seen_at) FROM user_sessions s WHERE s.user_id = u.id) AS ultimo_acesso,
             (SELECT count(*)::int FROM accounts a WHERE a.owner_id = u.id) AS contas
        FROM app_users u
@@ -180,7 +183,7 @@ export async function buscarUsuarioPorId(userId: string): Promise<UsuarioAdmin |
   return queryOne<UsuarioAdmin>(
     `SELECT u.id, u.email, u.full_name, u.status_plano, u.codigo_oferta, u.plano_expira_em,
             u.plano_origem, u.plano_atualizado_em, u.plano_observacao, u.cakto_subscription_id,
-            u.is_super_admin, u.created_at,
+            u.is_super_admin, u.senha_provisoria, u.acesso_provisionado_em, u.created_at,
             (SELECT max(s.last_seen_at) FROM user_sessions s WHERE s.user_id = u.id) AS ultimo_acesso,
             (SELECT count(*)::int FROM accounts a WHERE a.owner_id = u.id) AS contas
        FROM app_users u WHERE u.id = $1`,

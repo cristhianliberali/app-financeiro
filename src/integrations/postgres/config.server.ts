@@ -620,6 +620,17 @@ export function getPlanoToleranciaDias(): number {
 }
 
 /**
+ * Criar a conta e mandar a senha por e-mail quando uma assinatura nasce.
+ *
+ * Ligado por padrão, mas só age com SMTP configurado: criar uma conta cuja
+ * senha ninguém consegue receber deixaria a pessoa trancada do lado de fora com
+ * a compra paga — pior do que não criar conta nenhuma.
+ */
+export function isProvisionamentoAtivo(): boolean {
+  return readBool("CAKTO_PROVISIONAR_ACESSO", true) && isSmtpConfigured();
+}
+
+/**
  * Carência da inadimplência, em dias.
  *
  * Uma renovação recusada não encerra a assinatura: a Cakto tenta de novo. Os
