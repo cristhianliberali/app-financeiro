@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireAuth } from "@/integrations/postgres/auth-middleware";
+import { requirePlano } from "@/integrations/postgres/auth-middleware";
 
 import type { ChatReply } from "./chat-contract";
 
@@ -45,7 +45,7 @@ function requireMidia(value: unknown, campo: string): MidiaChat {
 
 /** Diz à tela se o chat está configurado neste ambiente. */
 export const getChatConfig = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .handler(async (): Promise<{ enabled: boolean; provider: string; model: string | null }> => {
     const { getChatSettings } = await import("@/integrations/postgres/config.server");
     try {
@@ -68,7 +68,7 @@ export const getChatConfig = createServerFn({ method: "GET" })
  * modelo de chat. O que foi extraído volta em `origem`, para a tela mostrar.
  */
 export const sendChatMessage = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: {
       profileId: string;

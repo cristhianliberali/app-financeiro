@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { LogOut, Settings, Users } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { CreditCard, LogOut, Settings, ShieldAlert, Users } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +12,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ProfileDialog } from "@/components/ProfileDialog";
 import { useAuth } from "@/hooks/useAuth";
+import { souSuperAdmin } from "@/lib/admin.functions";
+import { SUPER_ADMIN_QUERY_KEY } from "@/components/admin/AdminShell";
 
 /** Iniciais do nome (ou do e-mail, quando não há nome cadastrado). */
 function initials(name: string | null, email: string): string {
@@ -35,6 +38,17 @@ export function ProfileMenu({
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+
+  // A entrada do painel só aparece para quem pode entrar nele. Esconder não é a
+  // proteção — a rota se defende sozinha —, mas um item de menu que leva a uma
+  // porta fechada é ruído para todo mundo que não administra o app.
+  const { data: admin } = useQuery({
+    queryKey: SUPER_ADMIN_QUERY_KEY,
+    queryFn: () => souSuperAdmin(),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
 
   if (!user) return null;
 
@@ -73,6 +87,17 @@ export function ProfileMenu({
           <DropdownMenuItem onClick={() => navigate({ to: "/conta" })}>
             <Users className="mr-2 size-4" /> Conta &amp; equipe
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate({ to: "/assinatura" })}>
+            <CreditCard className="mr-2 size-4" /> Assinatura
+          </DropdownMenuItem>
+          {admin && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate({ to: "/admin" })}>
+                <ShieldAlert className="mr-2 size-4" /> Painel do super admin
+              </DropdownMenuItem>
+            </>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={async () => {

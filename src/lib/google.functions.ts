@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireAuth } from "@/integrations/postgres/auth-middleware";
+import { requirePlano } from "@/integrations/postgres/auth-middleware";
 import type { CalendarDiagnostic } from "@/integrations/postgres/google.server";
 
 export type GoogleStatus = {
@@ -30,7 +30,7 @@ function requireDate(value: unknown, field: string): string {
 }
 
 export const getGoogleStatus = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .handler(async ({ context }): Promise<GoogleStatus> => {
     const { isGoogleConfigured } = await import("@/integrations/postgres/config.server");
     if (!isGoogleConfigured()) {
@@ -57,7 +57,7 @@ export const getGoogleStatus = createServerFn({ method: "GET" })
 
 /** Devolve a URL de consentimento; quem redireciona é o navegador. */
 export const startGoogleConnection = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .handler(async (): Promise<{ url: string }> => {
     const { startGoogleConnection: run } =
       await import("@/integrations/postgres/google-oauth.server");
@@ -65,7 +65,7 @@ export const startGoogleConnection = createServerFn({ method: "POST" })
   });
 
 export const disconnectGoogle = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .handler(async ({ context }): Promise<null> => {
     const { disconnect } = await import("@/integrations/postgres/google.server");
     await disconnect(context.user.id);
@@ -74,7 +74,7 @@ export const disconnectGoogle = createServerFn({ method: "POST" })
 
 /** Botão "sincronizar agora" do painel. */
 export const syncGoogleNow = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .handler(
     async ({
       context,
@@ -99,7 +99,7 @@ export const syncGoogleNow = createServerFn({ method: "POST" })
  * última rodada.
  */
 export const diagnoseCalendarSync = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .handler(async ({ context }): Promise<CalendarDiagnostic> => {
     const { diagnoseCalendar } = await import("@/integrations/postgres/google.server");
     return diagnoseCalendar(context.user.id);
@@ -107,7 +107,7 @@ export const diagnoseCalendarSync = createServerFn({ method: "POST" })
 
 /** Compromissos da agenda numa janela de datas, para o calendário do painel. */
 export const fetchAgendaEvents = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { from: string; to: string }) => ({
     from: requireDate(input?.from, "from"),
     to: requireDate(input?.to, "to"),

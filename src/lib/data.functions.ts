@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireAuth } from "@/integrations/postgres/auth-middleware";
+import { requirePlano } from "@/integrations/postgres/auth-middleware";
 
 /** Espelha `DATA_TABLES` do servidor para validar a entrada já no cliente. */
 export const DATA_TABLES = [
@@ -27,7 +27,7 @@ function requireTable(value: unknown): DataTableName {
 }
 
 export const fetchProfiles = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { accountId: string }) => ({ accountId: requireId(input?.accountId) }))
   .handler(async ({ data, context }) => {
     const { listProfiles } = await import("@/integrations/postgres/repository.server");
@@ -35,7 +35,7 @@ export const fetchProfiles = createServerFn({ method: "GET" })
   });
 
 export const fetchCategories = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { profileId: string }) => ({ profileId: requireId(input?.profileId) }))
   .handler(async ({ data, context }) => {
     const { listCategories } = await import("@/integrations/postgres/repository.server");
@@ -43,7 +43,7 @@ export const fetchCategories = createServerFn({ method: "GET" })
   });
 
 export const fetchTransactions = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { profileId: string; from?: string; to?: string; basis?: string }) => ({
     profileId: requireId(input?.profileId),
     ...(input?.from ? { from: input.from } : {}),
@@ -57,7 +57,7 @@ export const fetchTransactions = createServerFn({ method: "GET" })
   });
 
 export const fetchRecurring = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { profileId: string }) => ({ profileId: requireId(input?.profileId) }))
   .handler(async ({ data, context }) => {
     const { listRecurring } = await import("@/integrations/postgres/repository.server");
@@ -65,7 +65,7 @@ export const fetchRecurring = createServerFn({ method: "GET" })
   });
 
 export const fetchInvestments = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { profileId: string }) => ({ profileId: requireId(input?.profileId) }))
   .handler(async ({ data, context }) => {
     const { listInvestments } = await import("@/integrations/postgres/repository.server");
@@ -73,7 +73,7 @@ export const fetchInvestments = createServerFn({ method: "GET" })
   });
 
 export const fetchGoals = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { profileId: string }) => ({ profileId: requireId(input?.profileId) }))
   .handler(async ({ data, context }) => {
     const { listGoals } = await import("@/integrations/postgres/repository.server");
@@ -87,7 +87,7 @@ export const fetchGoals = createServerFn({ method: "GET" })
  * materializar a série são uma coisa só, e precisam cair na mesma transação.
  */
 export const saveRecurring = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: {
       id?: string;
@@ -136,7 +136,7 @@ export const saveRecurring = createServerFn({ method: "POST" })
 
 /** Quantos lançamentos a regra tem hoje — o que a confirmação de exclusão mostra. */
 export const fetchRecurringImpact = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { id: string }) => ({ id: requireId(input?.id) }))
   .handler(async ({ data, context }) => {
     const { recurringImpact } = await import("@/integrations/postgres/recurring.server");
@@ -145,7 +145,7 @@ export const fetchRecurringImpact = createServerFn({ method: "POST" })
 
 /** Exclui a regra, com o destino dos lançamentos escolhido por quem exclui. */
 export const removeRecurring = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { id: string; scope: "all" | "future" | "keep" }) => {
     if (!["all", "future", "keep"].includes(input?.scope)) {
       throw new Error("Escolha o que fazer com os lançamentos já criados");
@@ -158,7 +158,7 @@ export const removeRecurring = createServerFn({ method: "POST" })
   });
 
 export const upsertRows = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator(
     (input: {
       table: DataTableName;
@@ -179,7 +179,7 @@ export const upsertRows = createServerFn({ method: "POST" })
 
 /** Exclusão em massa: uma transação no banco, uma requisição só. */
 export const removeManyRows = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { table: DataTableName; ids: string[] }) => {
     const ids = Array.isArray(input?.ids) ? input.ids : [];
     if (ids.length === 0) throw new Error("Nenhum registro selecionado");
@@ -193,7 +193,7 @@ export const removeManyRows = createServerFn({ method: "POST" })
   });
 
 export const removeRow = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
+  .middleware([requirePlano])
   .inputValidator((input: { table: DataTableName; id: string }) => ({
     table: requireTable(input?.table),
     id: requireId(input?.id),

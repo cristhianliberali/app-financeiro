@@ -160,3 +160,79 @@ export async function sendEmailChangedNoticeEmail(input: {
     }),
   });
 }
+
+/**
+ * Acesso liberado pela compra: o e-mail que carrega a senha provisória.
+ *
+ * É a única mensagem do app que leva uma credencial no corpo, e o texto assume
+ * isso em vez de disfarçar: diz que a senha é provisória, pede a troca e explica
+ * de onde ela veio. Quem recebe não pediu nada — comprou —, e um e-mail com
+ * senha que não explica o motivo parece exatamente com um golpe.
+ *
+ * `novaConta` muda duas frases, não o formato: quem já tinha conta precisa saber
+ * que a senha antiga deixou de valer, e quem não tinha precisa saber que a conta
+ * acabou de nascer.
+ */
+export async function sendAccessProvisionedEmail(input: {
+  to: string;
+  name: string | null;
+  senha: string;
+  link: string;
+  novaConta: boolean;
+  /** Nome da oferta comprada, quando o webhook trouxe. */
+  plano?: string | null;
+}): Promise<void> {
+  const { to, name, senha, link, novaConta, plano } = input;
+
+  const abertura = novaConta
+    ? "Sua assinatura foi confirmada e sua conta na Aura Finanças já está pronta."
+    : "Sua assinatura foi confirmada. Como você já tinha uma conta aqui, geramos uma senha " +
+      "provisória nova para ela — a anterior deixou de valer.";
+
+  const detalhePlano = plano ? ` Plano: ${plano}.` : "";
+
+  await sendMail({
+    to,
+    subject: "Seu acesso à Aura Finanças",
+    text: [
+      greeting(name),
+      "",
+      abertura + detalhePlano,
+      "",
+      "Entre com estes dados:",
+      `E-mail: ${to}`,
+      `Senha provisória: ${senha}`,
+      "",
+      link,
+      "",
+      "Troque a senha no primeiro acesso, em Meu perfil. Enquanto não trocar, ela continua " +
+        "valendo — e continua nesta caixa de entrada.",
+    ].join("\n"),
+    html: layout({
+      title: novaConta ? "Sua conta está pronta" : "Seu acesso foi renovado",
+      body: [
+        paragraph(greeting(name)),
+        paragraph(escapeHtml(abertura + detalhePlano)),
+        `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0;width:100%;background:#f5f5f5;border-radius:12px;">
+           <tr><td style="padding:16px 18px;">
+             <p style="margin:0 0 4px 0;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#737373;">E-mail</p>
+             <p style="margin:0 0 14px 0;font-size:14px;font-weight:600;">${escapeHtml(to)}</p>
+             <p style="margin:0 0 4px 0;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#737373;">Senha provisória</p>
+             <p style="margin:0;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:22px;font-weight:700;letter-spacing:0.06em;">${escapeHtml(senha)}</p>
+           </td></tr>
+         </table>`,
+        `<p style="margin:20px 0;">
+           <a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 20px;background:#171717;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:10px;">Entrar na minha conta</a>
+         </p>`,
+        paragraph(
+          "Troque a senha no primeiro acesso, em <strong>Meu perfil</strong>. Enquanto não trocar, " +
+            "ela continua valendo — e continua nesta caixa de entrada.",
+        ),
+        `<p style="margin:0;font-size:12px;word-break:break-all;color:#737373;">${escapeHtml(link)}</p>`,
+      ].join("\n"),
+      footer:
+        "Você está recebendo esta mensagem porque uma assinatura foi confirmada para este " +
+        "endereço. Se não foi você, procure quem administra o app.",
+    }),
+  });
+}

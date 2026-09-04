@@ -1,0 +1,115 @@
+{
+  "secret": "segredo-de-teste",
+  "event": "purchase_approved",
+  "data": [
+    {
+      "id": "cc289a4a-be36-6ced-b3fc-51ed5ba60619",
+      "refId": "4HSuUHa",
+      "customer": {
+        "id": 8239121,
+        "name": "Cliente de Teste",
+        "email": "cliente@exemplo.com",
+        "birthDate": null,
+        "phone": "5511999999999",
+        "docType": "cpf",
+        "docNumber": "00000000000"
+      },
+      "address": null,
+      "shipping": null,
+      "affiliate": "",
+      "offer": {
+        "id": "3359jgv",
+        "image": null,
+        "name": "Teste",
+        "price": 5,
+        "currency": "BRL"
+      },
+      "offer_type": "main",
+      "product": {
+        "name": "Dashboard de Finanças e Projetos",
+        "id": "9d0d209d-8ae0-f165-27c9-bafd6e5a0dbe",
+        "short_id": "Bp2ay5P",
+        "supportEmail": "suporte@exemplo.com",
+        "type": "subscription",
+        "invoiceDescription": "Dashboard de Projetos e Finanças"
+      },
+      "checkout": 1081722,
+      "parent_order": "",
+      "subscription": {
+        "id": "65355926-86ad-5da3-998a-57f91121efd8",
+        "status": "inactive",
+        "current_period": 1,
+        "recurrence_period": 30,
+        "quantity_recurrences": -1,
+        "trial_days": 0,
+        "max_retries": 3,
+        "amount": "5.00",
+        "retry_interval": 1,
+        "paid_payments_quantity": 1,
+        "retention": "00:00:25.397301",
+        "parent_order": "cc289a4a-be36-6ced-b3fc-51ed5ba60619",
+        "paymentMethod": "pix",
+        "customer": {
+          "name": "Cliente de Teste",
+          "email": "cliente@exemplo.com",
+          "phone": "5511999999999",
+          "birthDate": null,
+          "docNumber": "00000000000",
+          "docType": "cpf"
+        },
+        "product": "9d0d209d-8ae0-f165-27c9-bafd6e5a0dbe",
+        "offer": "3359jgv",
+        "orders": [
+          "cc289a4a-be36-6ced-b3fc-51ed5ba60619"
+        ],
+        "next_payment_date": null,
+        "createdAt": "2026-09-03T19:41:16.695697-03:00",
+        "updatedAt": "2026-09-03T19:41:16.698702-03:00",
+        "canceledAt": null
+      },
+      "subscription_period": 1,
+      "checkoutUrl": "https://pay.cakto.com.br/3359jgv",
+      "status": "paid",
+      "baseAmount": 5,
+      "discount": "0.00",
+      "amount": 5.99,
+      "commissions": [
+        {
+          "user": "produtor@exemplo.com",
+          "totalAmount": 2.51,
+          "percentage": 100,
+          "type": "producer"
+        }
+      ],
+      "couponCode": null,
+      "reason": null,
+      "refund_reason": null,
+      "paymentMethod": "pix",
+      "paymentMethodName": "PIX",
+      "installments": 1,
+      "fees": 2.49,
+      "charged_fees": "0.99",
+      "additionalInstallmentInterest": "0.00",
+      "interest": null,
+      "utm_source": null,
+      "utm_medium": null,
+      "utm_campaign": null,
+      "utm_term": null,
+      "utm_content": null,
+      "sck": null,
+      "fbc": null,
+      "fbp": "fb.2.1788395940918.84443746108241765",
+      "createdAt": "2026-09-03T19:41:13.755989-03:00",
+      "due_date": null,
+      "paidAt": "2026-09-03T19:41:42.092998-03:00",
+      "refundedAt": null,
+      "chargedbackAt": null,
+      "canceledAt": null,
+      "pix": {
+        "qrCode": "00020101021226810014br.gov.bcb.pix-CODIGO-DE-TESTE-6304FFFF",
+        "user_journey": null,
+        "expirationDate": "2026-09-03 23:41:16.506154+00:00"
+      }
+    }
+  ]
+}

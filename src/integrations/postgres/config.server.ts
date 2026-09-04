@@ -533,3 +533,148 @@ export function getSessionCookieName(): string {
 export function getSessionTtlDays(): number {
   return readInt("SESSION_TTL_DAYS", 30);
 }
+
+/**
+ * Assinaturas na Cakto.
+ *
+ * A integração tem duas metades independentes, e é de propósito que elas se
+ * configurem separado:
+ *
+ *   - `CAKTO_WEBHOOK_SECRET` é a metade *obrigatória*. É por webhook que a
+ *     Cakto avisa que alguém comprou, renovou ou cancelou, e é dele que sai o
+ *     estado gravado em `app_users.status_plano`.
+ *   - `CAKTO_CLIENT_ID`/`CAKTO_CLIENT_SECRET` são a metade opcional: servem
+ *     para o app *perguntar* algo à Cakto (hoje, testar a conexão a partir do
+ *     painel do super admin). Sem elas o acesso continua funcionando — só o
+ *     botão de teste some.
+ */
+export type CaktoSettings = {
+  webhookSecret: string;
+  clientId: string | undefined;
+  clientSecret: string | undefined;
+  /** Base da API pública. Existe como variável para o teste apontar a um servidor local. */
+  apiBaseUrl: string;
+};
+
+export function getCaktoSettings(): CaktoSettings {
+  const webhookSecret = readEnv("CAKTO_WEBHOOK_SECRET");
+  if (!webhookSecret) {
+    throw new Error(
+      "Integração com a Cakto não configurada. Defina CAKTO_WEBHOOK_SECRET com o mesmo " +
+        "segredo cadastrado no webhook do painel da Cakto — veja .env.example.",
+    );
+  }
+
+  return {
+    webhookSecret,
+    clientId: readEnv("CAKTO_CLIENT_ID"),
+    clientSecret: readEnv("CAKTO_CLIENT_SECRET"),
+    apiBaseUrl: (readEnv("CAKTO_API_BASE_URL") ?? "https://api.cakto.com.br").replace(/\/+$/, ""),
+  };
+}
+
+/** O painel usa isto para explicar por que a assinatura não está de pé. */
+export function isCaktoConfigured(): boolean {
+  try {
+    getCaktoSettings();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** A API pública só entra em cena com as duas credenciais de OAuth. */
+export function isCaktoApiConfigured(): boolean {
+  try {
+    const { clientId, clientSecret } = getCaktoSettings();
+    return !!clientId && !!clientSecret;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Liga a trava de acesso por assinatura.
+ *
+ * Nasce **desligada**, e isso não é descuido: subir uma versão que fecha o app
+ * para todo mundo antes de a Cakto estar cadastrando os status trancaria os
+ * usuários existentes para fora dos próprios dados. O caminho é aplicar o
+ * schema, apontar o webhook, conferir no painel do super admin que os status
+ * estão chegando, e só então ligar `CAKTO_EXIGIR_ASSINATURA=true`.
+ *
+ * Com a trava desligada nada mais muda: os webhooks continuam sendo recebidos e
+ * gravados, e o painel do super admin continua funcionando.
+ */
+export function isPlanoObrigatorio(): boolean {
+  return readBool("CAKTO_EXIGIR_ASSINATURA", false);
+}
+
+/**
+ * Folga, em dias, depois do fim do período pago.
+ *
+ * Cobre a distância entre a data de renovação e a chegada do webhook. Sem ela,
+ * todo assinante em dia perderia o app por algumas horas a cada ciclo.
+ */
+export function getPlanoToleranciaDias(): number {
+  return readInt("CAKTO_TOLERANCIA_DIAS", 3);
+}
+
+/**
+ * Criar a conta e mandar a senha por e-mail quando uma assinatura nasce.
+ *
+ * Ligado por padrão, mas só age com SMTP configurado: criar uma conta cuja
+ * senha ninguém consegue receber deixaria a pessoa trancada do lado de fora com
+ * a compra paga — pior do que não criar conta nenhuma.
+ */
+export function isProvisionamentoAtivo(): boolean {
+  return readBool("CAKTO_PROVISIONAR_ACESSO", true) && isSmtpConfigured();
+}
+
+/**
+ * Carência da inadimplência, em dias.
+ *
+ * Uma renovação recusada não encerra a assinatura: a Cakto tenta de novo. Os
+ * webhooks reais trazem a política dela no corpo — `max_retries: 3` com
+ * `retry_interval: 1` —, então o padrão aqui é justamente essa janela. Cortar o
+ * acesso na primeira recusa tiraria o app de quem vai pagar no dia seguinte.
+ */
+export function getPlanoDiasCarencia(): number {
+  return readInt("CAKTO_DIAS_CARENCIA", 3);
+}
+
+/**
+ * Quem foi convidado para a conta de um assinante entra junto.
+ *
+ * O plano é por pessoa, mas o dado é da conta: bloquear o cônjuge convidado
+ * para a conta da família seria cobrar duas assinaturas pelo mesmo orçamento.
+ * `false` exige assinatura própria de cada pessoa, inclusive das convidadas.
+ */
+export function isAcessoHerdadoPorConvite(): boolean {
+  return readBool("CAKTO_ACESSO_HERDADO", true);
+}
+
+/**
+ * E-mails que entram no painel de super admin independentemente da coluna
+ * `is_super_admin`.
+ *
+ * Resolve o problema do primeiro acesso: a coluna nasce `false` para todo
+ * mundo, e sem esta lista não haveria por onde promover o primeiro
+ * administrador a não ser por SQL na mão. Quem está aqui é promovido no banco
+ * no primeiro login, para que o painel mostre o mesmo que a lista diz.
+ */
+export function getSuperAdminEmails(): string[] {
+  const raw = readEnv("SUPER_ADMIN_EMAILS");
+  if (!raw) return [];
+  return raw
+    .split(/[,\s;]+/)
+    .map((email) => email.trim().toLowerCase())
+    .filter((email) => email.includes("@"));
+}
+
+/**
+ * Endereço do checkout da oferta principal, mostrado a quem está sem acesso.
+ * Sem ele a tela de bloqueio explica a situação, mas sem botão de compra.
+ */
+export function getCaktoCheckoutUrl(): string | undefined {
+  return readEnv("CAKTO_CHECKOUT_URL");
+}
