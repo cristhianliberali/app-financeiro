@@ -183,8 +183,15 @@ export function AppShell({
       </Sheet>
 
       <main className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-background/85 px-4 py-3 backdrop-blur-xl lg:px-8">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
+        {/*
+          O cabeçalho tem três blocos e, no celular, duas faixas: identificação
+          (menu e seletores) e avisos ficam na primeira; as ações da tela caem
+          inteiras para a segunda. Deixar tudo numa faixa só de `flex-wrap`
+          quebrava o grupo de ações no meio e encalhava o sino sozinho ao lado
+          de dois níveis de botões — a faixa própria é o que mantém a leitura.
+        */}
+        <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-background/85 px-4 py-3 backdrop-blur-xl lg:px-8">
+          <div className="flex min-w-0 items-center gap-2">
             <button
               onClick={() => setMenuOpen(true)}
               className="rounded-xl border border-border p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:hidden"
@@ -260,12 +267,12 @@ export function AppShell({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex min-w-0 items-center gap-2">
             <ActiveTimerBar />
             {/* Os lembretes de tarefa também alcançam quem está no Finanças. */}
             <NotificationBell />
-            {actions}
           </div>
+          {actions && <div className="w-full lg:w-auto">{actions}</div>}
         </header>
         <div className="mx-auto max-w-7xl space-y-6 p-4 lg:p-8">
           {/*

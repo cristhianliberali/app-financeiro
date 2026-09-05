@@ -188,20 +188,42 @@ function Dashboard() {
           As mesmas ações do centro de transações, aqui em cima: o dashboard é
           onde o dia começa, e mandar alguém trocar de tela só para abrir as
           recorrências ou importar uma fatura é um desvio sem motivo.
+
+          No celular as quatro não cabem lado a lado com rótulo, e deixá-las
+          quebrar em duas alturas desmontava o cabeçalho. As duas de apoio ficam
+          só com o ícone até `sm`; as duas de lançamento mantêm o rótulo e
+          dividem o que sobra da linha, que é o que a pessoa toca todo dia.
         */
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => setRecurringOpen(true)}>
-            <Repeat /> Recorrentes
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="px-2 sm:px-3"
+            aria-label="Recorrentes"
+            title="Recorrentes"
+            onClick={() => setRecurringOpen(true)}
+          >
+            <Repeat /> <span className="hidden sm:inline">Recorrentes</span>
           </Button>
-          <Button size="sm" variant="outline" asChild>
-            <Link to="/importar">
-              <FileScan /> Importar com IA
+          <Button size="sm" variant="outline" className="px-2 sm:px-3" asChild>
+            <Link to="/importar" aria-label="Importar com IA" title="Importar com IA">
+              <FileScan /> <span className="hidden sm:inline">Importar com IA</span>
             </Link>
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setDialog("income")}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 sm:flex-none"
+            onClick={() => setDialog("income")}
+          >
             <Plus /> Receita
           </Button>
-          <Button size="sm" variant="brand" onClick={() => setDialog("expense")}>
+          <Button
+            size="sm"
+            variant="brand"
+            className="flex-1 sm:flex-none"
+            onClick={() => setDialog("expense")}
+          >
             <Plus /> Despesa
           </Button>
         </div>

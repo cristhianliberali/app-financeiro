@@ -287,19 +287,28 @@ function TransactionsPage() {
   return (
     <AppShell
       actions={
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => setRecurringOpen(true)}>
-            <Repeat /> Recorrentes
+        /* Mesmo arranjo do dashboard: apoio só com ícone no celular. */
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="px-2 sm:px-3"
+            aria-label="Recorrentes"
+            title="Recorrentes"
+            onClick={() => setRecurringOpen(true)}
+          >
+            <Repeat /> <span className="hidden sm:inline">Recorrentes</span>
           </Button>
           {/* A importação é tela, não janela: ela guarda a revisão em aberto. */}
-          <Button size="sm" variant="outline" asChild>
-            <Link to="/importar">
-              <FileScan /> Importar com IA
+          <Button size="sm" variant="outline" className="px-2 sm:px-3" asChild>
+            <Link to="/importar" aria-label="Importar com IA" title="Importar com IA">
+              <FileScan /> <span className="hidden sm:inline">Importar com IA</span>
             </Link>
           </Button>
           <Button
             size="sm"
             variant="outline"
+            className="flex-1 sm:flex-none"
             onClick={() => {
               setEditing(null);
               setDialog("income");
@@ -309,6 +318,7 @@ function TransactionsPage() {
           </Button>
           <Button
             size="sm"
+            className="flex-1 sm:flex-none"
             onClick={() => {
               setEditing(null);
               setDialog("expense");
